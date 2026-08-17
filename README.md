@@ -105,17 +105,55 @@ butoanelor se dezactiveaza. `prefers-reduced-motion` opreste tot ce misca.
 
 ---
 
-## 5. Ce mai trebuie facut inainte de lansare
+## 5. Date reale, imagine de share, ce mai lipseste
 
-1. **Date reale**: `stats`, feed-ul si terminalele sunt statice. Cel mai simplu
-   traseu e un endpoint care intoarce JSON si un `fetch` care rescrie
-   `data-odo` inainte de `initOdo`.
-2. **Formularul** din sertarul "Early access" nu are server: pregateste un email
+### Cifrele
+
+`js/live.js` e stratul de date. Se configureaza in `content.js` -> `SITE.live`:
+
+- **`endpoint`**: pui acolo un URL care intoarce JSON-ul de mai jos si cifrele
+  din banda, feed-ul din hero si randul de sub hero se iau de acolo, la fiecare
+  `refreshMs`. Cat timp e gol (implicit) nu iese nicio cerere si raman cifrele
+  scrise in `content.js`.
+
+  ```json
+  {
+    "stats": { "jobs": 204118, "paid": 3311.4, "agents": 4907 },
+    "feed":  ["RINGER #0204 · CLOCK IN · +0.412 ETH"],
+    "meta":  "POT 91% FULL · NEXT CLOCK IN ~3 MIN"
+  }
+  ```
+
+  Cheile din `stats` sunt `SITE.stats[].key`. Orice camp lipsa e ignorat, deci
+  poti intoarce doar ce ai. Exemplu complet in `api/stats.sample.json`; ca sa
+  vezi ca merge, pui `endpoint: 'api/stats.sample.json'` si reincarci.
+
+- **`ethPrice`**: pretul ETH/USD de la Coinbase, public, fara cheie, cu CORS
+  deschis, deci merge dintr-un site static. E **singura cifra reala** din
+  pagina acum. Punctul de langa el se face verde cand pretul urca si rosu cand
+  scade. Daca cererea pica, chipul dispare si nimic nu se strica.
+
+Restul cifrelor (jobs, ETH platit, agenti online, feed, terminale, `POT 68%`)
+sunt inventate pana pui `endpoint`.
+
+### Imaginea de share
+
+`assets/og.jpg` (1200x630) e generata din **`og.html`**. Ca sa o refaci:
+deschizi `og.html` in browser, faci o captura a dreptunghiului de 1200x630 din
+coltul stanga-sus si o salvezi peste `assets/og.jpg`. Meta-urile `og:` si
+`twitter:` sunt deja in `index.html` si pointeaza catre
+`https://stonk.grappes.dev/assets/og.jpg`. `og.html` e blocat cu 404 in
+`nginx.conf`, deci nu ajunge pagina publica.
+
+### Ce mai lipseste
+
+1. **Formularul** din sertarul "Early access" nu are server: pregateste un email
    si deschide clientul de mail. Pentru trimitere reala ai nevoie de Formspree,
    Web3Forms sau un backend propriu.
-3. **Linkuri**: docs, contract, X, Discord sunt `#` in `content.js`.
-4. **OG image** si `og:`/`twitter:` meta pentru cand se da link pe X.
-5. **Conectarea la wallet** si mintul propriu-zis: pagina e doar prezentare.
+2. **Linkuri**: docs, contract, X, Discord sunt `#` in `content.js`.
+3. **Conectarea la wallet** si mintul propriu-zis: pagina e doar prezentare.
+4. **Trasaturile** din sectiunea de raritate sunt rolate in browser, doar ca
+   demonstratie. Cand exista contractul, `initRoller` citeste de acolo.
 
 ---
 
@@ -139,5 +177,24 @@ stonk-agents/
 
 ## 7. Publicare
 
-Site static: merge pe orice gazduire (Coolify cu un container de nginx, Cloudflare
-Pages, GitHub Pages). Urci folderul asa cum e.
+LIVE pe **https://stonk.grappes.dev**, pe Coolify (Netcup), ca site static
+servit de nginx.
+
+| | |
+| --- | --- |
+| repo | `git@github.com:grappesai-cloud/stonk-agents.git`, ramura `main` |
+| proiect Coolify | Stonk Agents, `h13n1pb2h5cslwi6vilj455v` |
+| aplicatie | `l8zhwpnb6qknb82sn667pvdy`, build pack `dockerfile`, port expus `80` |
+| cheie de deploy | `stonk-agents-deploy` in Coolify, publica adaugata pe repo |
+| DNS | `stonk` A -> `159.195.82.196` in Cloudflare (adaugat de mana, grappes.dev nu are wildcard si nu exista token API) |
+
+Deploy dupa un push (de pe server, tokenul e in `/root/.coolify-cli-token`):
+
+```bash
+ssh root@100.70.161.75 'T=$(cat /root/.coolify-cli-token); \
+  curl -s -H "Authorization: Bearer $T" \
+  "http://localhost:8000/api/v1/deploy?uuid=l8zhwpnb6qknb82sn667pvdy"'
+```
+
+Fiind static, merge la fel de bine si pe Cloudflare Pages sau GitHub Pages:
+urci folderul asa cum e.
