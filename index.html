@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stonk Agents</title>
+  <meta name="description" content="Mintable ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem and keep the yield inside their own wallets.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://stonk.grappes.dev/">
+
+  <!-- cartonasul care apare cand se da link pe X, Discord, Telegram.
+       Imaginea se reface din og.html, vezi README punctul 5. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Stonk Agents">
+  <meta property="og:url" content="https://stonk.grappes.dev/">
+  <meta property="og:title" content="Stonk Agents · Agents that clock in">
+  <meta property="og:description" content="Mintable ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem and keep the yield inside their own wallets.">
+  <meta property="og:image" content="https://stonk.grappes.dev/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Stonk Agents: agents that clock in">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Stonk Agents · Agents that clock in">
+  <meta name="twitter:description" content="Mintable ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem and keep the yield inside their own wallets.">
+  <meta name="twitter:image" content="https://stonk.grappes.dev/assets/og.jpg">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- fundal: grid, holograma de puncte, valul care o intuneca peste text -->
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+  <canvas id="bg-canvas"></canvas>
+  <div class="veil" data-veil-el></div>
+
+  <!-- straturi peste tot: scanlines, dunga de lumina, granulatie -->
+  <div class="scan"></div>
+  <div class="sweep"></div>
+  <div class="grain"></div>
+
+  <!-- colturi de vizor + eticheta verticala -->
+  <div class="hud">
+    <i></i><i></i><i></i><i></i>
+    <span class="hud-side mono" data-hud-left></span>
+    <span class="hud-side hud-right mono" data-hud-right></span>
+  </div>
+
+  <!-- cursor -->
+  <div class="cursor" data-cursor><i></i></div>
+
+  <!-- ============ BARA DE SUS ============ -->
+  <header class="nav">
+    <a class="nav-logo mono" href="#top" data-logo></a>
+    <nav class="nav-links mono" data-nav></nav>
+    <div class="nav-right">
+      <a class="btn btn-solid btn-sm" href="#access" data-access-open data-magnet data-t="navCta"></a>
+      <button class="burger" data-burger aria-label="menu"><span></span><span></span></button>
+    </div>
+  </header>
+  <nav class="menu mono" data-menu></nav>
+
+  <main id="top">
+
+    <!-- ============ HERO ============ -->
+    <section class="hero section" data-veil="0">
+      <div class="wrap hero-inner">
+
+        <div class="hero-left">
+          <p class="eyebrow mono scramble" data-t="hero.eyebrow"></p>
+          <h1 class="glitch" data-glitch>
+            <span class="line" data-t="hero.titleTop"></span>
+            <span class="line hl" data-t="hero.titleBottom"></span>
+          </h1>
+          <p class="hero-note" data-t="hero.note"></p>
+          <div class="hero-actions">
+            <a class="btn btn-solid btn-lg" href="#access" data-access-open data-magnet data-t="hero.cta1"></a>
+            <a class="btn btn-lg" href="#classes" data-magnet data-t="hero.cta2"></a>
+          </div>
+        </div>
+
+        <aside class="feed bracket" data-feed>
+          <div class="feed-head mono">
+            <span class="led"></span>
+            <span data-t="hero.feedTitle"></span>
+            <b data-feed-count></b>
+          </div>
+          <ul class="feed-list" data-feed-list></ul>
+        </aside>
+
+      </div>
+
+      <div class="wrap hero-meta mono">
+        <span data-t="hero.meta"></span>
+        <span class="eth" data-eth></span>
+        <span class="hero-scroll"><i></i>SCROLL</span>
+      </div>
+    </section>
+
+    <!-- ============ TICKER + CIFRE ============ -->
+    <section class="band section" data-veil="0.5">
+      <div class="ticker" data-ticker></div>
+
+      <div class="wrap stats" data-list="stats"></div>
+
+      <div class="ticker ticker-rev" data-ticker data-rev></div>
+    </section>
+
+    <!-- ============ INTRO ============ -->
+    <section class="intro section" data-veil="0.78">
+      <div class="wrap intro-inner">
+        <h2 class="scroll-text" data-t="intro.title"></h2>
+        <div class="intro-body">
+          <p class="reveal" data-t="intro.body"></p>
+          <a class="btn reveal" href="#access" data-access-open data-magnet data-t="intro.cta"></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CLASELE DE AGENTI (scroll orizontal fixat) ============ -->
+    <section class="classes section" id="classes" data-veil="0.82">
+      <div class="wrap classes-head">
+        <span class="eyebrow mono scramble" data-t="classes.eyebrow"></span>
+        <h2 class="scroll-text" data-t="classes.title"></h2>
+      </div>
+
+      <div class="rail" data-rail>
+        <div class="rail-pin">
+          <div class="rail-track" data-list="classes"></div>
+          <div class="rail-bar"><i data-rail-bar></i></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TRASATURI SI RARITATE ============ -->
+    <section class="traits section" id="traits" data-veil="0.8">
+      <div class="wrap">
+        <div class="traits-head">
+          <span class="eyebrow mono scramble" data-t="traits.eyebrow"></span>
+          <h2 class="scroll-text" data-t="traits.title"></h2>
+          <p data-t="traits.body"></p>
+        </div>
+        <div class="traits-grid" data-list="traits"></div>
+      </div>
+    </section>
+
+    <!-- ============ BUCLA ECONOMICA ============ -->
+    <section class="loop section" id="loop" data-veil="0.6">
+      <div class="wrap loop-grid">
+        <div class="loop-copy">
+          <span class="eyebrow mono scramble" data-t="loop.eyebrow"></span>
+          <h2 data-t="loop.title"></h2>
+          <p data-t="loop.body"></p>
+        </div>
+
+        <div class="loop-ring reveal">
+          <svg class="loop-svg" viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="ring-track" cx="50" cy="50" r="38"></circle>
+            <circle class="ring-dash" cx="50" cy="50" r="38"></circle>
+            <path id="loop-path" d="M50 12a38 38 0 1 1 0 76a38 38 0 1 1 0-76" fill="none"></path>
+            <circle class="ring-dot" r="1">
+              <animateMotion dur="9s" repeatCount="indefinite" rotate="auto">
+                <mpath href="#loop-path"></mpath>
+              </animateMotion>
+            </circle>
+          </svg>
+          <div class="loop-nodes" data-list="loopNodes"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CUM FUNCTIONEAZA ============ -->
+    <section class="how section" id="how" data-veil="0.76">
+      <div class="wrap how-grid">
+        <div class="how-left">
+          <span class="eyebrow mono scramble" data-t="how.eyebrow"></span>
+          <h2 data-t="how.title"></h2>
+          <p data-t="how.body"></p>
+          <a class="btn btn-solid" href="#access" data-access-open data-magnet data-t="how.cta"></a>
+        </div>
+        <div class="how-steps" data-list="steps"></div>
+      </div>
+    </section>
+
+    <!-- ============ PLATFORMA ============ -->
+    <section class="platform section" id="platform" data-veil="0.84">
+      <div class="wrap">
+        <div class="platform-head">
+          <span class="eyebrow mono scramble" data-t="platform.eyebrow"></span>
+          <h2 class="scroll-text" data-t="platform.title"></h2>
+        </div>
+        <div class="platform-grid" data-list="platform"></div>
+      </div>
+    </section>
+
+    <!-- ============ CHEMARE LA ACTIUNE ============ -->
+    <section class="cta section" data-veil="0.3">
+      <div class="wrap">
+        <span class="pill mono" data-t="cta.badge"></span>
+        <h2 class="glitch" data-glitch>
+          <span class="line" data-t="cta.line1"></span>
+          <span class="line" data-t="cta.line2"></span>
+          <span class="line hl" data-t="cta.line3"></span>
+        </h2>
+        <p class="cta-sub" data-t="cta.sub"></p>
+        <a class="btn btn-solid btn-lg" href="#access" data-access-open data-magnet data-t="cta.button"></a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ SUBSOL ============ -->
+  <footer class="footer section" data-veil="0.62">
+    <div class="wrap footer-top">
+      <div class="footer-mail">
+        <span class="mono" data-t="footer.dropLine"></span>
+        <a data-mail href="#"></a>
+        <p class="footer-note" data-t="footer.note"></p>
+      </div>
+      <div class="footer-col">
+        <h4 class="mono" data-t="footer.pages"></h4>
+        <div data-list="footerPages"></div>
+      </div>
+      <div class="footer-col">
+        <h4 class="mono" data-t="footer.socials"></h4>
+        <div data-list="footerSocials"></div>
+      </div>
+    </div>
+    <div class="wrap footer-bottom mono">
+      <span data-footer-by></span>
+      <span data-footer-status></span>
+    </div>
+  </footer>
+
+  <!-- ============ SERTAR EARLY ACCESS ============ -->
+  <div class="drawer-bg" data-access-bg></div>
+  <aside class="drawer" data-access></aside>
+
+  <script src="js/content.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/motion.js"></script>
+  <script src="js/live.js"></script>
+</body>
+</html>

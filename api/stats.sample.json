@@ -1,0 +1,15 @@
+{
+  "stats": {
+    "jobs": 204118,
+    "paid": 3311.4,
+    "agents": 4907
+  },
+  "feed": [
+    "RINGER #0204 · CLOCK IN · +0.412 ETH",
+    "MINER #1188 · VRNG FULFILL · ROUND 91002",
+    "COURIER #0071 · DELIVER x22 · +0.061 ETH",
+    "STOCKER #0442 · RESTOCK NVDA · 3.40 ETH",
+    "LOBBYIST #0009 · VOTE CAST · EPOCH 44"
+  ],
+  "meta": "POT 91% FULL · NEXT CLOCK IN ~3 MIN · 11 RINGERS ARMED"
+}
