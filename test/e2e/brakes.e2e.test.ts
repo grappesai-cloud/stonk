@@ -138,3 +138,30 @@ describe('franele', () => {
     ctx.ledger.close()
   }, 60_000)
 })
+
+describe('fara contract de lot', () => {
+  it('modul profit refuza sa livreze orbeste, si spune ce ai de facut', async () => {
+    const ctx = await freshCtx({
+      execution: { dryRun: false, batchContract: null },
+      policy: { mode: 'profit', cooldownSec: 0 }
+    })
+    const o = await runOnce(ctx)
+    expect(o.delivered).toBe(0)
+    expect(o.stoppedBy).toMatch(/bacsis masurat/)
+    expect(o.stoppedBy).toMatch(/CourierBatch/)
+    ctx.ledger.close()
+  }, 60_000)
+
+  it('o tranzactie duce exact o livrare, ca registrul sa nu minta', async () => {
+    const ctx = await freshCtx({
+      execution: { dryRun: false, batchContract: null },
+      policy: { mode: 'campaign', cooldownSec: 0, batchSize: 10 }
+    })
+    const o = await runOnce(ctx)
+    expect(o.delivered).toBe(BROKERS)
+    // cate livrari, atatea tranzactii: nicio livrare inregistrata fara acoperire
+    const rows = ctx.ledger.recentDeliveries(100)
+    expect(new Set(rows.map((r) => r.txHash)).size).toBe(BROKERS)
+    ctx.ledger.close()
+  }, 90_000)
+})

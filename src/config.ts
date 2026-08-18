@@ -114,6 +114,13 @@ export const ConfigSchema = z.object({
     minTipWei: zBig.default(0n),
     /** bacsis >= gaz * multiplu, altfel livrarea nu merita */
     profitMultiple: z.number().min(0).default(1.5),
+    /**
+     * In modul profit, refuza sa livreze cand bacsisul nu poate fi masurat
+     * inainte (adica fara contract de lot). Altfel frana de rentabilitate ar
+     * exista in configurare dar nu s-ar aplica niciodata, ceea ce e mai rau
+     * decat sa nu existe.
+     */
+    requireMeasuredTips: z.boolean().default(true),
     cooldownSec: z.number().int().min(0).default(3600),
     maxDeliveriesPerRun: z.number().int().positive().default(250),
     batchSize: z.number().int().positive().default(25),

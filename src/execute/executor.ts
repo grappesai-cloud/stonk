@@ -99,7 +99,13 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     return out
   }
 
-  const chunks = chunk(claims, cfg.policy.batchSize)
+  /**
+   * Fara contract de lot, o tranzactie duce o singura livrare. Daca am grupa
+   * oricum, am scrie in registru N livrari trimise pentru o tranzactie care a
+   * facut una singura, si toata socoteala de mai tarziu ar fi falsa.
+   */
+  const perTx = cfg.execution.batchContract ? cfg.policy.batchSize : 1
+  const chunks = chunk(claims, perTx)
   const dayStart = Math.floor(Date.now() / 1000) - 86400
   let spentToday = ledger.gasSpentSince(dayStart)
 
@@ -123,6 +129,19 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     }
 
     // 3. rentabilitate, pe lot
+    if (cfg.policy.mode === 'profit' && !sim.tipsMeasured && cfg.policy.requireMeasuredTips) {
+      const detail =
+        'modul profit cere bacsis masurat, dar nu exista contract de lot. ' +
+        'Desfasoara CourierBatch, sau treci pe modul campanie, sau pune requireMeasuredTips pe false si accepta ca livrezi orbeste.'
+      out.stoppedBy = detail
+      for (const c of group) {
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', detail))
+        out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail })
+      }
+      log.error(detail)
+      break
+    }
+
     const verdict = decideProfit({ tipWei: sim.tipsWei, gasCostWei: sim.gasCostWei, cfg })
     if (!verdict.go && sim.tipsMeasured) {
       for (const c of group) {
@@ -254,9 +273,10 @@ async function send(
     })
   }
 
-  // fara contract de lot: o singura livrare pe tranzactie
+  // fara contract de lot: exact o livrare, garantat, pentru ca lotul are unul
   const first = sim.claims[0]
   if (!first) throw new Error('lot gol')
+  if (sim.claims.length > 1) throw new Error('fara contract de lot nu se pot trimite mai multe livrari intr-o tranzactie')
   return wallet.sendTransaction({
     account,
     chain: wallet.chain,
