@@ -252,6 +252,35 @@ structura cu patru campuri, nu un numar. In configurare se scrie
 si merge cu orice contract. Locuri goale: `$tokenId`, `$wallet`, `$owner`,
 `$max128`, `$max256`, `$zero`, plus orice sir de cifre care devine numar intreg.
 
+## Cat costa o livrare, masurat
+
+`npx tsx scripts/economics.ts 60` forkeaza 4663, livreaza in loturi de marimi
+diferite si masoara gazul consumat pe stare de productie, la pretul real de
+acolo. Rulat pe 19 august 2026:
+
+| livrari pe tranzactie | cost pe livrare (ETH) |
+|---|---|
+| 1 | 0.000149 |
+| 5 | 0.000046 |
+| 10 | 0.000038 |
+| 25 | 0.000035 |
+| 50 | 0.000031 |
+
+**Gruparea taie 79% din cost.** Dar castigul se aplatizeaza: de la 25 la 50 mai
+scazi doar 12%, fiindca partea fixa a tranzactiei e deja impartita la destui.
+Peste acolo cresti doar riscul unui lot picat, nu si castigul. De aia
+`batchSize` implicit e 25.
+
+Doua concluzii pentru proiect, nu pentru cod:
+
+- **bacsisul trebuie sa treaca de ~0.00003 ETH pe livrare** ca sa iasa pe zero,
+  la lot de 50. Orice peste asta e profit.
+- la costul asta, **campania de livrari gratuite dinainte de mint e practic
+  gratuita**. O mie de livrari costa cat o cafea.
+
+Contractul de proba nu e cel de la StonkBrokers, deci cifra absoluta se va
+schimba cu al lor. Curba de grupare nu.
+
 ## Proba pe date reale
 
 Testele cap-coada ruleaza pe un lant local, deci dovedesc logica. Asta dovedeste
