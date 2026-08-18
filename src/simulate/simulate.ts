@@ -21,6 +21,7 @@ import {
 import { abiOf, type Config } from '../config.js'
 import { functionNameOf } from '../chain/reader.js'
 import { pool } from '../chain/client.js'
+import { resolveArgs, templateFrom } from '../args.js'
 import type { Claim } from '../scan/claims.js'
 
 export const BATCH_ABI = [
@@ -64,11 +65,15 @@ export interface BatchSim {
   tipsMeasured: boolean
 }
 
+export function deliverArgsOf(cfg: Config, claim: Claim, owner?: Address | null): unknown[] {
+  const template = templateFrom(cfg.drops.deliverArg, cfg.drops.deliverArgs)
+  return resolveArgs(template, { tokenId: claim.tokenId, wallet: claim.wallet, owner })
+}
+
 export function deliverCalldata(cfg: Config, claim: Claim): Hex {
   const abi = abiOf(cfg.drops.deliverSignature, 'drops.deliverSignature') as Abi
   const fn = functionNameOf(abi)
-  const arg = cfg.drops.deliverArg === 'wallet' ? claim.wallet : claim.tokenId
-  return encodeFunctionData({ abi, functionName: fn, args: [arg] })
+  return encodeFunctionData({ abi, functionName: fn, args: deliverArgsOf(cfg, claim) as never })
 }
 
 /**
@@ -104,9 +109,14 @@ export async function simulateEach(
   const fn = functionNameOf(abi)
   return pool(claims, concurrency, async (claim) => {
     const data = deliverCalldata(cfg, claim)
-    const arg = cfg.drops.deliverArg === 'wallet' ? claim.wallet : claim.tokenId
     try {
-      await client.simulateContract({ address: cfg.drops.address, abi, functionName: fn, args: [arg], account: from })
+      await client.simulateContract({
+        address: cfg.drops.address,
+        abi,
+        functionName: fn,
+        args: deliverArgsOf(cfg, claim) as never,
+        account: from
+      })
       let gas = 0n
       try {
         gas = await client.estimateGas({ account: from, to: cfg.drops.address, data })

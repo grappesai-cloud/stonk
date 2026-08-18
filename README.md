@@ -220,6 +220,38 @@ Canalul public primeste fiecare livrare, iar peste pragul din configurare
 primeste un rezumat in loc de zece mesaje. Rezumat zilnic la ora setata, si
 alerta de gaz scazut cel mult o data la sase ore.
 
+## Testarea fara adresele reale
+
+Nu ai adresele StonkBrokers? Se poate proba oricum, in trei feluri, si toate trei
+sunt mai convingatoare decat obiectele false.
+
+**1. Fork peste lantul real.** `npm run test:e2e` porneste si un anvil care
+**forkeaza 4663 cu toata starea de productie**, si desfasoara distribuitorul de
+proba peste ea. Diferenta care conteaza: registrul ERC-6551 si implementarea nu
+mai sunt copiile mele, sunt **cele adevarate, deja desfasurate acolo**. Pe un
+lant gol, daca as fi inteles gresit specificatia, si codul si testul ar gresi
+la fel si nimic nu ar cadea. Pe fork, cade.
+
+**2. Detectarea autorizarii pe un contract strain.** Tot pe fork, unealta
+incearca `collect()` de la Uniswap V3, care e rezervata proprietarului pozitiei.
+Un strain trebuie respins, proprietarul nu. E aceeasi verificare pe care o va
+face pe `deliver()` la StonkBrokers, dar pe un contract pe care nu l-am scris eu
+si nu il pot influenta.
+
+**3. Citire pe un contract adevarat.** `config/uniswap.probe.json` pune Courier-ul
+sa citeasca pozitiile Uniswap de pe 4663 prin configurare, fara nicio linie de
+cod schimbata. Asa se vede daca stratul de adaptare chiar e agnostic:
+
+```bash
+npx tsx src/cli.ts scan -c config/uniswap.probe.json
+```
+
+Aici se vede si de ce exista **sablonul de argumente**: `collect()` cere o
+structura cu patru campuri, nu un numar. In configurare se scrie
+`[{ "tokenId": "$tokenId", "recipient": "$wallet", "amount0Max": "$max128" }]`,
+si merge cu orice contract. Locuri goale: `$tokenId`, `$wallet`, `$owner`,
+`$max128`, `$max256`, `$zero`, plus orice sir de cifre care devine numar intreg.
+
 ## Proba pe date reale
 
 Testele cap-coada ruleaza pe un lant local, deci dovedesc logica. Asta dovedeste
@@ -258,7 +290,7 @@ npm run test:e2e  # cap-coada, porneste anvil si desfasoara contracte reale
 npm run test:all
 ```
 
-63 de teste. Cap-coada nu foloseste obiecte false: porneste un lant local, desfasoara
+77 de teste. Cap-coada nu foloseste obiecte false: porneste un lant local, desfasoara
 registrul 6551, colectia, distribuitorul si contractul de lot, si demonstreaza
 in ordine ca adresa calculata local e aceeasi cu cea de pe lant, ca scanarea
 gaseste exact ce a fost pus, ca rularea uscata nu cheltuie nimic, ca livrarea

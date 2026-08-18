@@ -8,6 +8,7 @@ import type { Address, PublicClient } from 'viem'
 import { abiOf, type Config } from '../config.js'
 import { functionNameOf, multiRead, outputCount, outputIndex, type Call } from '../chain/reader.js'
 import { walletsOf } from '../discover/brokers.js'
+import { resolveArgs, templateFrom } from '../args.js'
 
 export interface TokenClaim {
   token: Address
@@ -47,11 +48,12 @@ export async function scanClaims(client: PublicClient, cfg: Config, tokenIds: bi
   const nativeIdx = p.nativeFields.map((f) => outputIndex(abi, fnName, f))
   const tokenIdx = p.tokenFields.map((t) => ({ ...t, idx: outputIndex(abi, fnName, t.field) }))
 
+  const template = templateFrom(p.arg, p.args)
   const calls: Call[] = tokenIds.map((id) => ({
     address: cfg.drops.address,
     abi,
     functionName: fnName,
-    args: [p.arg === 'wallet' ? wallets.get(id)! : id]
+    args: resolveArgs(template, { tokenId: id, wallet: wallets.get(id)! })
   }))
 
   const res = await multiRead<unknown>(client, calls, { chunk: cfg.drops.readChunk })

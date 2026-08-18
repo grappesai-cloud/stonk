@@ -29,9 +29,9 @@ export const ROOT = resolve(HERE, '../..')
 export const ANVIL_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as Hex
 export const ANVIL_KEY_2 = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex
 
-export const localChain = (port: number) =>
+export const localChain = (port: number, id = 31337) =>
   defineChain({
-    id: 31337,
+    id,
     name: 'anvil',
     nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
     rpcUrls: { default: { http: [`http://127.0.0.1:${port}`] } }
@@ -44,23 +44,37 @@ export interface Anvil {
   stop: () => void
 }
 
-export async function startAnvil(port = 8545): Promise<Anvil> {
+export async function startAnvil(port = 8545, forkUrl?: string): Promise<Anvil> {
   const bin = process.env.ANVIL_BIN ?? `${process.env.HOME}/.foundry/bin/anvil`
-  const proc = spawn(bin, ['--port', String(port), '--silent'], { stdio: 'ignore' })
-  const url = `http://127.0.0.1:${port}`
+  const args = ['--port', String(port)]
+  if (forkUrl) args.push('--fork-url', forkUrl)
+  else args.push('--silent')
 
+  /* iesirea NU se arunca: cand forkul nu porneste, singurul loc in care scrie
+     de ce e chiar aici, si un test care spune doar "nu a pornit" te trimite sa
+     ghicesti */
+  const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+  let out = ''
+  proc.stdout?.on('data', (b: Buffer) => (out += b.toString()))
+  proc.stderr?.on('data', (b: Buffer) => (out += b.toString()))
+
+  const url = `http://127.0.0.1:${port}`
   const client = createPublicClient({ chain: localChain(port), transport: http(url) })
-  const deadline = Date.now() + 30_000
+  const waitMs = forkUrl ? 180_000 : 30_000
+  const deadline = Date.now() + waitMs
   while (Date.now() < deadline) {
+    if (proc.exitCode !== null) {
+      throw new Error(`anvil s-a inchis singur (cod ${proc.exitCode}):\n${out.slice(-800)}`)
+    }
     try {
       await client.getBlockNumber()
       return { proc, port, url, stop: () => proc.kill('SIGKILL') }
     } catch {
-      await new Promise((r) => setTimeout(r, 150))
+      await new Promise((r) => setTimeout(r, 250))
     }
   }
   proc.kill('SIGKILL')
-  throw new Error('anvil nu a pornit in 30 de secunde')
+  throw new Error(`anvil nu a pornit in ${waitMs / 1000} secunde. Ultima iesire:\n${out.slice(-800)}`)
 }
 
 export interface Artifact {
@@ -89,8 +103,11 @@ export interface Deployed {
   wallet: WalletClient
 }
 
-export async function deployAll(anvil: Anvil, opts: { brokerCount: number; feeBps?: number }): Promise<Deployed> {
-  const chain = localChain(anvil.port)
+export async function deployAll(
+  anvil: Anvil,
+  opts: { brokerCount: number; feeBps?: number; chainId?: number; registry?: Address; implementation?: Address }
+): Promise<Deployed> {
+  const chain = localChain(anvil.port, opts.chainId ?? 31337)
   const account = privateKeyToAccount(ANVIL_KEY)
   const holderAccount = privateKeyToAccount(ANVIL_KEY_2)
   const client = createPublicClient({ chain, transport: http(anvil.url) }) as PublicClient
@@ -103,8 +120,11 @@ export async function deployAll(anvil: Anvil, opts: { brokerCount: number; feeBp
     return receipt.contractAddress
   }
 
-  const registry = await deploy(artifact('ERC6551Registry.sol', 'ERC6551Registry'))
-  const implementation = await deploy(artifact('ERC6551Account.sol', 'ERC6551Account'))
+  /* pe fork folosim registrul si implementarea care exista deja pe lantul real,
+     nu copiile noastre. Asta e diferenta dintre "codul meu e consecvent cu el
+     insusi" si "codul meu e consecvent cu productia". */
+  const registry = opts.registry ?? (await deploy(artifact('ERC6551Registry.sol', 'ERC6551Registry')))
+  const implementation = opts.implementation ?? (await deploy(artifact('ERC6551Account.sol', 'ERC6551Account')))
   const brokers = await deploy(artifact('MockBrokerNFT.sol', 'MockBrokerNFT'))
   const stock = await deploy(artifact('MockERC20.sol', 'MockERC20'), ['Mock NVDA', 'mNVDA', 18])
   const salt = ('0x' + '00'.repeat(32)) as Hex
@@ -187,7 +207,7 @@ export function writeTestConfig(
   const cfg = {
     network: {
       name: 'anvil',
-      chainId: 31337,
+      chainId: d.chain.id,
       rpc: [anvil.url],
       nativeSymbol: 'ETH',
       multicall3: null,

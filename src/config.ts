@@ -37,8 +37,10 @@ const zBig = z
 const zPendingCall = z.object({
   /** ex: "function pendingOf(uint256 tokenId) view returns (uint256 ethAmount, uint256 tokenAmount)" */
   signature: z.string().min(10),
-  /** cu ce se cheama: id-ul NFT-ului sau adresa portofelului 6551 */
+  /** forma scurta: cu ce se cheama, id-ul NFT-ului sau adresa portofelului */
   arg: z.enum(['tokenId', 'wallet']).default('tokenId'),
+  /** forma completa: sablon de argumente, pentru contracte cu structuri sau mai multe argumente */
+  args: z.array(z.unknown()).nullable().default(null),
   /** campurile din raspuns care sunt valoare nativa (ETH) */
   nativeFields: z.array(z.string()).default([]),
   /** campurile din raspuns care sunt cantitati de token, cu adresa tokenului */
@@ -95,8 +97,10 @@ export const ConfigSchema = z.object({
     pending: zPendingCall,
     /** ex: "function deliver(uint256 tokenId)" */
     deliverSignature: z.string().min(10),
-    /** cu ce se cheama livrarea */
+    /** cu ce se cheama livrarea, forma scurta */
     deliverArg: z.enum(['tokenId', 'wallet']).default('tokenId'),
+    /** sablon de argumente pentru livrare, ex: [{ tokenId: "$tokenId", recipient: "$wallet" }] */
+    deliverArgs: z.array(z.unknown()).nullable().default(null),
     /** optional, daca protocolul expune livrare in lot */
     deliverBatchSignature: z.string().nullable().default(null),
     /** optional: eveniment de livrare, pentru reconciliere */
