@@ -205,6 +205,10 @@ window.SITE = {
     eyebrow: 'THE ECONOMIC LOOP',
     title: 'Nothing here leaks. It circles.',
     body: 'Minting burns supply. Working prints yield. Yield makes agents worth holding, and a faster agent network means more drops for every broker in the ecosystem.',
+    /* blocul din mijlocul cercului */
+    coreTop: 'EVERY MINT',
+    coreMid: '50% BURNED',
+    coreBot: '50% TO TREASURY',
     nodes: [
       { n: '01', label: 'MINT', sub: 'burn supply' },
       { n: '02', label: 'WORK', sub: 'jobs execute' },

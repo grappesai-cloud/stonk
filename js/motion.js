@@ -26,12 +26,14 @@
     { at: 0.18, shape: 'cube', scale: 0.46, y: 0.16 },
     { at: 0.30, shape: 'grid', scale: 1.05 },
     { at: 0.42, shape: 'ring', scale: 0.62 },
-    { at: 0.54, shape: 'cube', scale: 0.50 },
+    /* in dreptul buclei, forma se muta in coltul gol de jos-stanga:
+       cercul din sectiune e deja destul de puternic vizual */
+    { at: 0.54, shape: 'cube', scale: 0.30, x: -0.22, y: 0.26 },
     { at: 0.66, shape: 'bolt', scale: 0.52 },
     { at: 0.80, shape: 'candles', scale: 0.52 },
     { at: 0.90, shape: 'hex', scale: 0.34 },
-    { at: 0.97, letter: 'S', scale: 0.78 },
-    { at: 1.00, letter: 'S', scale: 0.78 }
+    { at: 0.96, shape: 'hex', scale: 0.28, y: -0.06 },
+    { at: 1.00, shape: 'hex', scale: 0.24, y: -0.12, opacity: 0.45 }
   ];
 
   function initParticles() {
