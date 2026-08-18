@@ -1,0 +1,13 @@
+services:
+  courier:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LOG_FORMAT: json
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    ports:
+      - "127.0.0.1:8787:8787"
+    command: ["start", "-c", "./config/default.json"]
