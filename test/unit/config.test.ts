@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig } from '../../src/config.js'
+import { loadConfig, missingEnv } from '../../src/config.js'
 
 const A = '0x1111111111111111111111111111111111111111'
 const B = '0x2222222222222222222222222222222222222222'
@@ -41,10 +41,11 @@ describe('configurarea', () => {
     delete process.env.TEST_COURIER_KEY
   })
 
-  it('se opreste clar cand variabila de mediu lipseste', () => {
-    expect(() => loadConfig(write({ ...minimal, execution: { privateKey: 'env:NU_EXISTA_ASA_CEVA' } }))).toThrow(
-      /NU_EXISTA_ASA_CEVA/
-    )
+  it('cand variabila de mediu lipseste lasa campul gol si raporteaza, ca sa mearga comenzile de citire', () => {
+    delete process.env.NU_EXISTA_ASA_CEVA
+    const cfg = loadConfig(write({ ...minimal, execution: { privateKey: 'env:NU_EXISTA_ASA_CEVA' } }))
+    expect(cfg.execution.privateKey).toBe(null)
+    expect(missingEnv.join(' ')).toContain('NU_EXISTA_ASA_CEVA')
   })
 
   it('refuza o adresa stricata si spune unde', () => {

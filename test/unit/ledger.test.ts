@@ -58,6 +58,23 @@ describe('registrul', () => {
     l.close()
   })
 
+  it('imparte gazul si bacsisul pe livrarile din tranzactie, cu rest', () => {
+    const l = led()
+    const run = l.startRun('profit', false)
+    for (const id of ['1', '2', '3']) {
+      l.recordDelivery({
+        runId: run, tokenId: id, wallet: W1, owner: null, valueWei: 0n, nativeWei: 0n,
+        tipWei: 0n, gasWei: 0n, txHash: '0xbatch', blockNumber: null, status: 'sent', reason: null
+      })
+    }
+    l.settleTx('0xbatch', { gasWei: 100n, tipWei: 10n, blockNumber: 5n, status: 'confirmed' })
+    const t = l.totals(0)
+    // suma bucatilor e exact totalul, nimic pierdut la impartire
+    expect(t.gasWei).toBe(100n)
+    expect(t.tipsWei).toBe(10n)
+    l.close()
+  })
+
   it('peretele uitatilor creste, apoi se goleste dupa livrare', () => {
     const l = led()
     l.seeClaim('1', W1, OWNER, parseEther('0.5'), parseEther('0.5'))

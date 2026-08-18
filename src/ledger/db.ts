@@ -186,10 +186,34 @@ export class Ledger {
       )
   }
 
-  markDeliveryConfirmed(txHash: string, gasWei: bigint, blockNumber: bigint, status: DeliveryStatus): void {
-    this.db
-      .prepare('UPDATE deliveries SET status=?, gas_wei=?, block_number=? WHERE tx_hash=?')
-      .run(status, gasWei.toString(), blockNumber.toString(), txHash)
+  /**
+   * Inchide o tranzactie: imparte gazul si bacsisul pe livrarile din ea.
+   *
+   * Impartirea se face cu rest, nu prin taiere: la impartire simpla suma
+   * bucatilor iese mai mica decat totalul, si atunci raportul de la final
+   * arata mai putin gaz si mai putin castig decat s-a intamplat. Restul se
+   * lipeste de primul rand.
+   */
+  settleTx(
+    txHash: string,
+    p: { gasWei: bigint; tipWei: bigint; blockNumber: bigint | null; status: DeliveryStatus }
+  ): void {
+    const ids = this.db.prepare('SELECT id FROM deliveries WHERE tx_hash=? ORDER BY id').all(txHash) as Array<{
+      id: number
+    }>
+    if (ids.length === 0) return
+    const n = BigInt(ids.length)
+    const gasEach = p.gasWei / n
+    const tipEach = p.tipWei / n
+    const gasRest = p.gasWei - gasEach * n
+    const tipRest = p.tipWei - tipEach * n
+
+    const st = this.db.prepare('UPDATE deliveries SET status=?, gas_wei=?, tip_wei=?, block_number=? WHERE id=?')
+    ids.forEach((r, i) => {
+      const gas = i === 0 ? gasEach + gasRest : gasEach
+      const tip = i === 0 ? tipEach + tipRest : tipEach
+      st.run(p.status, gas.toString(), tip.toString(), p.blockNumber === null ? null : p.blockNumber.toString(), r.id)
+    })
   }
 
   /** tranzactii trimise pentru care nu am apucat sa scriem chitanta */

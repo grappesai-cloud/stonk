@@ -11,7 +11,7 @@ import { STRANGER } from './context.js'
 import { abiOf, missingEnv } from './config.js'
 import { hasCode } from './chain/reader.js'
 import { REGISTRY_ABI, tbaAddress } from './erc6551/address.js'
-import { discoverTokenIds, ownersOf } from './discover/brokers.js'
+import { discoverTokenIds, ownersOf, walletsOf } from './discover/brokers.js'
 import { scanClaims } from './scan/claims.js'
 import { probeGating } from './simulate/simulate.js'
 
@@ -112,6 +112,20 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
     }
   } catch (e) {
     add('citire drop-uri', false, (e as Error).message, true)
+  }
+
+  // ---- cate portofele 6551 sunt chiar desfasurate
+  if (ids.length > 0) {
+    const sampleIds = ids.slice(0, Math.min(ids.length, 25))
+    const wallets = walletsOf(cfg, sampleIds)
+    const deployed = await Promise.all([...wallets.values()].map((w) => hasCode(client, w)))
+    const n = deployed.filter(Boolean).length
+    add(
+      'portofele 6551 desfasurate',
+      true,
+      `${n} din ${sampleIds.length} verificate au cod. Livrarea merge si catre unul nedesfasurat: adresa e determinista, ` +
+        `banii stau acolo si devin accesibili cand contul e creat.`
+    )
   }
 
   // ---- operatorul

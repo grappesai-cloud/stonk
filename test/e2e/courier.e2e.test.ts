@@ -176,11 +176,15 @@ describe('livrarea pe bune', () => {
     expect(o.gasWei).toBe(0n)
   }, 60_000)
 
-  it('registrul stie ce s-a intamplat', () => {
+  it('registrul stie ce s-a intamplat, inclusiv cat s-a castigat si cat s-a ars', () => {
     const t = ctx.ledger.totals(0)
     expect(t.deliveries).toBe(BROKERS)
     expect(t.wallets).toBe(BROKERS)
     expect(t.valueWei > 0n).toBe(true)
+    // bacsisul chiar ajunge pe randuri: fara asta raportul ar arata castig zero
+    expect(t.tipsWei > 0n).toBe(true)
+    expect(t.gasWei > 0n).toBe(true)
+    expect(t.netWei).toBe(t.tipsWei - t.gasWei)
     expect(ctx.ledger.wallTotals().count).toBe(0)
   })
 
@@ -198,6 +202,15 @@ describe('livrarea pe bune', () => {
     expect(report.all.deliveries).toBe(BROKERS)
     server.close()
   })
+})
+
+describe('descoperirea prin evenimente', () => {
+  it('scanarea de log-uri Transfer gaseste aceiasi brokeri ca numararea directa', async () => {
+    const byRange = await discoverTokenIds(ctx.client, ctx.cfg)
+    const logsCfg = { ...ctx.cfg, brokers: { ...ctx.cfg.brokers, idStrategy: 'logs' as const, deployBlock: 0n } }
+    const byLogs = await discoverTokenIds(ctx.client, logsCfg)
+    expect(byLogs).toEqual(byRange)
+  }, 60_000)
 })
 
 describe('cand deliver() e rezervata proprietarului', () => {

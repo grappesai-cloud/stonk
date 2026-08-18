@@ -192,7 +192,12 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       out.tipsWei += tips
 
       const okStatus = receipt.status === 'success'
-      ledger.markDeliveryConfirmed(hash, gasWei / BigInt(Math.max(group.length, 1)), receipt.blockNumber, okStatus ? 'confirmed' : 'reverted')
+      ledger.settleTx(hash, {
+        gasWei,
+        tipWei: okStatus ? tips : 0n,
+        blockNumber: receipt.blockNumber,
+        status: okStatus ? 'confirmed' : 'reverted'
+      })
 
       for (const c of group) {
         if (okStatus) {
@@ -262,7 +267,7 @@ async function send(
   })
 }
 
-function tipsFromReceipt(logs: readonly { address: string; topics: readonly Hex[]; data: Hex }[], cfg: Config): bigint | null {
+export function tipsFromReceipt(logs: readonly { address: string; topics: readonly Hex[]; data: Hex }[], cfg: Config): bigint | null {
   const batch = cfg.execution.batchContract?.toLowerCase()
   if (!batch) return null
   for (const l of logs) {

@@ -7,6 +7,7 @@
  * cand poate a dat revert. Se rezolva o singura data, la inceput.
  */
 import type { Ctx } from './context.js'
+import { tipsFromReceipt } from './execute/executor.js'
 import { log } from './log.js'
 
 export interface Reconciled {
@@ -26,12 +27,8 @@ export async function reconcile(ctx: Ctx): Promise<Reconciled> {
       const tokens = ctx.ledger.tokensOfTx(hash)
       const gasWei = receipt.gasUsed * (receipt.effectiveGasPrice ?? 0n)
       const ok = receipt.status === 'success'
-      ctx.ledger.markDeliveryConfirmed(
-        hash,
-        gasWei / BigInt(Math.max(tokens.length, 1)),
-        receipt.blockNumber,
-        ok ? 'confirmed' : 'reverted'
-      )
+      const tipWei = ok ? (tipsFromReceipt(receipt.logs, ctx.cfg) ?? 0n) : 0n
+      ctx.ledger.settleTx(hash, { gasWei, tipWei, blockNumber: receipt.blockNumber, status: ok ? 'confirmed' : 'reverted' })
       if (ok) {
         out.confirmed++
         for (const t of tokens) ctx.ledger.clearClaim(t)
