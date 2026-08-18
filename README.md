@@ -32,20 +32,20 @@ sau `data-list="nume"`, iar `js/render.js` le completeaza.
 
 | Zona | Ce contine |
 | --- | --- |
-| `SITE.brand` | nume, token, email, retele, textul de status |
+| `SITE.brand` | nume, token, email, retele (url gol = eticheta SOON) |
+| `SITE.launch` | **statusul mintului, data numaratorii, textul butoanelor, contractul** |
 | `SITE.nav` | linkurile din bara de sus si din subsol |
-| `SITE.hero` | titlu, subtitlu, butoane, liniile din feed-ul live |
+| `SITE.hero` | titlu, subtitlu, butoane, liniile din feed |
 | `SITE.ticker` | textele care curg pe banda |
-| `SITE.stats` | **cifrele contoarelor** |
+| `SITE.stats` | cifrele din banda |
 | `SITE.classes.items` | cele 5 clase de agenti |
 | `SITE.loop.nodes` | cele 6 noduri ale buclei economice |
 | `SITE.how.steps` | cei 4 pasi |
 | `SITE.platform.cards` | cele 3 terminale (`lines` = ce se scrie singur) |
 | `SITE.cta`, `SITE.footer`, `SITE.access` | final, subsol, formular |
 
-> **Cifrele sunt inventate.** `stats`, feed-ul din hero si liniile din terminale
-> sunt continut de prezentare. Inainte de lansare le inlocuiesti cu date reale
-> sau le legi la un API (vezi punctul 5).
+> `{{cta}}` si `{{status}}` din texte sunt inlocuite automat cu valorile din
+> `SITE.launch`, ca sa nu schimbi acelasi buton in patru locuri. Vezi punctul 5.
 
 ---
 
@@ -105,57 +105,81 @@ butoanelor se dezactiveaza. `prefers-reduced-motion` opreste tot ce misca.
 
 ---
 
-## 5. Date reale, imagine de share, ce mai lipseste
+## 5. Lansarea: ce schimbi si unde
+
+Pagina e gandita pentru o lansare rapida de proiect web3, deci tot ce se
+schimba la mint sta intr-un singur bloc: **`SITE.launch`** din `content.js`.
+
+```js
+launch: {
+  status: 'soon',                       // 'soon' | 'live' | 'sold'
+  date:   '2026-09-15T18:00:00Z',       // tinta numaratorii, ISO cu fus
+  cta:    { soon: 'JOIN WHITELIST', live: 'MINT AGENT', ... },
+  contract: { address: '', chain: 'BASE', explorer: '...' }
+}
+```
+
+- **numaratoarea chiar merge**: ticaie din secunda in secunda in hero si, cand
+  data trece, banda se schimba singura in `MINT IS LIVE`. Nu e un text fix.
+- **`{{cta}}`** din restul fisierului ia automat textul potrivit statusului,
+  deci butoanele din bara de sus, hero, "how" si finalul paginii se schimba
+  toate dintr-un singur camp.
+- **`contract.address`** gol afiseaza `NOT DEPLOYED YET` in subsol. Cand pui
+  adresa, apare scurtata, cu link catre explorer si buton de copiat.
+
+### Formularul de whitelist
+
+Trimite datele pe bune, nu doar deschide clientul de mail. Trei variante, in
+ordinea in care le incearca:
+
+1. **`access.web3formsKey`** - iti faci cheie gratuita pe web3forms.com (cere
+   doar un email, dureaza doua minute) si o pui acolo. Formularul pleaca direct
+   de pe site, fara backend, si primesti mailul.
+2. **`access.endpoint`** - daca ai backend propriu, primeste acelasi JSON prin
+   POST (`handle`, `wallet`, `email`, `class`, `size`, `page`).
+3. **mailto**, doar daca amandoua sunt goale. Merge, dar pe telefoanele fara
+   client de mail configurat omul apasa si nu se intampla nimic. **Nu lansa
+   asa.**
+
+Butonul trece prin `SENDING`, iar ecranul de reusita apare **doar daca cererea
+chiar a reusit**. Daca pica, ramane formularul completat si un mesaj de eroare.
 
 ### Cifrele
 
-`js/live.js` e stratul de date. Se configureaza in `content.js` -> `SITE.live`:
+`js/live.js` e stratul de date, configurat in `SITE.live`:
 
-- **`endpoint`**: pui acolo un URL care intoarce JSON-ul de mai jos si cifrele
-  din banda, feed-ul din hero si randul de sub hero se iau de acolo, la fiecare
-  `refreshMs`. Cat timp e gol (implicit) nu iese nicio cerere si raman cifrele
-  scrise in `content.js`.
-
-  ```json
-  {
-    "stats": { "jobs": 204118, "paid": 3311.4, "agents": 4907 },
-    "feed":  ["RINGER #0204 · CLOCK IN · +0.412 ETH"],
-    "meta":  "POT 91% FULL · NEXT CLOCK IN ~3 MIN"
-  }
-  ```
-
-  Cheile din `stats` sunt `SITE.stats[].key`. Orice camp lipsa e ignorat, deci
-  poti intoarce doar ce ai. Exemplu complet in `api/stats.sample.json`; ca sa
-  vezi ca merge, pui `endpoint: 'api/stats.sample.json'` si reincarci.
-
+- **`endpoint`**: un URL care intoarce
+  `{ "stats": {...}, "feed": [...], "meta": "..." }`. Cheile din `stats` sunt
+  `SITE.stats[].key`. Exemplu complet in `api/stats.sample.json`. Cat timp e
+  gol, nu iese nicio cerere catre el.
 - **`ethPrice`**: pretul ETH/USD de la Coinbase, public, fara cheie, cu CORS
-  deschis, deci merge dintr-un site static. E **singura cifra reala** din
-  pagina acum. Punctul de langa el se face verde cand pretul urca si rosu cand
-  scade. Daca cererea pica, chipul dispare si nimic nu se strica.
+  deschis. Merge dintr-un site static si e real.
 
-Restul cifrelor (jobs, ETH platit, agenti online, feed, terminale, `POT 68%`)
-sunt inventate pana pui `endpoint`.
+**Inainte de lansare, in `stats` tii doar cifre adevarate**: supply, numarul de
+clase, procentul ars. Un contor inventat care nu se misca se vede din prima si
+darama increderea in toata pagina. Feed-ul din hero e marcat `SIM` exact din
+acelasi motiv. Dupa lansare le inlocuiesti cu jobs / paid / agents si le legi
+prin `key`.
+
+### Linkuri
+
+In `brand.socials`, un `url` gol afiseaza eticheta `SOON`, neclickabila. Nu
+lasa niciodata `#`: un subsol plin de linkuri moarte arata a proiect abandonat,
+si asta e exact impresia pe care nu ti-o permiti la un mint.
 
 ### Imaginea de share
 
-`assets/og.jpg` (1200x630) e generata din **`og.html`**. Ca sa o refaci:
-deschizi `og.html` in browser, faci o captura a dreptunghiului de 1200x630 din
-coltul stanga-sus si o salvezi peste `assets/og.jpg`. Meta-urile `og:` si
-`twitter:` sunt deja in `index.html` si pointeaza catre
-`https://stonk.grappes.dev/assets/og.jpg`. `og.html` e blocat cu 404 in
-`nginx.conf`, deci nu ajunge pagina publica.
+`assets/og.jpg` (1200x630) se genereaza din **`og.html`**: deschizi fisierul in
+browser, faci o captura a dreptunghiului de 1200x630 din coltul stanga-sus si o
+salvezi peste `assets/og.jpg`. Meta-urile `og:` si `twitter:` sunt deja in
+`index.html`. `og.html` da 404 in productie, deci nu e pagina publica.
 
 ### Ce mai lipseste
 
-1. **Formularul** din sertarul "Early access" nu are server: pregateste un email
-   si deschide clientul de mail. Pentru trimitere reala ai nevoie de Formspree,
-   Web3Forms sau un backend propriu.
-2. **Linkuri**: docs, contract, X, Discord sunt `#` in `content.js`.
-3. **Conectarea la wallet** si mintul propriu-zis: pagina e doar prezentare.
-4. **Trasaturile** din sectiunea de raritate sunt rolate in browser, doar ca
+1. **Conectarea la wallet** si mintul propriu-zis: pagina e doar prezentare.
+2. **Trasaturile** din sectiunea de raritate sunt rolate in browser, ca
    demonstratie. Cand exista contractul, `initRoller` citeste de acolo.
-
----
+3. **Analytics**: nu e pus nimic.
 
 ## 6. Structura
 

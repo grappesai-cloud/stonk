@@ -266,16 +266,113 @@
     if (form) {
       form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var d = new FormData(form);
-        var lines = [];
-        d.forEach(function (v, k) { if (v) lines.push(k + ': ' + v); });
-        var mail = window.SITE.brand.email;
-        drawer.querySelector('[data-access-ok]').textContent = window.SITE.access.sent;
-        location.href = 'mailto:' + mail +
-          '?subject=' + encodeURIComponent('Stonk Agents early access - ' + (d.get('handle') || '')) +
-          '&body=' + encodeURIComponent(lines.join('\n'));
+        submitAccess(form, drawer);
       });
     }
+  }
+
+  /* trimiterea inscrierii: web3forms, endpoint propriu, sau mailto pe ultimul
+     loc. Formularul nu se declara reusit decat daca chiar a plecat. */
+  function submitAccess(form, drawer) {
+    var A = window.SITE.access;
+    var msg = drawer.querySelector('[data-access-msg]');
+    var btn = drawer.querySelector('[data-access-submit]');
+    var doneBox = drawer.querySelector('[data-access-done]');
+
+    var data = {}, lines = [];
+    new FormData(form).forEach(function (v, k) {
+      if (v) { data[k] = v; lines.push(k + ': ' + v); }
+    });
+    data.page = location.href;
+
+    /* fara nicio destinatie configurata: deschidem clientul de mail si
+       spunem asta pe fata, ca sa nu para ca s-a trimis ceva */
+    if (!A.web3formsKey && !A.endpoint) {
+      msg.textContent = A.mailto;
+      msg.classList.remove('is-err');
+      location.href = 'mailto:' + window.SITE.brand.email +
+        '?subject=' + encodeURIComponent('Whitelist - ' + (data.handle || '')) +
+        '&body=' + encodeURIComponent(lines.join('\n'));
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = A.sending;
+    msg.textContent = '';
+    msg.classList.remove('is-err');
+
+    var url, body = {}, k;
+    for (k in data) { if (Object.prototype.hasOwnProperty.call(data, k)) body[k] = data[k]; }
+
+    if (A.web3formsKey) {
+      url = 'https://api.web3forms.com/submit';
+      body.access_key = A.web3formsKey;
+      body.subject = 'Stonk Agents whitelist: ' + (data.handle || data.wallet || '');
+      body.from_name = 'Stonk Agents site';
+    } else {
+      url = A.endpoint;
+    }
+
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json().catch(function () { return { success: true }; });
+      })
+      .then(function (j) {
+        if (j && j.success === false) throw new Error('rejected');
+        form.style.display = 'none';
+        if (doneBox) doneBox.classList.add('is-on');
+      })
+      .catch(function () {
+        msg.textContent = A.err;
+        msg.classList.add('is-err');
+        btn.disabled = false;
+        btn.textContent = A.send;
+      });
+  }
+
+  /* ---------- numaratoarea pana la mint ---------------------------------- */
+  function initCountdown() {
+    var el = document.querySelector('[data-countdown]');
+    if (!el || el.getAttribute('data-done')) return;
+    var target = new Date(el.getAttribute('data-target') || '').getTime();
+    var val = el.querySelector('[data-cd-value]');
+    if (!val || isNaN(target)) return;
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+    (function tick() {
+      var left = target - Date.now();
+      if (left <= 0) {
+        el.innerHTML = '<i class="led"></i>' +
+          ((window.SITE.launch && window.SITE.launch.liveLabel) || 'MINT IS LIVE');
+        return;
+      }
+      var s = Math.floor(left / 1000);
+      val.textContent = Math.floor(s / 86400) + 'D ' +
+        pad(Math.floor(s % 86400 / 3600)) + 'H ' +
+        pad(Math.floor(s % 3600 / 60)) + 'M ' +
+        pad(s % 60) + 'S';
+      setTimeout(tick, 1000);
+    })();
+  }
+
+  /* ---------- copiat adresa contractului --------------------------------- */
+  function initCopy() {
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-copy]');
+      if (!b || !navigator.clipboard) return;
+      var was = b.textContent;
+      navigator.clipboard.writeText(b.getAttribute('data-copy')).then(function () {
+        b.textContent = (window.SITE.launch.contract.copied) || 'COPIED';
+        b.classList.add('is-done');
+        setTimeout(function () { b.textContent = was; b.classList.remove('is-done'); }, 1600);
+      }, function () { /* browserul a refuzat, lasam textul cum era */ });
+    });
   }
 
   /* ---------- aparitii la scroll ---------------------------------------- */
@@ -709,6 +806,8 @@
     initVeil();
     initMenu();
     initAccess();
+    initCountdown();
+    initCopy();
     initScrollText();
     initReveal();
     initScramble();

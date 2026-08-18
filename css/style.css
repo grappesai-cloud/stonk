@@ -697,6 +697,20 @@ a:hover .roll span { transform: translateY(-100%); }
   padding-bottom: 28px;
   color: var(--text-faint);
 }
+/* numaratoarea pana la mint: chiar merge, nu e un text fix */
+.countdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-faint);
+}
+.countdown b {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--lime);
+  font-variant-numeric: tabular-nums;
+}
+
 /* pretul ETH, singura cifra reala din pagina; apare doar daca a venit */
 .eth {
   display: none;
@@ -1378,6 +1392,62 @@ a:hover .roll span { transform: translateY(-100%); }
   transition: color 0.3s var(--ease);
 }
 .footer-col a:hover { color: var(--lime); }
+
+/* ce nu exista inca: eticheta SOON, nu link mort */
+.link-soon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  cursor: default;
+}
+.link-soon i {
+  font-style: normal;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  padding: 2px 5px;
+  color: var(--lime);
+  background: rgba(198, 255, 61, 0.1);
+}
+
+/* adresa contractului */
+.contract {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 44px;
+  padding: 12px var(--pad-x);
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-faint);
+}
+.contract .c-label { letter-spacing: 0.24em; }
+.contract .c-chain {
+  padding: 3px 7px;
+  color: var(--lime);
+  background: rgba(198, 255, 61, 0.1);
+}
+.contract .c-soon { color: var(--lime); opacity: 0.7; }
+.contract .c-addr { color: var(--text); letter-spacing: 0.08em; }
+.contract .c-addr:hover { color: var(--lime); }
+.contract .c-copy {
+  border: 1px solid var(--line);
+  background: none;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.3s var(--ease), color 0.3s var(--ease);
+}
+.contract .c-copy:hover,
+.contract .c-copy.is-done { border-color: var(--lime); color: var(--lime); }
+
 .footer-bottom {
   display: flex;
   justify-content: space-between;
@@ -1467,7 +1537,56 @@ a:hover .roll span { transform: translateY(-100%); }
   transition: background 0.3s var(--ease);
 }
 .drawer-submit:hover { background: #d9ff74; }
-.drawer-ok { margin: 12px 0 16px; color: var(--lime); min-height: 18px; }
+.drawer-submit:disabled { opacity: 0.6; cursor: wait; }
+.drawer-msg { margin: 12px 0 16px; color: var(--lime); min-height: 18px; }
+.drawer-msg.is-err { color: var(--hot); }
+
+/* butoanele de cantitate */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 2px; }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip span {
+  display: block;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease), color 0.25s var(--ease), background 0.25s var(--ease);
+}
+.chip span:hover { border-color: var(--lime-line); color: var(--text); }
+.chip input:checked + span {
+  border-color: var(--lime);
+  background: rgba(198, 255, 61, 0.12);
+  color: var(--lime);
+}
+
+/* ecranul de dupa trimitere */
+.drawer-done { display: none; padding: 40px 0 0; }
+.drawer-done.is-on { display: block; }
+.drawer-done h3 { font-size: 30px; margin-bottom: 12px; }
+.drawer-done p { color: var(--text-dim); }
+.done-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 26px;
+  border: 1px solid var(--lime);
+  background: rgba(198, 255, 61, 0.08);
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+.done-mark svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: var(--lime);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* ---------- 17. Responsive ---------- */
 @media (max-width: 1200px) {

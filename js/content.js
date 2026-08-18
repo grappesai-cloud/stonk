@@ -3,8 +3,11 @@
    Singurul fisier pe care trebuie sa il modifici ca sa schimbi texte,
    cifre, clasele de agenti si linkurile.
 
-   ATENTIE: toate cifrele din `stats` si din feed-uri sunt PLACEHOLDER.
-   Le inlocuiesti cu date reale (sau le legi la un API) inainte de lansare.
+   Blocul `launch` de mai jos e cel pe care il schimbi la lansare: statusul,
+   data, textul butoanelor si adresa contractului vin toate de acolo.
+
+   `stats` tine doar cifre adevarate (decizii de proiect). Feed-ul din hero e
+   marcat SIM pentru ca e o simulare pana exista contractul.
    ========================================================================= */
 
 window.SITE = {
@@ -19,12 +22,44 @@ window.SITE = {
     status: 'AGENT NETWORK ONLINE',
     hudLeft: 'STONK://AGENTS.V1',
     hudRight: 'ERC-6551 / WORKFORCE',
+    /* Pui `url` si linkul devine activ. Lasi `url` gol si apare cu eticheta
+       SOON, neclickabil. Nu lasa niciodata '#': un subsol plin de linkuri
+       moarte arata a proiect abandonat. */
     socials: [
-      { label: 'X / TWITTER', url: 'https://x.com/' },
-      { label: 'DISCORD', url: 'https://discord.com/' },
-      { label: 'DOCS', url: '#' },
-      { label: 'CONTRACT', url: '#' }
+      { label: 'X / TWITTER', url: '' },
+      { label: 'DISCORD', url: '' },
+      { label: 'DOCS', url: '' },
+      { label: 'SNAPSHOT', url: '' }
     ]
+  },
+
+  /* --------------------------------------------------------------- launch */
+  /* Blocul de lansare. Astea sunt singurele campuri pe care le schimbi cand
+     mintul se deschide, plus adresa contractului. */
+  launch: {
+    /* 'soon' | 'live' | 'sold' - schimba si eticheta, si butoanele */
+    status: 'soon',
+
+    /* momentul deschiderii, in ISO 8601 cu fus. Numaratoarea e reala:
+       daca data e in trecut, banda trece singura pe 'MINT LIVE'. */
+    date: '2026-09-15T18:00:00Z',
+
+    label: { soon: 'MINT SOON', live: 'MINT LIVE', sold: 'SOLD OUT' },
+    /* textul butoanelor; `{{cta}}` din restul fisierului ia valoarea de aici */
+    cta: { soon: 'JOIN WHITELIST', live: 'MINT AGENT', sold: 'VIEW ON SECONDARY' },
+    countdownLabel: 'MINT OPENS IN',
+    liveLabel: 'MINT IS LIVE',
+
+    /* adresa contractului. Goala = apare "NOT DEPLOYED YET" in loc de link. */
+    contract: {
+      label: 'CONTRACT',
+      address: '',
+      chain: 'BASE',
+      explorer: 'https://basescan.org/address/',
+      soon: 'NOT DEPLOYED YET',
+      copy: 'COPY',
+      copied: 'COPIED'
+    }
   },
 
   /* ------------------------------------------------------------------ nav */
@@ -35,7 +70,7 @@ window.SITE = {
     { label: 'HOW', href: '#how' },
     { label: 'PLATFORM', href: '#platform' }
   ],
-  navCta: 'MINT AGENT',
+  navCta: '{{cta}}',
 
   /* ----------------------------------------------------------------- hero */
   hero: {
@@ -43,10 +78,11 @@ window.SITE = {
     titleTop: 'AGENTS',
     titleBottom: 'THAT CLOCK IN',
     note: 'Mintable NFT workers with their own wallets. They run the jobs nobody wants to run, and the yield lands inside them.',
-    cta1: 'MINT AGENT',
+    cta1: '{{cta}}',
     cta2: 'VIEW FLEET',
-    meta: 'POT 68% FULL · NEXT CLOCK IN ~14 MIN · 3 RINGERS ARMED',
-    feedTitle: 'LIVE JOB FEED',
+    feedTitle: 'JOB FEED',
+    /* feed-ul e o simulare pana exista contractul; eticheta o spune pe fata */
+    feedTag: 'SIM',
     feed: [
       'RINGER #0204 · CLOCK IN · +0.412 ETH',
       'MINER #1188 · VRNG FULFILL · ROUND 88213',
@@ -70,12 +106,15 @@ window.SITE = {
   ],
 
   /* ---------------------------------------------------------------- stats */
-  /* `key` e numele campului cerut de la API (vezi SITE.live mai jos).
-     Cat timp nu exista API, raman cifrele de aici. */
+  /* Inainte de lansare tine aici DOAR cifre adevarate: decizii de proiect,
+     nu telemetrie inventata. Cine se uita treizeci de secunde la un contor
+     care nu se misca isi da seama, si atunci pica toata pagina.
+     Dupa lansare le inlocuiesti cu jobs / paid / agents si le legi la API
+     prin `key` (vezi SITE.live). `drift` il pui doar pe cifre reale. */
   stats: [
-    { key: 'jobs', value: 128407, label: 'JOBS EXECUTED', drift: 3 },
-    { key: 'paid', value: 1942.6, decimals: 1, suffix: ' ETH', label: 'PAID TO AGENTS', drift: 0.4 },
-    { key: 'agents', value: 3184, label: 'AGENTS ONLINE', drift: 1 }
+    { key: 'supply', value: 5000, label: 'AGENTS IN SUPPLY' },
+    { key: 'classes', value: 5, label: 'AGENT CLASSES' },
+    { key: 'burn', value: 50, suffix: '%', label: 'BURNED PER MINT' }
   ],
 
   /* ----------------------------------------------------------------- live */
@@ -224,7 +263,7 @@ window.SITE = {
     eyebrow: 'HOW IT WORKS',
     title: 'Four steps. No code, no bot to babysit.',
     body: 'You are not running infrastructure. You are hiring one.',
-    cta: 'MINT YOUR FIRST AGENT',
+    cta: '{{cta}}',
     steps: [
       { title: 'MINT', body: 'Burn STONKBROKER to mint an agent. Half burns, half funds the treasury. Traits are rolled on chain.' },
       { title: 'FUND', body: 'Send gas ETH into the agent wallet. That wallet belongs to the NFT, not to you, so it moves when the NFT moves.' },
@@ -279,31 +318,49 @@ window.SITE = {
 
   /* ------------------------------------------------------------------ cta */
   cta: {
-    badge: 'MINT OPEN',
+    badge: '{{status}}',
     line1: 'HIRE AN AGENT',
     line2: 'BEFORE THE',
     line3: 'POT FILLS',
     sub: 'Every round someone gets the tip. It may as well be yours.',
-    button: 'MINT AGENT'
+    button: '{{cta}}'
   },
 
   /* --------------------------------------------------------------- drawer */
   access: {
-    title: 'EARLY ACCESS',
-    subtitle: 'Get on the mint list.',
-    name: 'HANDLE',
-    namePh: 'degen.eth',
-    email: 'EMAIL',
-    emailPh: 'you@wallet.xyz',
+    title: 'WHITELIST',
+    subtitle: 'Spots are capped. Wallet goes on chain, not in a newsletter.',
+
+    /* UNDE AJUNGE FORMULARUL.
+       Varianta rapida, doua minute, fara backend: iti faci cheie gratuita pe
+       web3forms.com (cere doar un email) si o pui aici. Formularul pleaca
+       direct de pe site si primesti mailul.
+       Daca ai deja un endpoint propriu, il pui in `endpoint` si primeste
+       acelasi JSON prin POST.
+       Daca amandoua sunt goale, formularul cade pe mailto ca inainte, dar
+       ATENTIE: pe telefoanele fara client de mail configurat, omul apasa si
+       nu se intampla nimic. Nu lansa asa. */
+    web3formsKey: '',
+    endpoint: '',
+
+    handle: 'X HANDLE',
+    handlePh: '@degen',
     wallet: 'WALLET',
-    walletPh: '0x...',
-    klass: 'PREFERRED CLASS',
+    walletPh: '0x... or name.eth',
+    email: 'EMAIL',
+    emailPh: 'optional, for the drop alert',
+    klass: 'CLASS YOU WANT',
     klassPh: 'Select a class',
     klassOptions: ['The Ringer', 'The Miner', 'The Stocker', 'The Lobbyist', 'The Courier', 'Undecided'],
-    message: 'NOTE',
-    messagePh: 'I want a fleet of ringers and I want them yesterday...',
-    send: 'REQUEST ACCESS',
-    sent: 'REQUEST READY. OPENING YOUR MAIL CLIENT.'
+    size: 'HOW MANY',
+    sizeOptions: ['1', '2 - 5', '6 - 20', 'Whole fleet'],
+
+    send: 'GET ON THE LIST',
+    sending: 'SENDING',
+    ok: 'YOU ARE ON THE LIST.',
+    okSub: 'Follow the X account, the mint drops there first.',
+    err: 'THAT DID NOT GO THROUGH. TRY AGAIN, OR DM US ON X.',
+    mailto: 'OPENING YOUR MAIL CLIENT.'
   },
 
   /* --------------------------------------------------------------- footer */

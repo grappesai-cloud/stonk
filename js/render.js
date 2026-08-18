@@ -46,14 +46,31 @@
     var menu = document.querySelector('[data-menu]');
     if (menu) {
       menu.innerHTML = links +
-        '<a href="#access" data-access-open>' + roll('MINT') + '</a>';
+        '<a href="#access" data-access-open>' + roll(tokens('{{cta}}')) + '</a>';
     }
+  }
+
+  /* starea lansarii: un singur loc care decide textul butoanelor si eticheta */
+  function launchStatus() {
+    var L = D.launch || {};
+    var st = L.status || 'soon';
+    /* daca data a trecut, nu mai lasam pagina sa spuna "soon" */
+    if (st === 'soon' && L.date && new Date(L.date).getTime() <= Date.now()) st = 'live';
+    return st;
+  }
+
+  function tokens(text) {
+    if (typeof text !== 'string' || text.indexOf('{{') < 0) return text;
+    var L = D.launch || {}, st = launchStatus();
+    return text
+      .replace('{{cta}}', (L.cta && L.cta[st]) || 'MINT')
+      .replace('{{status}}', (L.label && L.label[st]) || '');
   }
 
   /* ---------- texte simple ---------------------------------------------- */
   function renderSimple() {
     document.querySelectorAll('[data-t]').forEach(function (n) {
-      n.textContent = get(n.getAttribute('data-t'));
+      n.textContent = tokens(get(n.getAttribute('data-t')));
     });
     document.querySelectorAll('[data-mail]').forEach(function (n) {
       n.textContent = D.brand.email;
@@ -77,7 +94,43 @@
       return '<li class="mono">' + esc(line) + '</li>';
     }).join('');
     var count = document.querySelector('[data-feed-count]');
-    if (count) count.textContent = ('0' + D.hero.feed.length).slice(-2);
+    if (count) count.textContent = D.hero.feedTag || ('0' + D.hero.feed.length).slice(-2);
+  }
+
+  /* ---------- numaratoarea pana la mint ---------------------------------- */
+  function renderCountdown() {
+    var host = document.querySelector('[data-countdown]');
+    if (!host) return;
+    var L = D.launch || {};
+    var st = launchStatus();
+
+    if (st !== 'soon' || !L.date) {
+      host.innerHTML = '<i class="led"></i>' + esc(st === 'sold' ? (L.label && L.label.sold) : L.liveLabel);
+      host.setAttribute('data-done', '1');
+      return;
+    }
+    host.innerHTML = '<i class="led"></i>' + esc(L.countdownLabel) +
+      ' <b data-cd-value>--</b>';
+    host.setAttribute('data-target', L.date);
+  }
+
+  /* ---------- adresa contractului ---------------------------------------- */
+  function renderContract() {
+    var host = document.querySelector('[data-contract]');
+    if (!host) return;
+    var c = (D.launch && D.launch.contract) || {};
+
+    if (!c.address) {
+      host.innerHTML = '<span class="c-label">' + esc(c.label || 'CONTRACT') + '</span>' +
+        '<span class="c-soon">' + esc(c.soon || 'SOON') + '</span>';
+      return;
+    }
+    var short = c.address.slice(0, 6) + '...' + c.address.slice(-4);
+    host.innerHTML = '<span class="c-label">' + esc(c.label || 'CONTRACT') + '</span>' +
+      '<span class="c-chain">' + esc(c.chain || '') + '</span>' +
+      '<a class="c-addr" href="' + esc((c.explorer || '') + c.address) + '" target="_blank" rel="noopener">' +
+        esc(short) + '</a>' +
+      '<button class="c-copy" data-copy="' + esc(c.address) + '">' + esc(c.copy || 'COPY') + '</button>';
   }
 
   /* ---------- banda care curge ------------------------------------------ */
@@ -298,11 +351,15 @@
     footerPages: function (host) {
       host.innerHTML = D.nav.map(function (l) {
         return '<a href="' + esc(l.href) + '">' + roll(l.label) + '</a>';
-      }).join('') + '<a href="#access" data-access-open>' + roll('MINT') + '</a>';
+      }).join('') + '<a href="#access" data-access-open>' + roll(tokens('{{cta}}')) + '</a>';
     },
 
+    /* fara link mort: ce nu exista inca apare cu eticheta SOON, nu cu '#' */
     footerSocials: function (host) {
       host.innerHTML = D.brand.socials.map(function (s) {
+        if (!s.url) {
+          return '<span class="link-soon">' + esc(s.label) + '<i>SOON</i></span>';
+        }
         return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + roll(s.label) + '</a>';
       }).join('');
     }
@@ -329,23 +386,37 @@
         '</div>' +
         '<button class="drawer-close" data-access-close aria-label="close">&times;</button>' +
       '</div>' +
-      '<a class="drawer-mail" data-mail href="#"></a>' +
+
       '<form data-access-form>' +
-        '<div class="field"><label class="mono">' + esc(a.name) + '</label>' +
-          '<input name="handle" required placeholder="' + esc(a.namePh) + '"></div>' +
-        '<div class="field"><label class="mono">' + esc(a.email) + '</label>' +
-          '<input type="email" name="email" required placeholder="' + esc(a.emailPh) + '"></div>' +
+        '<div class="field"><label class="mono">' + esc(a.handle) + '</label>' +
+          '<input name="handle" required placeholder="' + esc(a.handlePh) + '"></div>' +
         '<div class="field"><label class="mono">' + esc(a.wallet) + '</label>' +
-          '<input name="wallet" placeholder="' + esc(a.walletPh) + '"></div>' +
+          '<input name="wallet" required placeholder="' + esc(a.walletPh) + '"></div>' +
+        '<div class="field"><label class="mono">' + esc(a.email) + '</label>' +
+          '<input type="email" name="email" placeholder="' + esc(a.emailPh) + '"></div>' +
         '<div class="field"><label class="mono">' + esc(a.klass) + '</label><select name="class">' +
           '<option value="" selected disabled>' + esc(a.klassPh) + '</option>' +
           a.klassOptions.map(function (o) { return '<option>' + esc(o) + '</option>'; }).join('') +
         '</select></div>' +
-        '<div class="field"><label class="mono">' + esc(a.message) + '</label>' +
-          '<textarea name="note" placeholder="' + esc(a.messagePh) + '"></textarea></div>' +
-        '<p class="drawer-ok mono" data-access-ok></p>' +
-        '<button class="drawer-submit mono" type="submit">' + esc(a.send) + '</button>' +
-      '</form>';
+        '<div class="field"><label class="mono">' + esc(a.size) + '</label>' +
+          '<div class="chips" data-chips>' +
+            a.sizeOptions.map(function (o, i) {
+              return '<label class="chip"><input type="radio" name="size" value="' + esc(o) + '"' +
+                (i === 0 ? ' checked' : '') + '><span>' + esc(o) + '</span></label>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
+        '<p class="drawer-msg mono" data-access-msg></p>' +
+        '<button class="drawer-submit mono" type="submit" data-access-submit>' + esc(a.send) + '</button>' +
+      '</form>' +
+
+      /* ecranul de reusita, ascuns pana cand chiar pleaca formularul */
+      '<div class="drawer-done" data-access-done>' +
+        '<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6"/></svg></div>' +
+        '<h3>' + esc(a.ok) + '</h3>' +
+        '<p>' + esc(a.okSub) + '</p>' +
+        '<a class="drawer-mail" data-mail href="#"></a>' +
+      '</div>';
 
     var mail = host.querySelector('[data-mail]');
     mail.textContent = D.brand.email;
@@ -365,6 +436,8 @@
   renderSimple();
   renderHud();
   renderFeed();
+  renderCountdown();
+  renderContract();
   renderTicker();
   renderLists();
   renderAccess();
