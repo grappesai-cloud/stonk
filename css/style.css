@@ -1596,7 +1596,19 @@ a:hover .roll span { transform: translateY(-100%); }
 }
 
 @media (max-width: 900px) {
-  :root { --pad-x: 20px; --hud: 8px; --nav-h: 64px; --cut: 12px; }
+  :root {
+    --pad-x: 20px;
+    --hud: 8px;
+    --nav-h: 64px;
+    --cut: 12px;
+    /* la 390px, "THAT CLOCK IN" trebuie sa incapa pe un rand */
+    --fs-display: clamp(30px, 9.2vw, 46px);
+  }
+
+  /* bara de sus la 390px: logo + buton + burger, fara sa se calce */
+  .nav { gap: 10px; padding: 0 calc(var(--hud) + 8px); }
+  .nav-logo { font-size: 11px; letter-spacing: 0.14em; }
+  .btn-sm { height: 32px; padding: 0 11px; font-size: 9.5px; letter-spacing: 0.1em; }
 
   .cursor, .hud-side { display: none; }
   .nav-links { display: none; }
@@ -1610,6 +1622,10 @@ a:hover .roll span { transform: translateY(-100%); }
     padding-bottom: 40px;
   }
   .feed-list { height: 160px; }
+
+  /* butoanele din hero pe toata latimea: incap si se apasa mai usor */
+  .hero-actions { width: 100%; }
+  .hero-actions .btn { flex: 1 1 100%; }
   .hero-meta { flex-direction: column; gap: 6px; padding-bottom: 22px; }
 
   .stats { grid-template-columns: 1fr; gap: 0; }
@@ -1653,7 +1669,19 @@ a:hover .roll span { transform: translateY(-100%); }
   .loop { padding: 80px 0 70px; }
   .loop-grid { grid-template-columns: 1fr; gap: 36px; }
   .loop-ring { aspect-ratio: auto; max-width: none; }
-  .loop-svg { display: none; }
+  .loop-svg, .loop-sweep { display: none; }
+  /* fara cerc, miezul devine un bloc normal deasupra listei */
+  .loop-core {
+    position: static;
+    width: auto;
+    transform: none;
+    text-align: left;
+    margin-bottom: 22px;
+    padding: 16px 18px;
+    border: 1px solid var(--edge);
+    background: var(--pane);
+  }
+  .loop-core b { font-size: clamp(26px, 8vw, 34px); }
   .loop-nodes {
     position: static;
     display: grid;
