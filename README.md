@@ -274,10 +274,22 @@ pauza dintre livrari tine chiar cand a aparut marfa noua.
 Telegramul e testat cu reteaua inlocuita: ce mesaj pleaca, cui, cand se
 grupeaza, si ca nu exista nicio comanda care sa ceara semnatura sau cheie.
 
-Bug prins de teste, ca exemplu de ce exista: prima varianta a registrului lipea
+Trei bug-uri reale, prinse inainte de productie, ca exemplu de ce exista
+testele si recitirea codului.
+
+Primul: prima varianta a registrului lipea
 adresa contractului NFT pe 20 de octeti in loc de 32, cum cere specificatia.
 Ieseau alte adrese. Pe productie ar fi insemnat livrari catre portofele
 inexistente.
+
+Al doilea: bacsisul se tinea doar la nivel de rulare, deci raportul de profit
+arata castig zero dupa livrari adevarate. Adica exact cifra pentru care exista
+tot proiectul.
+
+Al treilea, cel mai urat: fara contract de lot, executorul trimitea o singura
+livrare dar inregistra tot grupul ca trimis. Registrul ar fi aratat zece livrari
+acolo unde s-a facut una. Acum, fara contract de lot, o tranzactie duce exact o
+livrare, garantat si probat.
 
 ## Desfasurare
 
