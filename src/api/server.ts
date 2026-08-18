@@ -9,6 +9,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { formatEther } from 'viem'
 import type { Ctx } from '../context.js'
+import { wallPage } from './page.js'
 import { log } from '../log.js'
 
 function json(res: ServerResponse, status: number, body: unknown, cors: string): void {
@@ -55,8 +56,21 @@ export function createApi(ctx: Ctx) {
           return json(res, 200, { ok: true, chainId: cfg.network.chainId, block, mode: cfg.policy.mode, dry: cfg.execution.dryRun }, cors)
         }
 
+        /* peretele uitatilor, ca pagina */
+        case '/': {
+          res.writeHead(200, {
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': 'public, max-age=30',
+            'x-content-type-options': 'nosniff',
+            'referrer-policy': 'no-referrer',
+            'content-security-policy':
+              "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+          })
+          res.end(wallPage(cfg))
+          return
+        }
+
         /* forma pe care o citeste landing page-ul */
-        case '/':
         case '/stats': {
           const all = ledger.totals(0)
           const wall = ledger.wallTotals()

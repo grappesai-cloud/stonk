@@ -200,6 +200,18 @@ describe('livrarea pe bune', () => {
     expect(stats.feed.length).toBeGreaterThan(0)
     const report = (await (await fetch('http://127.0.0.1:8899/report')).json()) as { all: { deliveries: number } }
     expect(report.all.deliveries).toBe(BROKERS)
+
+    // peretele uitatilor, ca pagina: HTML propriu, cu politica de continut stransa
+    const page = await fetch('http://127.0.0.1:8899/')
+    expect(page.status).toBe(200)
+    expect(page.headers.get('content-type')).toMatch(/text\/html/)
+    expect(page.headers.get('content-security-policy')).toMatch(/default-src 'none'/)
+    const html = await page.text()
+    expect(html).toContain('We never ask you to connect a wallet')
+    expect(html).toContain("fetch('/wall")
+
+    const missing = await fetch('http://127.0.0.1:8899/nu-exista')
+    expect(missing.status).toBe(404)
     server.close()
   })
 })
