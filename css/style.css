@@ -153,7 +153,7 @@ main{position:relative;z-index:1}
   border-bottom:1px solid transparent;transition:background .3s,border-color .3s,backdrop-filter .3s;
 }
 .nav.stuck{background:rgba(0,0,0,.72);backdrop-filter:blur(14px);border-bottom-color:var(--line)}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.02em;font-size:15px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.02em;font-size:15px;white-space:nowrap}
 .brand-mark{width:20px;height:20px;fill:none;stroke:var(--green);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .brand-mark .thin{stroke-width:2}
 .nav-links{display:flex;gap:26px;margin-left:14px}
@@ -327,6 +327,9 @@ main{position:relative;z-index:1}
   .quote{width:100%}
 }
 @media (max-width:560px){
+  /* la latimea asta bara de sus are marca, pretul, butonul si meniul.
+     Pretul e cel mai putin important dintre ele, deci pleaca primul. */
+  .eth{display:none}
   .hero-actions{width:100%}
   .hero-actions .btn{flex:1 1 100%}
   .stats{padding-top:56px}
