@@ -62,3 +62,10 @@ describe('configurarea', () => {
     expect(cfg.policy.minValueWei).toBe(12345678901234567890n)
   })
 })
+
+describe('limita de cereri', () => {
+  it('e pornita implicit, ca API-ul public sa nu poata fi tinut ocupat', () => {
+    const cfg = loadConfig(write(minimal))
+    expect(cfg.api.rateLimitPerMinute).toBeGreaterThan(0)
+  })
+})

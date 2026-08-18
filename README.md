@@ -150,6 +150,24 @@ Canalul public primeste fiecare livrare, iar peste un prag primeste rezumat, ca
 sa nu ajunga pe mut intr-o saptamana. Rezumat zilnic la ora din configurare.
 Alerta de gaz scazut, cel mult o data la sase ore.
 
+## Peretele uitatilor
+
+`GET /` serveste o pagina publica cu tot ce zace nerevendicat chiar acum:
+totalul, cate portofele asteapta, de cate zile sta cel mai vechi, si tabelul cu
+cele mai grase, cu link spre explorer. Se reimprospateaza singura la 15 secunde.
+
+E artefactul care creeaza cerere inainte sa existe produsul, si care raspunde
+singur la intrebarea "e real?". Pe pagina scrie, cu litere, ca nu se cere
+niciodata conectare de portofel. Regula asta e si apararea impotriva clonelor:
+daca e publica si absoluta, orice imitatie care cere conectare se demasca
+singura.
+
+Ca sa o vezi fara contracte reale:
+
+```bash
+npx tsx scripts/demo-api.ts   # date de proba, http://127.0.0.1:8788/
+```
+
 ## API de citire
 
 Fara autentificare, pentru ca nu are ce sa protejeze: totul de aici e deja
@@ -157,6 +175,7 @@ public pe lant. Nicio ruta nu scrie.
 
 | ruta | ce da |
 |---|---|
+| `/` | peretele uitatilor, ca pagina |
 | `/health` | lant, bloc, mod |
 | `/stats` | exact forma pe care o citeste landing page-ul: `{stats, feed, meta}` |
 | `/wall` | peretele uitatilor, cu vechime |
@@ -165,6 +184,9 @@ public pe lant. Nicio ruta nu scrie.
 
 Pe landing page se pune `SITE.live.endpoint` pe adresa lui `/stats` si cifrele
 din hero devin reale.
+
+Nicio ruta nu scrie, deci nu exista suprafata de atac de aparat. Limita de
+cereri pe adresa IP e pornita implicit.
 
 ## Registrul e produsul
 
@@ -178,6 +200,48 @@ Sumele stau ca text in baza de date, niciodata ca intreg: weiul depaseste ce
 poate tine un numar din JavaScript, si o rotunjire tacuta acolo ar strica toate
 cifrele de mai tarziu.
 
+## Telegram, pas cu pas
+
+1. `@BotFather`, `/newbot`, iei jetonul si il pui in `.env` la `TELEGRAM_TOKEN`.
+2. Faci canalul public si adaugi botul ca administrator, cu drept de postare.
+3. In configurare: `alerts.telegram.enabled: true` si `channel: "@numele-tau"`.
+4. **Inregistreaza numele canalului si al botului acum**, inainte sa anunti ceva.
+   Squatterii iau numele in ziua anuntului, si nu costa nimic sa le iei tu.
+
+Canalul public primeste fiecare livrare, iar peste pragul din configurare
+primeste un rezumat in loc de zece mesaje. Rezumat zilnic la ora setata, si
+alerta de gaz scazut cel mult o data la sase ore.
+
+## Proba pe date reale
+
+Testele cap-coada ruleaza pe un lant local, deci dovedesc logica. Asta dovedeste
+altceva: ca drumul de citire tine pe lantul real.
+
+```bash
+npx tsx scripts/proof-live.ts 0x4A2C6e28D1FbAdeE3c11C4B4157f4bf2fe2A1f1a 2000
+```
+
+Rulat pe 19 august 2026, pe Robinhood Chain, pe o colectie adevarata de 100.000
+de bucati cu zeci de mii de detinatori:
+
+```
+lant                          4663 la blocul 40043135
+adrese calculate local        2000 in 94 ms, fara nicio citire
+adrese cerute registrului     2000/2000 citite in 4145 ms
+nepotriviri                   ZERO
+proprietari cititi            2000/2000 in 4404 ms
+pret gaz                      0.0000020406 ETH pentru 100k unitati
+```
+
+Doua concluzii care conteaza dincolo de cod:
+
+- **matematica adreselor bate cu registrul de pe lantul real**, pe doua mii de
+  bucati la rand. O colectie de cinci mii se scaneaza in cateva secunde.
+- **gazul de acolo e neglijabil.** O livrare costa atat de putin incat modul
+  campanie, adica livrarile gratuite dinainte de mint, e practic gratuit. Pragul
+  de rentabilitate aproape ca nu conteaza pe lantul asta, ceea ce schimba
+  socoteala in favoarea campaniei.
+
 ## Teste
 
 ```bash
@@ -186,13 +250,21 @@ npm run test:e2e  # cap-coada, porneste anvil si desfasoara contracte reale
 npm run test:all
 ```
 
-Cap-coada nu foloseste obiecte false: porneste un lant local, desfasoara
+63 de teste. Cap-coada nu foloseste obiecte false: porneste un lant local, desfasoara
 registrul 6551, colectia, distribuitorul si contractul de lot, si demonstreaza
 in ordine ca adresa calculata local e aceeasi cu cea de pe lant, ca scanarea
 gaseste exact ce a fost pus, ca rularea uscata nu cheltuie nimic, ca livrarea
 muta banii in portofelul brokerului si nu in al nostru, ca bacsisul se imparte
 corect, si ca atunci cand functia e rezervata proprietarului unealta o spune
 si nu arde gaz pe o tranzactie care ar da revert.
+
+Franele sunt probate tot pe lant, intr-o rulare completa, nu chemate direct:
+modul profit refuza lotul neprofitabil, campania il livreaza, bugetul zilnic si
+plafonul de pret al gazului opresc rularea, fisierul de oprire opreste totul, si
+pauza dintre livrari tine chiar cand a aparut marfa noua.
+
+Telegramul e testat cu reteaua inlocuita: ce mesaj pleaca, cui, cand se
+grupeaza, si ca nu exista nicio comanda care sa ceara semnatura sau cheie.
 
 Bug prins de teste, ca exemplu de ce exista: prima varianta a registrului lipea
 adresa contractului NFT pe 20 de octeti in loc de 32, cum cere specificatia.
@@ -204,6 +276,11 @@ inexistente.
 ```bash
 docker compose up -d
 ```
+
+Pe Coolify: aplicatie cu build pack Dockerfile, portul 8787, un volum montat pe
+`/app/data` si variabilele din `.env` puse in panoul de mediu. Comanda de
+pornire ramane cea din imagine. Healthcheck-ul e deja in Dockerfile si loveste
+`/health`.
 
 Datele stau pe volum: registrul e produsul, nu se pierde la redeploy.
 Portul e legat pe `127.0.0.1`, se pune un reverse proxy in fata daca trebuie

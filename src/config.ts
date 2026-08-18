@@ -178,7 +178,9 @@ export const ConfigSchema = z.object({
     host: z.string().default('127.0.0.1'),
     port: z.number().int().positive().default(8787),
     /** originile care au voie sa citeasca, pentru landing page */
-    cors: z.array(z.string()).default(['*'])
+    cors: z.array(z.string()).default(['*']),
+    /** cereri pe minut de la o adresa IP; 0 = fara limita */
+    rateLimitPerMinute: z.number().int().min(0).default(120)
   }).default({}),
 
   storage: z.object({

@@ -212,6 +212,10 @@ describe('livrarea pe bune', () => {
 
     const missing = await fetch('http://127.0.0.1:8899/nu-exista')
     expect(missing.status).toBe(404)
+
+    // metodele care scriu nu exista deloc
+    const post = await fetch('http://127.0.0.1:8899/stats', { method: 'POST' })
+    expect(post.status).toBe(405)
     server.close()
   })
 })

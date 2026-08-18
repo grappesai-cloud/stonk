@@ -27,9 +27,38 @@ function eth(wei: bigint): number {
   return Number(formatEther(wei))
 }
 
+/**
+ * Limitare simpla pe adresa IP, cu galeata care se goleste singura.
+ * API-ul e public si citeste dintr-o baza locala: fara asta, un singur script
+ * plictisit tine procesul ocupat degeaba.
+ */
+class RateLimiter {
+  private hits = new Map<string, { count: number; resetAt: number }>()
+
+  constructor(private perMinute: number) {}
+
+  allow(ip: string): boolean {
+    if (this.perMinute === 0) return true
+    const now = Date.now()
+    const e = this.hits.get(ip)
+    if (!e || now > e.resetAt) {
+      this.hits.set(ip, { count: 1, resetAt: now + 60_000 })
+      if (this.hits.size > 5000) this.sweep(now)
+      return true
+    }
+    e.count++
+    return e.count <= this.perMinute
+  }
+
+  private sweep(now: number): void {
+    for (const [k, v] of this.hits) if (now > v.resetAt) this.hits.delete(k)
+  }
+}
+
 export function createApi(ctx: Ctx) {
   const { cfg, ledger } = ctx
   const allowed = cfg.api.cors
+  const limiter = new RateLimiter(cfg.api.rateLimitPerMinute)
 
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const origin = req.headers.origin ?? '*'
@@ -45,6 +74,14 @@ export function createApi(ctx: Ctx) {
       return
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'doar GET' }, cors)
+
+    const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
+      req.socket.remoteAddress ?? 'necunoscut'
+    if (!limiter.allow(ip)) {
+      res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60', 'access-control-allow-origin': cors })
+      res.end(JSON.stringify({ error: 'prea multe cereri' }))
+      return
+    }
 
     const url = new URL(req.url ?? '/', 'http://localhost')
     const limit = Math.min(Number(url.searchParams.get('limit') ?? 50) || 50, 500)
