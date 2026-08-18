@@ -177,24 +177,13 @@ stonk-agents/
 
 ## 7. Publicare
 
-LIVE pe **https://stonk.grappes.dev**, pe Coolify (Netcup), ca site static
-servit de nginx.
+LIVE pe **https://stonk.grappes.dev**, pe Coolify, ca site static servit de
+nginx: `Dockerfile` copiaza folderul in imagine, `nginx.conf` pune gzip, cache
+lung pe fonturi si imagini, cache scurt pe CSS si JS, zero cache pe HTML si
+404 pe `og.html`. Build pack `dockerfile`, portul expus `80`.
 
-| | |
-| --- | --- |
-| repo | `git@github.com:grappesai-cloud/stonk-agents.git`, ramura `main` |
-| proiect Coolify | Stonk Agents, `h13n1pb2h5cslwi6vilj455v` |
-| aplicatie | `l8zhwpnb6qknb82sn667pvdy`, build pack `dockerfile`, port expus `80` |
-| cheie de deploy | `stonk-agents-deploy` in Coolify, publica adaugata pe repo |
-| DNS | `stonk` A -> `159.195.82.196` in Cloudflare (adaugat de mana, grappes.dev nu are wildcard si nu exista token API) |
+Nu se compileaza nimic, deci merge la fel de bine oriunde: Cloudflare Pages,
+GitHub Pages, orice gazduire clasica. Urci folderul asa cum e.
 
-Deploy dupa un push (de pe server, tokenul e in `/root/.coolify-cli-token`):
-
-```bash
-ssh root@100.70.161.75 'T=$(cat /root/.coolify-cli-token); \
-  curl -s -H "Authorization: Bearer $T" \
-  "http://localhost:8000/api/v1/deploy?uuid=l8zhwpnb6qknb82sn667pvdy"'
-```
-
-Fiind static, merge la fel de bine si pe Cloudflare Pages sau GitHub Pages:
-urci folderul asa cum e.
+(Identificatorii aplicatiei si comanda de redeploy stau in notele interne, nu
+in repo.)

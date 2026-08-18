@@ -194,6 +194,66 @@
         '</div>';
     },
 
+    /* cadranul buclei: gradatii, hexagon inscris, marcaje pe cerc, arcul
+       aprins care sare din segment in segment si punctul cu coada */
+    loopSvg: function (host) {
+      var R = 38, i, a;
+
+      /* varfurile hexagonului = pozitiile celor 6 noduri */
+      var pts = [];
+      for (i = 0; i < 6; i += 1) {
+        a = (-90 + i * 60) * Math.PI / 180;
+        pts.push([50 + Math.cos(a) * R, 50 + Math.sin(a) * R]);
+      }
+
+      /* gradatii ca pe un cadran de instrument */
+      var ticks = '';
+      for (i = 0; i < 60; i += 1) {
+        a = (i * 6 - 90) * Math.PI / 180;
+        var long = i % 5 === 0;
+        var r1 = R + 3.5, r2 = R + (long ? 7 : 5);
+        ticks += '<line x1="' + (50 + Math.cos(a) * r1).toFixed(2) +
+          '" y1="' + (50 + Math.sin(a) * r1).toFixed(2) +
+          '" x2="' + (50 + Math.cos(a) * r2).toFixed(2) +
+          '" y2="' + (50 + Math.sin(a) * r2).toFixed(2) +
+          '" class="' + (long ? 't-long' : 't-short') + '"/>';
+      }
+
+      var marks = pts.map(function (p, k) {
+        return '<rect class="ring-mark" data-mark="' + k + '" x="' + (p[0] - 1.6).toFixed(2) +
+          '" y="' + (p[1] - 1.6).toFixed(2) + '" width="3.2" height="3.2" ' +
+          'transform="rotate(45 ' + p[0].toFixed(2) + ' ' + p[1].toFixed(2) + ')"/>';
+      }).join('');
+
+      /* punctul care orbiteaza, plus doua fantome in urma lui */
+      function orbit(cls, r, begin) {
+        return '<circle class="' + cls + '" r="' + r + '">' +
+          '<animateMotion dur="9s" begin="' + begin + '" repeatCount="indefinite">' +
+          '<mpath href="#loop-path"></mpath></animateMotion></circle>';
+      }
+
+      host.innerHTML = '' +
+        '<path id="loop-path" fill="none" d="M50 ' + (50 - R) +
+          'a' + R + ' ' + R + ' 0 1 1 0 ' + (R * 2) +
+          'a' + R + ' ' + R + ' 0 1 1 0 -' + (R * 2) + '"></path>' +
+        '<g class="ring-ticks">' + ticks + '</g>' +
+        '<polygon class="ring-hex" points="' +
+          pts.map(function (p) { return p[0].toFixed(2) + ',' + p[1].toFixed(2); }).join(' ') + '"/>' +
+        '<circle class="ring-track" cx="50" cy="50" r="' + R + '"></circle>' +
+        '<circle class="ring-dash" cx="50" cy="50" r="' + R + '"></circle>' +
+        /* arc de 60 de grade, centrat sus; JS il roteste pe nodul activ */
+        '<path class="ring-arc" data-arc fill="none" d="M' +
+          (50 + Math.cos(-120 * Math.PI / 180) * R).toFixed(2) + ',' +
+          (50 + Math.sin(-120 * Math.PI / 180) * R).toFixed(2) +
+          ' A' + R + ',' + R + ' 0 0 1 ' +
+          (50 + Math.cos(-60 * Math.PI / 180) * R).toFixed(2) + ',' +
+          (50 + Math.sin(-60 * Math.PI / 180) * R).toFixed(2) + '"/>' +
+        '<g class="ring-marks">' + marks + '</g>' +
+        orbit('ring-ghost g2', 1.6, '-8.5s') +
+        orbit('ring-ghost g1', 1.3, '-8.75s') +
+        orbit('ring-dot', 1.1, '0s');
+    },
+
     loopNodes: function (host) {
       host.innerHTML = D.loop.nodes.map(function (n, i) {
         return '' +

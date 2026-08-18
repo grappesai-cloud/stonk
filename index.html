@@ -156,16 +156,8 @@
         </div>
 
         <div class="loop-ring reveal">
-          <svg class="loop-svg" viewBox="0 0 100 100" aria-hidden="true">
-            <circle class="ring-track" cx="50" cy="50" r="38"></circle>
-            <circle class="ring-dash" cx="50" cy="50" r="38"></circle>
-            <path id="loop-path" d="M50 12a38 38 0 1 1 0 76a38 38 0 1 1 0-76" fill="none"></path>
-            <circle class="ring-dot" r="1">
-              <animateMotion dur="9s" repeatCount="indefinite" rotate="auto">
-                <mpath href="#loop-path"></mpath>
-              </animateMotion>
-            </circle>
-          </svg>
+          <div class="loop-sweep"></div>
+          <svg class="loop-svg" viewBox="0 0 100 100" aria-hidden="true" data-list="loopSvg"></svg>
           <div class="loop-core">
             <span class="mono" data-t="loop.coreTop"></span>
             <b data-t="loop.coreMid"></b>

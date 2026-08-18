@@ -671,9 +671,16 @@
   function initLoopNodes() {
     var nodes = document.querySelectorAll('[data-node]');
     if (!nodes.length || reduced) return;
+    var marks = document.querySelectorAll('[data-mark]');
+    var arc = document.querySelector('[data-arc]');
     var i = 0;
+
+    /* arcul aprins se roteste cu 60 de grade pe nod, deci pare ca fluxul
+       inainteaza pe cerc, nu ca doar clipesc etichetele */
     setInterval(function () {
       nodes.forEach(function (n, k) { n.classList.toggle('is-on', k === i); });
+      marks.forEach(function (m, k) { m.classList.toggle('is-on', k === i); });
+      if (arc) arc.style.transform = 'rotate(' + (i * 60) + 'deg)';
       i = (i + 1) % nodes.length;
     }, 1500);
   }

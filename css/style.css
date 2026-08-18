@@ -1132,18 +1132,70 @@ a:hover .roll span { transform: translateY(-100%); }
   text-shadow: 0 0 40px rgba(198, 255, 61, 0.35);
 }
 .loop-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.ring-track { fill: none; stroke: rgba(237, 242, 234, 0.09); stroke-width: 0.4; }
+
+/* cadran: gradatii pe exterior */
+.ring-ticks line { stroke: rgba(237, 242, 234, 0.16); stroke-width: 0.3; }
+.ring-ticks .t-long { stroke: rgba(198, 255, 61, 0.4); stroke-width: 0.5; }
+
+/* hexagonul inscris, acelasi semn ca marca */
+.ring-hex {
+  fill: rgba(198, 255, 61, 0.022);
+  stroke: rgba(198, 255, 61, 0.22);
+  stroke-width: 0.35;
+}
+
+.ring-track { fill: none; stroke: rgba(237, 242, 234, 0.16); stroke-width: 0.4; }
 .ring-dash {
   fill: none;
   stroke: var(--lime);
-  stroke-width: 0.5;
-  stroke-dasharray: 2 7;
-  opacity: 0.55;
-  animation: ringSpin 28s linear infinite;
-  transform-origin: 50% 50%;
+  stroke-width: 0.4;
+  stroke-dasharray: 1.5 7;
+  opacity: 0.4;
+  animation: ringSpin 34s linear infinite;
+  transform-origin: 50px 50px;
 }
 @keyframes ringSpin { to { transform: rotate(360deg); } }
-.ring-dot { fill: var(--lime); filter: drop-shadow(0 0 4px rgba(198, 255, 61, 0.9)); }
+
+/* segmentul aprins, care sare pe nodul activ */
+.ring-arc {
+  stroke: var(--lime);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  transform-origin: 50px 50px;
+  transition: transform 0.55s var(--ease);
+  filter: drop-shadow(0 0 3px rgba(198, 255, 61, 0.8));
+}
+
+/* marcajele de pe cerc, in dreptul fiecarui nod */
+.ring-mark {
+  fill: rgba(237, 242, 234, 0.4);
+  transition: fill 0.4s var(--ease), filter 0.4s var(--ease);
+}
+.ring-mark.is-on { fill: var(--lime); filter: drop-shadow(0 0 3px var(--lime)); }
+
+/* punctul care orbiteaza si coada lui */
+.ring-dot { fill: #f4ffe4; filter: drop-shadow(0 0 4px rgba(198, 255, 61, 1)); }
+.ring-ghost { fill: var(--lime); }
+.ring-ghost.g1 { opacity: 0.45; }
+.ring-ghost.g2 { opacity: 0.18; }
+
+/* maturarea de radar din interiorul cercului */
+.loop-sweep {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    rgba(198, 255, 61, 0.2) 0deg,
+    rgba(198, 255, 61, 0.06) 34deg,
+    rgba(198, 255, 61, 0) 80deg,
+    rgba(198, 255, 61, 0) 360deg
+  );
+  -webkit-mask-image: radial-gradient(closest-side, transparent 38%, #000 44%, #000 100%);
+  mask-image: radial-gradient(closest-side, transparent 38%, #000 44%, #000 100%);
+  animation: ringSpin 9s linear infinite;
+}
 
 .loop-nodes { position: absolute; inset: 0; }
 .loop-node {
