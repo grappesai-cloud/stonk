@@ -39,7 +39,18 @@
   function initParticles() {
     var cv = document.getElementById('bg-canvas');
     if (!cv || !window.ParticleField || reduced) return;
-    new window.ParticleField(cv, { stops: STOPS });
+
+    /* pe telefon textul sta chiar peste forma, iar hero-ul nu are val,
+       asa ca stingem holograma pana ramane textura, nu zgomot */
+    var stops = STOPS.map(function (s) {
+      if (!mqSmall.matches) return s;
+      var c = {}, k;
+      for (k in s) { if (Object.prototype.hasOwnProperty.call(s, k)) c[k] = s[k]; }
+      c.opacity = (c.opacity === undefined ? 1 : c.opacity) * 0.32;
+      return c;
+    });
+
+    new window.ParticleField(cv, { stops: stops });
   }
 
   /* ---------- valul de intuneric --------------------------------------- */
