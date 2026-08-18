@@ -7,6 +7,7 @@ import { formatEther } from 'viem'
 import { Command } from 'commander'
 import { buildContext, type Ctx } from './context.js'
 import { doctor, verifyTbaMath } from './doctor.js'
+import { discover } from './init.js'
 import { tbaAddress } from './erc6551/address.js'
 import { runForever, runOnce } from './runner.js'
 import { startApi } from './api/server.js'
@@ -34,6 +35,46 @@ function ctxOf(): Ctx {
 }
 
 const sym = (ctx: Ctx) => ctx.cfg.network.nativeSymbol
+
+program
+  .command('init <dropsAddress>')
+  .description('citeste ABI-ul verificat de pe explorer si propune semnaturile pentru configurare')
+  .action(async (dropsAddress: string) => {
+    const ctx = ctxOf()
+    const explorer = ctx.cfg.network.explorer
+    if (!explorer) {
+      process.stdout.write('nu e configurat niciun explorer, nu am de unde lua ABI-ul\n')
+      ctx.ledger.close()
+      return
+    }
+    const d = await discover(explorer, dropsAddress)
+    if (!d.verified) {
+      process.stdout.write(
+        `\nContractul ${dropsAddress} nu are ABI verificat pe ${explorer}.\n` +
+          `Scrie semnaturile de mana in configurare, sau cere-le echipei.\n`
+      )
+      ctx.ledger.close()
+      return
+    }
+    process.stdout.write(`\n${d.name ?? 'contract'} ${d.address}\n`)
+    process.stdout.write('\nCANDIDATI PENTRU CITIREA NEREVENDICATULUI (drops.pending.signature)\n')
+    for (const c of d.pending) {
+      process.stdout.write(`  [${String(c.score).padStart(2)}] ${c.signature}\n        ${c.why.join('; ')}\n`)
+    }
+    process.stdout.write('\nCANDIDATI PENTRU LIVRARE (drops.deliverSignature)\n')
+    for (const c of d.deliver) {
+      process.stdout.write(`  [${String(c.score).padStart(2)}] ${c.signature}\n        ${c.why.join('; ')}\n`)
+    }
+    if (d.errors.length) {
+      process.stdout.write('\nERORI PROPRII (drops.errorSignatures), pune-le ca simularea sa spuna nume, nu hex\n')
+      for (const e of d.errors) process.stdout.write(`  ${e}\n`)
+    }
+    process.stdout.write(
+      '\nAlegi tu, nu ghicesc eu: un nume ca `claim` poate face trei lucruri diferite.\n' +
+        'Dupa ce le pui in configurare, `courier doctor` iti spune daca ai nimerit.\n'
+    )
+    ctx.ledger.close()
+  })
 
 program
   .command('doctor')
