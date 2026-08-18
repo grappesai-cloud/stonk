@@ -47,6 +47,12 @@ Trei adrese si doua semnaturi:
 Contractul de drop-uri se descrie prin semnaturi in fisierul de configurare, nu
 prin cod. Cand vin adresele reale, se editeaza `config/default.json`, nu sursele.
 
+Si nici semnaturile nu trebuie scrise de mana: `courier init <adresa>` citeste
+ABI-ul verificat de pe explorer, urmareste proxy-ul catre implementare daca e
+cazul, si propune candidatii cu punctaj si motiv. Alegerea ramane a ta, ca o
+functie numita `claim` poate face trei lucruri diferite, dar nu mai pornesti de
+la o pagina goala.
+
 Verificat pe 19 august 2026: pe Robinhood Chain (4663) sunt deja desfasurate
 registrul canonic ERC-6551, implementarea tokenbound si Multicall3. Adica
 infrastructura pe care se sprijina Courier-ul exista deja acolo.
@@ -59,6 +65,7 @@ cp .env.example .env          # cheia sta aici, niciodata in config
 cp config/robinhood.example.json config/default.json
 # completezi cele doua adrese marcate TODO
 
+npx tsx src/cli.ts init 0xADRESA_DROPS   # citeste ABI-ul si propune semnaturile
 npx tsx src/cli.ts doctor     # trece tot?
 npx tsx src/cli.ts scan       # cine are ceva nerevendicat
 npx tsx src/cli.ts simulate   # ce s-ar livra, cu ce gaz, si de ce nu restul
@@ -72,6 +79,7 @@ Implicit nu se trimite nimic. `--live` se scrie de mana de fiecare data.
 
 | comanda | ce face |
 |---|---|
+| `init <adresa>` | citeste ABI-ul verificat de pe explorer si propune semnaturile pentru configurare |
 | `doctor` | verifica lantul, contractele, matematica adreselor si daca `deliver()` e apelabila de un strain |
 | `scan` | cine are ceva nerevendicat si cat valoreaza |
 | `wall` | peretele uitatilor, din ultima scanare |

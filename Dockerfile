@@ -1,10 +1,9 @@
 FROM node:22-alpine AS build
 WORKDIR /app
-COPY package*.json tsconfig.json ./
+COPY package*.json tsconfig.json tsconfig.build.json ./
 RUN npm ci
 COPY src ./src
-COPY test ./test
-RUN npx tsc -p tsconfig.json
+RUN npx tsc -p tsconfig.build.json
 
 FROM node:22-alpine
 WORKDIR /app

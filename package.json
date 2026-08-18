@@ -7,7 +7,7 @@
   "engines": { "node": ">=22" },
   "bin": { "courier": "./bin/courier.js" },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsx src/cli.ts",
     "courier": "tsx src/cli.ts",
     "test": "vitest run test/unit",
