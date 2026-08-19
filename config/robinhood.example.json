@@ -1,6 +1,14 @@
 {
   "_": "Robinhood Chain. Inlocuieste cele trei adrese marcate TODO cu cele reale de la StonkBrokers si ruleaza mai intai `courier doctor`.",
 
+  "_agent": "Agentul in numele caruia lucreaza procesul. Se pune de la inceput: fara el registrul stie ce s-a livrat, dar nu cine a livrat, si nu se poate dovedi niciodata ce a castigat o bucata anume.",
+  "agent": {
+    "id": 0,
+    "name": "COURIER #0000",
+    "wallet": null,
+    "owner": null
+  },
+
   "network": {
     "name": "robinhood",
     "chainId": 4663,

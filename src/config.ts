@@ -73,6 +73,29 @@ export const ConfigSchema = z.object({
    */
   watchtower: z.boolean().default(false),
 
+  /** adresa publica la care raspunde API-ul; din ea se compun linkurile din alerte */
+  publicUrl: z.string().url().nullable().default(null),
+
+  /**
+   * Agentul in numele caruia lucreaza procesul asta.
+   *
+   * Fara el, Courier e "botul nostru" si nimic mai mult: registrul stie ce s-a
+   * livrat, dar nu cine a livrat. Or toata povestea colectiei sta pe fraza
+   * "agentul TAU munceste", iar aia nu se poate dovedi fara atribuire.
+   *
+   * Se pune de la inceput, chiar inainte sa existe mintul: agentul #0000 e
+   * prototipul casei, iar in ziua lansarii are deja istoric adevarat in loc de
+   * promisiuni.
+   */
+  agent: z.object({
+    id: z.number().int().min(0).nullable().default(null),
+    name: z.string().default('COURIER #0000'),
+    /** portofelul 6551 al agentului; acolo ajung bacsisurile */
+    wallet: zAddress.nullable().default(null),
+    /** proprietarul agentului, doar pentru afisare */
+    owner: zAddress.nullable().default(null)
+  }).default({}),
+
   network: z.object({
     name: z.string(),
     chainId: z.number().int().positive(),

@@ -95,6 +95,7 @@ ${TERM_LAYERS}
 
   <header>
     <span class="logo">COURIER<b>//</b>CONSOLE</span>
+    <span class="chip" id="agent" hidden></span>
     <span class="st"><i class="led" id="led"></i><span id="state">CONNECTING</span><i class="cur"></i></span>
     <span class="sp">
       <button class="b" id="dry" disabled>dry run</button>
@@ -312,6 +313,15 @@ async function load(){
   paused = s.paused; nextRunAt = s.nextRunAt;
 
   const wt = !!s.watchtower;
+  /* in numele cui lucreaza procesul asta. Fara linia asta, cine se uita la
+     panou nu are cum sa stie ca munca se contorizeaza pe o bucata anume. */
+  const ag = $('agent');
+  if (s.agent && s.agent.id !== null) {
+    ag.hidden = false;
+    ag.textContent = s.agent.name + (s.agentTotals ? ' · ' + s.agentTotals.deliveries + ' jobs' : '');
+  } else {
+    ag.hidden = true;
+  }
   $('state').textContent = s.running ? (wt ? 'SCANNING' : 'RUNNING')
     : s.paused ? 'STOPPED' : (wt ? 'WATCH' : (s.dryRun ? 'DRY' : 'ONLINE'));
   $('led').className = 'led' + (s.paused ? ' off' : (s.dryRun && !wt ? ' warn' : ''));

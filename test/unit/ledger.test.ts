@@ -16,7 +16,7 @@ describe('registrul', () => {
     const run = l.startRun('profit', false)
     const huge = 123456789012345678901234567890n
     l.recordDelivery({
-      runId: run,
+      runId: run, agentId: 0,
       tokenId: '1',
       wallet: W1,
       owner: OWNER,
@@ -39,7 +39,7 @@ describe('registrul', () => {
     const l = led()
     const run = l.startRun('profit', false)
     const row = {
-      runId: run,
+      runId: run, agentId: 0,
       tokenId: '5',
       wallet: W1,
       owner: null,
@@ -63,7 +63,7 @@ describe('registrul', () => {
     const run = l.startRun('profit', false)
     for (const id of ['1', '2', '3']) {
       l.recordDelivery({
-        runId: run, tokenId: id, wallet: W1, owner: null, valueWei: 0n, nativeWei: 0n,
+        runId: run, agentId: 0, tokenId: id, wallet: W1, owner: null, valueWei: 0n, nativeWei: 0n,
         tipWei: 0n, gasWei: 0n, txHash: '0xbatch', blockNumber: null, status: 'sent', reason: null
       })
     }
@@ -104,7 +104,7 @@ describe('registrul', () => {
     const l = led()
     const run = l.startRun('profit', true)
     l.recordDelivery({
-      runId: run, tokenId: '9', wallet: W1, owner: null, valueWei: 1n, nativeWei: 1n,
+      runId: run, agentId: 0, tokenId: '9', wallet: W1, owner: null, valueWei: 1n, nativeWei: 1n,
       tipWei: 0n, gasWei: 0n, txHash: null, blockNumber: null, status: 'dry', reason: 'uscat'
     })
     expect(l.lastDeliveryAt('9')).toBe(null)

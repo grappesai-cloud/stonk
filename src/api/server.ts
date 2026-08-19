@@ -10,8 +10,21 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { formatEther } from 'viem'
 import type { Ctx } from '../context.js'
 import { wallPage } from './page.js'
+import { agentPage, walletPage } from './pages.js'
 import { serveFont } from '../ui/assets.js'
 import { log } from '../log.js'
+
+function htmlPage(res: ServerResponse, body: string): void {
+  res.writeHead(200, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'public, max-age=30',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+    'content-security-policy':
+      "default-src 'none'; connect-src 'self'; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+  })
+  res.end(body)
+}
 
 function json(res: ServerResponse, status: number, body: unknown, cors: string): void {
   const text = JSON.stringify(body, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))
@@ -88,7 +101,64 @@ export function createApi(ctx: Ctx) {
     if (serveFont(url.pathname, res)) return
     const limit = Math.min(Number(url.searchParams.get('limit') ?? 50) || 50, 500)
 
+    /* rutele cu prefix se rezolva inaintea switch-ului: sunt mai usor de citit
+       aici decat strecurate intr-un case cu expresie */
     try {
+      if (url.pathname.startsWith('/a/')) return htmlPage(res, agentPage(cfg))
+      if (url.pathname.startsWith('/w/')) return htmlPage(res, walletPage(cfg))
+      if (url.pathname.startsWith('/api/agent/')) {
+        const raw = decodeURIComponent(url.pathname.slice('/api/agent/'.length))
+        const id = Number(raw)
+        if (!Number.isInteger(id) || id < 0) return json(res, 400, { error: 'invalid agent id' }, cors)
+        const t = ledger.agentTotals(id)
+        return json(
+          res,
+          200,
+          {
+            id,
+            name: cfg.agent.id === id ? cfg.agent.name : `AGENT #${String(id).padStart(4, '0')}`,
+            wallet: cfg.agent.id === id ? cfg.agent.wallet : null,
+            deliveries: t.deliveries,
+            wallets: t.wallets,
+            deliveredEth: eth(t.valueWei),
+            earnedEth: eth(t.tipsWei),
+            gasEth: eth(t.gasWei),
+            netEth: eth(t.netWei),
+            firstAt: t.firstAt,
+            lastAt: t.lastAt,
+            history: ledger.agentHistory(id, 20).map((h) => ({
+              tokenId: h.tokenId,
+              valueEth: eth(h.valueWei),
+              at: h.at,
+              txHash: h.txHash
+            }))
+          },
+          cors
+        )
+      }
+      if (url.pathname.startsWith('/api/wallet/')) {
+        const raw = decodeURIComponent(url.pathname.slice('/api/wallet/'.length))
+        if (!/^0x[0-9a-fA-F]{40}$/.test(raw)) return json(res, 400, { error: 'invalid address' }, cors)
+        const v = ledger.walletView(raw, limit)
+        return json(
+          res,
+          200,
+          {
+            address: raw,
+            pendingEth: eth(v.pending.reduce((s2, p) => s2 + p.valueWei, 0n)),
+            pending: v.pending.map((p) => ({
+              tokenId: p.tokenId,
+              wallet: p.wallet,
+              valueEth: eth(p.valueWei),
+              ageDays: p.ageDays
+            })),
+            delivered: { count: v.delivered.count, valueEth: eth(v.delivered.valueWei), lastAt: v.delivered.lastAt },
+            history: v.history.map((h) => ({ tokenId: h.tokenId, valueEth: eth(h.valueWei), at: h.at, txHash: h.txHash }))
+          },
+          cors
+        )
+      }
+
       switch (url.pathname) {
         case '/health': {
           const block = await ctx.client.getBlockNumber()
@@ -200,6 +270,22 @@ export function createApi(ctx: Ctx) {
             netEth: eth(t.netWei)
           })
           return json(res, 200, { day: shape(ledger.totals(day)), week: shape(ledger.totals(week)), all: shape(ledger.totals(0)) }, cors)
+        }
+
+        case '/leaderboard': {
+          return json(
+            res,
+            200,
+            {
+              rows: ledger.leaderboard(20).map((r) => ({
+                agentId: r.agentId,
+                deliveries: r.deliveries,
+                deliveredEth: eth(r.valueWei),
+                earnedEth: eth(r.tipsWei)
+              }))
+            },
+            cors
+          )
         }
 
         default:

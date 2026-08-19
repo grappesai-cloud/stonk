@@ -37,7 +37,7 @@ for (let i = 1; i <= 40; i++) {
 // livrate deja
 for (let i = 100; i < 118; i++) {
   ledger.recordDelivery({
-    runId: run,
+    runId: run, agentId: 0,
     tokenId: String(i),
     wallet: addr(i),
     owner: addr(i + 500),
@@ -67,7 +67,7 @@ for (let i = 0; i < 4; i++) {
 for (const [reason, n] of [['below the value floor', 31], ['delivery cooldown', 12], ['nothing left to deliver', 7], ['tip under gas', 3]] as const) {
   for (let i = 0; i < n; i++) {
     ledger.recordDelivery({
-      runId: run, tokenId: String(900 + i), wallet: addr(900 + i), owner: null,
+      runId: run, agentId: 0, tokenId: String(900 + i), wallet: addr(900 + i), owner: null,
       valueWei: 0n, nativeWei: 0n, tipWei: 0n, gasWei: 0n, txHash: null, blockNumber: null,
       status: 'skipped', reason
     })
@@ -85,6 +85,8 @@ rows.forEach((r) => stamp.run(nowSec - Math.floor(r2() * 3600), r.id))
 
 /* `--watchtower` arata cum se vede modul de veghe, fara livrari */
 if (process.argv.includes('--watchtower')) cfg.watchtower = true
+
+cfg.agent = { id: 0, name: 'COURIER #0000', wallet: addr(4242) as `0x${string}`, owner: null }
 
 cfg.console.enabled = true
 cfg.console.token = 'demo'

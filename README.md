@@ -9,6 +9,37 @@ Nu e un demo si nu e un MVP. Are simulare inainte de fiecare tranzactie, frane
 de cheltuiala, reconciliere dupa cadere, alerte, API de citire si teste
 cap-coada pe un lant real cu contracte reale.
 
+## Pregatirea de lansare
+
+Planul, blocajele si cine raspunde de fiecare: **[LAUNCH.md](LAUNCH.md)**.
+Pe scurt: intrebarea cu `deliver()` blocheaza livrarea, nu si indexul, deci
+etapa 1 (veghe) poate porni in saptamana in care primim adresele.
+
+## Pagini publice
+
+| ruta | ce arata |
+|---|---|
+| `/` | peretele uitatilor: tot ce zace nerevendicat |
+| `/w/0x...` | **pagina unei adrese**: ce are de luat si ce i s-a livrat |
+| `/a/0` | **pagina unui agent**: ce a livrat si cat a castigat bucata aia |
+| `/leaderboard` | clasamentul flotei |
+
+Peretele general e frumos, dar nimeni nu il da mai departe. Pagina LUI, cu banii
+LUI, da. De aia fiecare rand din perete duce la `/w/`, si de aia alerta de
+Telegram contine acelasi link.
+
+## Atribuirea pe agent
+
+Fiecare rand din registru poarta **id-ul agentului** care a facut treaba. Fara
+asta, Courier ramane "botul nostru": registrul stie ce s-a livrat, dar nu cine a
+livrat, si nu se poate dovedi niciodata ce a castigat o bucata anume. Toata
+povestea colectiei sta pe fraza "agentul TAU munceste".
+
+Se pune de la inceput, inainte sa existe mintul: agentul `#0000` e prototipul
+casei, iar in ziua lansarii are deja istoric adevarat.
+
+Bazele facute inainte primesc coloana la pornire, fara sa se piarda niciun rand.
+
 ## Doua moduri
 
 **Veghe** (`courier start --watchtower`, sau `"watchtower": true` in config):

@@ -18,6 +18,7 @@ export type DeliveryStatus = 'sent' | 'confirmed' | 'reverted' | 'skipped' | 'fa
 
 export interface DeliveryRow {
   runId: number
+  agentId: number | null
   tokenId: string
   wallet: string
   owner: string | null
@@ -76,6 +77,7 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS deliveries (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id INTEGER NOT NULL,
+  agent_id INTEGER,
   token_id TEXT NOT NULL,
   wallet TEXT NOT NULL,
   owner TEXT,
@@ -92,6 +94,8 @@ CREATE TABLE IF NOT EXISTS deliveries (
 CREATE INDEX IF NOT EXISTS deliveries_token ON deliveries(token_id);
 CREATE INDEX IF NOT EXISTS deliveries_status ON deliveries(status);
 CREATE INDEX IF NOT EXISTS deliveries_created ON deliveries(created_at);
+-- indexul pe agent se face in migrate(): pe o baza veche coloana inca nu
+-- exista aici, si CREATE INDEX ar crapa inainte sa apucam sa o adaugam
 CREATE UNIQUE INDEX IF NOT EXISTS deliveries_tx_token ON deliveries(tx_hash, token_id) WHERE tx_hash IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS claims (
@@ -128,6 +132,20 @@ export class Ledger {
     if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true })
     this.db = new DatabaseSync(file)
     this.db.exec(SCHEMA)
+    this.migrate()
+  }
+
+  /**
+   * Baze facute inainte de atribuire nu au coloana agentului. Se adauga la
+   * pornire, o singura data. E mai bine decat sa ceri stergerea registrului:
+   * registrul e produsul, nu se arunca pentru o coloana.
+   */
+  private migrate(): void {
+    const cols = this.db.prepare('PRAGMA table_info(deliveries)').all() as Array<{ name: string }>
+    if (!cols.some((c) => c.name === 'agent_id')) {
+      this.db.exec('ALTER TABLE deliveries ADD COLUMN agent_id INTEGER')
+    }
+    this.db.exec('CREATE INDEX IF NOT EXISTS deliveries_agent ON deliveries(agent_id)')
   }
 
   close(): void {
@@ -171,11 +189,12 @@ export class Ledger {
     this.db
       .prepare(
         `INSERT OR IGNORE INTO deliveries
-         (run_id, token_id, wallet, owner, value_wei, native_wei, tip_wei, gas_wei, tx_hash, block_number, status, reason, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         (run_id, agent_id, token_id, wallet, owner, value_wei, native_wei, tip_wei, gas_wei, tx_hash, block_number, status, reason, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         d.runId,
+        d.agentId,
         d.tokenId,
         d.wallet,
         d.owner,
@@ -545,6 +564,146 @@ export class Ledger {
   lastRunAt(): number | null {
     const r = this.db.prepare('SELECT MAX(started_at) AS t FROM runs').get() as { t: number | null }
     return r?.t ?? null
+  }
+
+  // ---------------------------------------------------------------- agenti
+  /**
+   * Socoteala unui singur agent. Asta e cifra pe care o vinde toata colectia:
+   * nu "flota a livrat", ci "bucata asta a livrat si a castigat atat".
+   */
+  agentTotals(
+    agentId: number,
+    sinceTs = 0
+  ): { deliveries: number; wallets: number; valueWei: bigint; tipsWei: bigint; gasWei: bigint; netWei: bigint; firstAt: number | null; lastAt: number | null } {
+    const rows = this.db
+      .prepare(
+        `SELECT value_wei, tip_wei, gas_wei, wallet, created_at FROM deliveries
+         WHERE agent_id = ? AND created_at >= ? AND status IN ('sent','confirmed')`
+      )
+      .all(agentId, sinceTs) as Array<{
+      value_wei: string
+      tip_wei: string
+      gas_wei: string
+      wallet: string
+      created_at: number
+    }>
+    let valueWei = 0n
+    let tipsWei = 0n
+    let gasWei = 0n
+    let firstAt: number | null = null
+    let lastAt: number | null = null
+    const wallets = new Set<string>()
+    for (const r of rows) {
+      valueWei += BigInt(r.value_wei)
+      tipsWei += BigInt(r.tip_wei)
+      gasWei += BigInt(r.gas_wei)
+      wallets.add(r.wallet)
+      if (firstAt === null || r.created_at < firstAt) firstAt = r.created_at
+      if (lastAt === null || r.created_at > lastAt) lastAt = r.created_at
+    }
+    return { deliveries: rows.length, wallets: wallets.size, valueWei, tipsWei, gasWei, netWei: tipsWei - gasWei, firstAt, lastAt }
+  }
+
+  /** ce a livrat un agent, in ordine */
+  agentHistory(
+    agentId: number,
+    limit = 20
+  ): Array<{ tokenId: string; valueWei: bigint; at: number; txHash: string | null }> {
+    const rows = this.db
+      .prepare(
+        `SELECT token_id, value_wei, created_at, tx_hash FROM deliveries
+         WHERE agent_id = ? AND status IN ('sent','confirmed')
+         ORDER BY created_at DESC LIMIT ?`
+      )
+      .all(agentId, limit) as Array<{ token_id: string; value_wei: string; created_at: number; tx_hash: string | null }>
+    return rows.map((r) => ({
+      tokenId: r.token_id,
+      valueWei: BigInt(r.value_wei),
+      at: r.created_at,
+      txHash: r.tx_hash
+    }))
+  }
+
+  /** clasamentul flotei; gol pana exista mai multi agenti, si e in regula */
+  leaderboard(limit = 20, sinceTs = 0): Array<{ agentId: number; deliveries: number; valueWei: bigint; tipsWei: bigint }> {
+    const rows = this.db
+      .prepare(
+        `SELECT agent_id, value_wei, tip_wei FROM deliveries
+         WHERE agent_id IS NOT NULL AND created_at >= ? AND status IN ('sent','confirmed')`
+      )
+      .all(sinceTs) as Array<{ agent_id: number; value_wei: string; tip_wei: string }>
+    const map = new Map<number, { deliveries: number; valueWei: bigint; tipsWei: bigint }>()
+    for (const r of rows) {
+      const cur = map.get(r.agent_id) ?? { deliveries: 0, valueWei: 0n, tipsWei: 0n }
+      cur.deliveries++
+      cur.valueWei += BigInt(r.value_wei)
+      cur.tipsWei += BigInt(r.tip_wei)
+      map.set(r.agent_id, cur)
+    }
+    return [...map.entries()]
+      .map(([agentId, v]) => ({ agentId, ...v }))
+      .sort((a, b) => (a.tipsWei > b.tipsWei ? -1 : a.tipsWei < b.tipsWei ? 1 : 0))
+      .slice(0, limit)
+  }
+
+  // -------------------------------------------------------- pe portofel
+  /**
+   * Tot ce stim despre o adresa: ce i s-a livrat si ce ii mai sta nerevendicat.
+   * Cauta si dupa portofelul 6551, si dupa proprietar, fiindca omul stie de
+   * obicei doar adresa lui, nu si pe a portofelului brokerului.
+   */
+  walletView(
+    address: string,
+    limit = 25
+  ): {
+    delivered: { count: number; valueWei: bigint; lastAt: number | null }
+    pending: Array<{ tokenId: string; wallet: string; valueWei: bigint; ageDays: number }>
+    history: Array<{ tokenId: string; valueWei: bigint; at: number; txHash: string | null }>
+  } {
+    const a = address.toLowerCase()
+    const hist = this.db
+      .prepare(
+        `SELECT token_id, value_wei, created_at, tx_hash FROM deliveries
+         WHERE (LOWER(wallet) = ? OR LOWER(owner) = ?) AND status IN ('sent','confirmed')
+         ORDER BY created_at DESC LIMIT ?`
+      )
+      .all(a, a, limit) as Array<{ token_id: string; value_wei: string; created_at: number; tx_hash: string | null }>
+
+    const all = this.db
+      .prepare(
+        `SELECT value_wei, created_at FROM deliveries
+         WHERE (LOWER(wallet) = ? OR LOWER(owner) = ?) AND status IN ('sent','confirmed')`
+      )
+      .all(a, a) as Array<{ value_wei: string; created_at: number }>
+
+    const pend = this.db
+      .prepare(
+        `SELECT token_id, wallet, value_wei, first_seen FROM claims
+         WHERE delivered_at IS NULL AND value_wei != '0' AND (LOWER(wallet) = ? OR LOWER(owner) = ?)
+         ORDER BY CAST(value_wei AS REAL) DESC LIMIT ?`
+      )
+      .all(a, a, limit) as Array<{ token_id: string; wallet: string; value_wei: string; first_seen: number }>
+
+    const t = now()
+    return {
+      delivered: {
+        count: all.length,
+        valueWei: all.reduce((s, r) => s + BigInt(r.value_wei), 0n),
+        lastAt: all.length ? Math.max(...all.map((r) => r.created_at)) : null
+      },
+      pending: pend.map((r) => ({
+        tokenId: r.token_id,
+        wallet: r.wallet,
+        valueWei: BigInt(r.value_wei),
+        ageDays: Math.floor((t - r.first_seen) / 86400)
+      })),
+      history: hist.map((r) => ({
+        tokenId: r.token_id,
+        valueWei: BigInt(r.value_wei),
+        at: r.created_at,
+        txHash: r.tx_hash
+      }))
+    }
   }
 
   // -------------------------------------------------------------- watchers

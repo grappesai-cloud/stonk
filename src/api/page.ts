@@ -149,7 +149,14 @@ async function tick(){
         a.href = EXPLORER + '/address/' + r.wallet; a.target = '_blank'; a.rel = 'noopener';
         a.textContent = short(r.wallet); w.appendChild(a);
       } else { w.textContent = short(r.wallet); }
-      tr.append(td('#' + r.tokenId, 'dim'), w, td(waited(r.ageDays), 'dim'), td(num(r.valueEth, 4), 'g'));
+      /* id-ul duce la pagina portofelului: aia e pagina care se da mai departe,
+         nu peretele general */
+      const idCell = document.createElement('td'); idCell.className = 'dim';
+      const idLink = document.createElement('a');
+      idLink.href = '/w/' + r.wallet;
+      idLink.textContent = '#' + r.tokenId;
+      idCell.appendChild(idLink);
+      tr.append(idCell, w, td(waited(r.ageDays), 'dim'), td(num(r.valueEth, 4), 'g'));
       body.appendChild(tr);
     }
     $('empty').hidden = wall.rows.length > 0;

@@ -98,6 +98,9 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
   }
 
   const from = account?.address ?? '0x0000000000000000000000000000000000000000'
+  /* fiecare rand scris de aici poarta id-ul agentului in numele caruia s-a
+     lucrat; fara el nu se poate dovedi niciodata ce a castigat o bucata anume */
+  const agentId = cfg.agent.id
 
   // 2. pretul gazului
   const gasPriceWei = await client.getGasPrice()
@@ -131,7 +134,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     } catch (e) {
       log.error({ err: (e as Error).message }, 'batch simulation failed, skipping the batch')
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', `simulation failed: ${(e as Error).message}`))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', `simulation failed: ${(e as Error).message}`, agentId))
         out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail: 'simulation failed' })
       }
       continue
@@ -144,7 +147,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
         'Deploy CourierBatch, switch to campaign mode, or set requireMeasuredTips to false and accept delivering blind.'
       out.stoppedBy = detail
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', detail))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', detail, agentId))
         out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail })
       }
       log.error(detail)
@@ -154,7 +157,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     const verdict = decideProfit({ tipWei: sim.tipsWei, gasCostWei: sim.gasCostWei, cfg })
     if (!verdict.go && sim.tipsMeasured) {
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', verdict.detail))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', verdict.detail, agentId))
         out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail: verdict.detail })
       }
       continue
@@ -165,7 +168,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     if (!budget.go) {
       out.stoppedBy = `daily budget spent: ${budget.detail}`
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', budget.detail))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', budget.detail, agentId))
         out.skipped.push({ tokenId: c.tokenId, reason: 'daily-budget', detail: budget.detail })
       }
       break
@@ -174,7 +177,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     // 5. modul uscat: totul s-a calculat, nu se semneaza nimic
     if (cfg.execution.dryRun) {
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'dry', 'dry run'))
+        ledger.recordDelivery(row(runId, c, owners, 'dry', 'dry run', agentId))
       }
       out.tipsWei += sim.tipsWei
       out.gasWei += sim.gasCostWei
@@ -192,7 +195,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     if (balance < sim.gasCostWei) {
       out.stoppedBy = `balance too low: ${balance} under the estimated gas ${sim.gasCostWei}`
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', 'balance too low'))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', 'balance too low', agentId))
       }
       break
     }
@@ -203,7 +206,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       out.txHashes.push(hash)
       for (const c of group) {
         ledger.recordDelivery({
-          ...row(runId, c, owners, 'sent', null),
+          ...row(runId, c, owners, 'sent', null, agentId),
           txHash: hash
         })
       }
@@ -242,7 +245,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       const msg = (e as Error).message
       log.error({ err: msg }, 'sending the batch failed')
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'failed', msg))
+        ledger.recordDelivery(row(runId, c, owners, 'failed', msg, agentId))
       }
       out.stoppedBy = `send failed: ${msg}`
       break
@@ -321,10 +324,12 @@ function row(
   c: Claim,
   owners: Map<bigint, Address>,
   status: 'sent' | 'skipped' | 'failed' | 'dry',
-  reason: string | null
+  reason: string | null,
+  agentId: number | null = null
 ) {
   return {
     runId,
+    agentId,
     tokenId: c.tokenId.toString(),
     wallet: c.wallet,
     owner: owners.get(c.tokenId) ?? null,

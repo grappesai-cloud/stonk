@@ -224,3 +224,15 @@ describe('somnul buclei', () => {
     expect(c.take()).toEqual({ dry: false })
   })
 })
+
+describe('atribuirea pe agent', () => {
+  const auth = { authorization: `Bearer ${TOKEN}` }
+
+  it('starea spune in numele cui lucreaza', async () => {
+    const s = (await (await fetch(`${base}/api/state`, { headers: auth })).json()) as {
+      agent: { id: number | null; name: string }
+    }
+    expect(s.agent).toBeTruthy()
+    expect(s.agent.name).toBe('COURIER #0000')
+  })
+})

@@ -156,7 +156,8 @@ export class Telegram {
           [
             `<b>Delivered to you</b>`,
             `Broker #${esc(i.tokenId)} · ${fmt(i.valueWei)} ${this.cfg.network.nativeSymbol}`,
-            i.txHash && explorer ? `<a href="${explorer}/tx/${i.txHash}">transaction</a>` : ''
+            i.txHash && explorer ? `<a href="${explorer}/tx/${i.txHash}">transaction</a>` : '',
+            this.walletLink(i.wallet)
           ]
             .filter(Boolean)
             .join('\n')
@@ -200,11 +201,20 @@ export class Telegram {
           [
             `<b>You have unclaimed value</b>`,
             `Broker #${esc(i.tokenId)} is holding ${fmt(i.valueWei)} ${sym} that was never claimed.`,
-            `Nothing to do and nothing to sign. Courier delivers it when it runs.`
-          ].join('\n')
+            `Nothing to do and nothing to sign. Courier delivers it when it runs.`,
+            this.walletLink(i.wallet)
+          ]
+            .filter(Boolean)
+            .join('\n')
         )
       }
     }
+  }
+
+  /** linkul catre pagina adresei, daca stim unde suntem publicati */
+  private walletLink(wallet: Address): string {
+    const base = this.cfg.publicUrl
+    return base ? `<a href="${base.replace(/\/+$/, '')}/w/${wallet}">see it</a>` : ''
   }
 
   async gasLow(balanceWei: bigint, address: Address): Promise<void> {

@@ -145,6 +145,11 @@ export function createConsole(ctx: Ctx) {
 
       return json(res, 200, {
         watchtower: cfg.watchtower,
+        agent: { id: cfg.agent.id, name: cfg.agent.name, wallet: cfg.agent.wallet },
+        agentTotals: cfg.agent.id === null ? null : (() => {
+          const t = ledger.agentTotals(cfg.agent.id)
+          return { deliveries: t.deliveries, earnedEth: eth(t.tipsWei), deliveredEth: eth(t.valueWei) }
+        })(),
         paused: existsSync(killFile),
         running: ctx.control.running,
         canRun: ctx.control.attached,
