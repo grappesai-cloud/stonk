@@ -320,7 +320,7 @@ de prezentare ramane pe pielea lui curata; uneltele arata a unelte.
 
 Totul in `src/ui/terminal.ts`, un singur loc de schimbat.
 
-## Consola de operator## Consola de operator
+## Consola de operator
 
 `courier console`, sau pornita odata cu `start`. Acelasi limbaj vizual ca
 site-ul: negru, un singur verde, cifre monospace.
