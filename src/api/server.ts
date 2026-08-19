@@ -216,7 +216,9 @@ export function createApi(ctx: Ctx) {
             chainOk = false
           }
           const h = healthOf(ledger.lastFinishedRunAt(), cfg)
-          const ok = chainOk && !h.stale
+          /* in asteptare nu se termina rulari, deci vechimea nu inseamna nimic:
+             procesul e sanatos, ii lipsesc adresele */
+          const ok = chainOk && (!h.stale || ctx.control.standby !== null)
           return json(
             res,
             ok ? 200 : 503,
@@ -227,6 +229,7 @@ export function createApi(ctx: Ctx) {
               block,
               mode: cfg.watchtower ? 'watchtower' : cfg.policy.mode,
               dry: cfg.execution.dryRun,
+              standby: ctx.control.standby,
               lastRunAt: h.lastRunAt,
               ageSec: h.ageSec,
               staleAfterSec: h.staleAfterSec,

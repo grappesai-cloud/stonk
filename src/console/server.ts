@@ -152,6 +152,8 @@ export function createConsole(ctx: Ctx) {
           return { deliveries: t.deliveries, earnedEth: eth(t.tipsWei), deliveredEth: eth(t.valueWei) }
         })(),
         paused: existsSync(killFile),
+        /* lipsa adreselor nu e o eroare, e o asteptare; consola o spune asa */
+        standby: ctx.control.standby,
         running: ctx.control.running,
         canRun: ctx.control.attached,
         nextRunAt: ctx.control.nextRunAt,

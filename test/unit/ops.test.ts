@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { backupDue, backupOnce, listBackups } from '../../src/ledger/backup.js'
 import { Ledger } from '../../src/ledger/db.js'
 import { healthOf, isWedged, staleAfterSec, watchdogSec } from '../../src/health.js'
+import { placeholders, standbyReason } from '../../src/standby.js'
 import { loadConfig } from '../../src/config.js'
 
 const W1 = '0x1111111111111111111111111111111111111111'
@@ -176,5 +177,36 @@ describe('cat de viu e', () => {
     expect(isWedged(0, 900 * 1000, 900)).toBe(false)
     expect(isWedged(0, 901 * 1000, 900)).toBe(true)
     expect(isWedged(0, 10_000_000, null)).toBe(false)
+  })
+})
+
+describe('asteptarea dupa adrese', () => {
+  const ZERO = '0x0000000000000000000000000000000000000000'
+
+  it('vede care adresa e inca substituent', () => {
+    const c = cfg()
+    expect(placeholders(c)).toEqual([])
+    const both = { ...c, brokers: { ...c.brokers, address: ZERO }, drops: { ...c.drops, address: ZERO } }
+    expect(placeholders(both as typeof c)).toEqual(['brokers.address', 'drops.address'])
+  })
+
+  it('spune ca asteapta, in loc sa incerce si sa cada de cinci ori', async () => {
+    const c = cfg()
+    const waiting = { ...c, brokers: { ...c.brokers, address: ZERO } }
+    const client = { getCode: async () => '0x60' } as never
+    expect(await standbyReason(client, waiting as typeof c)).toMatch(/brokers.address still zero/)
+  })
+
+  it('prinde si adresa care arata bine dar nu e contract pe lantul asta', async () => {
+    const c = cfg()
+    const client = { getCode: async () => '0x' } as never
+    const r = await standbyReason(client, c)
+    expect(r).toMatch(/has no code on chain 4663/)
+  })
+
+  it('cand totul e la locul lui, nu mai asteapta', async () => {
+    const c = cfg()
+    const client = { getCode: async () => '0x6080604052' } as never
+    expect(await standbyReason(client, c)).toBe(null)
   })
 })

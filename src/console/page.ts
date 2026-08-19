@@ -329,9 +329,13 @@ async function load(){
   } else {
     ag.hidden = true;
   }
-  $('state').textContent = s.running ? (wt ? 'SCANNING' : 'RUNNING')
+  /* asteptarea bate orice alta stare: daca lipsesc adresele, tot restul e
+     decor si operatorul trebuie sa vada de la prima privire ce lipseste */
+  $('state').textContent = s.standby ? 'STANDBY'
+    : s.running ? (wt ? 'SCANNING' : 'RUNNING')
     : s.paused ? 'STOPPED' : (wt ? 'WATCH' : (s.dryRun ? 'DRY' : 'ONLINE'));
-  $('led').className = 'led' + (s.paused ? ' off' : (s.dryRun && !wt ? ' warn' : ''));
+  $('led').className = 'led' + (s.standby ? ' warn' : (s.paused ? ' off' : (s.dryRun && !wt ? ' warn' : '')));
+  if (s.standby) { const m = $('msg'); m.className = 'msg err'; m.textContent = String(s.standby).toUpperCase(); }
 
   const t = $('toggle');
   t.disabled = false;

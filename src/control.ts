@@ -16,6 +16,8 @@ export class Controller {
   attached = false
   running = false
   nextRunAt: number | null = null
+  /** de ce nu se lucreaza: lipsesc adresele contractelor. null = se lucreaza */
+  standby: string | null = null
   lastOutcome: (RunOutcome & { dry: boolean; at: number }) | null = null
 
   request(dry: boolean): boolean {

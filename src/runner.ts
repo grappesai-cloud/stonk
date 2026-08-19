@@ -17,6 +17,7 @@ import { reconcile } from './reconcile.js'
 import { backupDue, backupOnce } from './ledger/backup.js'
 import { beat, beatFailure } from './alerts/heartbeat.js'
 import { isWedged, watchdogSec } from './health.js'
+import { standbyReason } from './standby.js'
 import { log } from './log.js'
 
 export interface RunOutcome {
@@ -225,6 +226,7 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
      ridica inapoi acelasi restart. */
   const watchdog = watchdogSec(ctx.cfg)
   let lastCompletedMs = Date.now()
+  let lastStandby: string | null = null
   const guard = watchdog
     ? setInterval(() => {
         if (!isWedged(lastCompletedMs, Date.now(), watchdog)) return
@@ -247,23 +249,39 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
     control.nextRunAt = null
 
     try {
-      const o = await runOnce(ctx)
-      control.finished(o, dryThisRun)
-      onRun?.(o)
+      /* Inainte de orice: avem cu ce lucra? Fara adrese, o rulare nu esueaza
+         interesant, esueaza mereu la fel, iar cinci esecuri la rand inchid
+         procesul. Asteptarea e o stare, nu o eroare. */
+      const waiting = await standbyReason(ctx.client, ctx.cfg)
+      control.standby = waiting
+      if (waiting) {
+        if (waiting !== lastStandby) log.warn({ reason: waiting }, 'standing by')
+        lastStandby = waiting
+        /* procesul e sanatos si face exact ce trebuie, deci pulsul bate si
+           cainele de paza nu are ce cauta aici */
+        lastCompletedMs = Date.now()
+        await beat(ctx.cfg.alerts.heartbeat)
+      } else {
+        if (lastStandby) log.info('addresses are in place, going back to work')
+        lastStandby = null
+        const o = await runOnce(ctx)
+        control.finished(o, dryThisRun)
+        onRun?.(o)
+        lastCompletedMs = Date.now()
+        await beat(ctx.cfg.alerts.heartbeat)
+        maybeBackup(ctx)
+        log.info(
+          {
+            delivered: o.delivered,
+            candidates: o.candidates,
+            wall: o.wallCount,
+            gas: formatEther(o.gasWei),
+            tips: formatEther(o.tipsWei)
+          },
+          'run complete'
+        )
+      }
       consecutiveFailures = 0
-      lastCompletedMs = Date.now()
-      await beat(ctx.cfg.alerts.heartbeat)
-      maybeBackup(ctx)
-      log.info(
-        {
-          delivered: o.delivered,
-          candidates: o.candidates,
-          wall: o.wallCount,
-          gas: formatEther(o.gasWei),
-          tips: formatEther(o.tipsWei)
-        },
-        'run complete'
-      )
     } catch (e) {
       consecutiveFailures++
       log.error({ err: (e as Error).message, consecutiveFailures }, 'run failed')
