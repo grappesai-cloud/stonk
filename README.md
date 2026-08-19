@@ -391,6 +391,10 @@ Trei butoane sus: **proba uscata** (calculeaza tot si nu trimite nimic),
 
 ![consola in modul curier](docs/consola-sus.jpg)
 
+*Cifrele din capturi sunt date de proba, din `scripts/demo-api.ts`. Nicio
+livrare reala nu a avut loc inca: botul nu a semnat niciodata nimic pe un lant
+adevarat.*
+
 Acelasi panou in modul de veghe: numarul erou devine cat zace nerevendicat,
 logul arata descoperiri, si raman doua butoane.
 
@@ -628,9 +632,10 @@ cazuta acum, nu peste o fereastra intreaga.
 
 ## Unde ruleaza acum
 
-**Pe server din 19.08**, nu pe laptop: Netcup, `root@<server>` (doar prin
-Tailscale), in `/root/stonk-courier`, `docker compose`, restart `unless-stopped`,
-Docker pornit la boot.
+**Pe server din 19.08**, nu pe laptop: `root@<server>` (adresa e in notele
+echipei, nu in repo, si oricum se ajunge la ea doar prin Tailscale), in
+`/root/stonk-courier`, `docker compose`, restart `unless-stopped`, Docker pornit
+la boot.
 
 Sta in **asteptare**, si asta e starea corecta: nu are inca adresele
 contractelor, deci nu scaneaza si nu semneaza nimic. Jurnalul spune exact ce
@@ -647,7 +652,7 @@ internet. La consola se ajunge prin tunel:
 ```bash
 ssh -L 8789:127.0.0.1:8789 root@<server>
 # apoi http://127.0.0.1:8789 in browser
-# jetonul: ssh root@<server> 'grep CONSOLE_TOKEN /root/stonk-courier/.env'
+# jetonul se citeste de pe server, din .env; nu exista nicaieri altundeva
 ```
 
 Cheia operatorului **nu exista inca**, dinadins: se genereaza pe server cand
