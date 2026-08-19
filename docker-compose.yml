@@ -107,6 +107,26 @@ services:
       start_period: 20s
       retries: 3
 
+  # Lista de asteptare a site-ului. NU e un agent: e singurul serviciu din tot
+  # proiectul care primeste scriere de la un strain, si de aia sta separat, cu
+  # baza lui si portul lui.
+  signup:
+    <<: *agent
+    environment:
+      LOG_FORMAT: json
+      SIGNUP_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8802:8802"
+      - "10.0.0.1:8802:8802"
+    entrypoint: ["node", "dist/src/signup.js"]
+    command: []
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8802/count"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # Copia registrului se face si singura, din bot, la cateva ore. Asta e pentru
   # cand vrei una acum, inainte de o migrare sau de un redeploy:
   #   docker compose run --rm backup
