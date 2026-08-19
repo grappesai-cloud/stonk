@@ -1,0 +1,58 @@
+# Doi agenti, acelasi cod, configurari diferite. Meseria se alege din
+# `agent.kind`, nu din imagine, deci imaginea se construieste o data.
+#
+# Amandoi pornesc in VEGHE: masoara si tin indexul, nu semneaza nimic. Trecerea
+# la treaba adevarata se face din configurare, dupa ce `fleet doctor` spune ca
+# meseria exista pe contractul real.
+x-agent: &agent
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    LOG_FORMAT: json
+    # In container, legarea pe 127.0.0.1 ar ascunde serverul si de proxy-ul
+    # care publica portul. Granita nu se pierde: pe gazda, porturile de mai jos
+    # sunt publicate tot pe loopback.
+    API_HOST: 0.0.0.0
+    CONSOLE_HOST: 0.0.0.0
+  volumes:
+    # registrul si copiile lui traiesc pe gazda, nu in container
+    - ./data:/app/data
+    - ./config:/app/config:ro
+
+services:
+  ringer:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8790:8790"
+      - "127.0.0.1:8791:8791"
+    command: ["start", "-c", "./config/ringer.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8790/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  miner:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8792:8792"
+      - "127.0.0.1:8793:8793"
+    command: ["start", "-c", "./config/miner.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8792/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # Copia registrului se face si singura, din bot, la cateva ore. Asta e pentru
+  # cand vrei una acum, inainte de o migrare sau de un redeploy:
+  #   docker compose run --rm backup
+  backup:
+    <<: *agent
+    profiles: ["tools"]
+    restart: "no"
+    ports: []
+    command: ["backup", "-c", "./config/ringer.json"]

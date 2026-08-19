@@ -1,0 +1,294 @@
+/**
+ * Executia. Aici se cheltuie bani, deci aici stau toate franele.
+ *
+ * Ordinea verificarilor nu e decorativa: intai ce opreste totul (comutatorul
+ * de oprire, veghea, modul uscat), apoi ce opreste bucata (pretul gazului,
+ * rentabilitatea, bugetul zilnic, soldul), abia apoi se semneaza. Orice iesire
+ * scrie in registru motivul, ca sa nu existe treaba disparuta fara explicatie.
+ *
+ * O garantie pe care nu o rup: o tranzactie duce exact o bucata de munca.
+ * Cand contractul stie sa inghita mai multe deodata, gruparea se face in
+ * modulul meseriei si iese tot o singura bucata, cu castigul ei masurat. Asa
+ * nu se poate intampla ce s-a intamplat o data la Courier: o tranzactie
+ * trimisa, un grup intreg trecut in registru ca facut.
+ */
+import { existsSync } from 'node:fs'
+import { type Account, type Address, type Hex, type PublicClient, type WalletClient } from 'viem'
+import type { Config } from './config.js'
+import type { Ledger } from './ledger/db.js'
+import type { Target, WorkItem } from './work.js'
+import { calldataFor, quote, type SingleSim } from './simulate.js'
+import { decideProfit, gasPriceAcceptable, withinDailyBudget, type Skipped } from './policy/rules.js'
+import { log } from './log.js'
+
+export interface DoneItem {
+  item: WorkItem
+  txHash: Hex
+  status: 'sent' | 'confirmed' | 'reverted'
+  gasWei: bigint
+  rewardWei: bigint
+  /** cat a durat de la vederea ocaziei pana la semnatura */
+  latencyMs: number | null
+  gasPriceWei: bigint
+}
+
+export interface ExecuteResult {
+  done: DoneItem[]
+  skipped: Skipped[]
+  txHashes: Hex[]
+  gasWei: bigint
+  rewardWei: bigint
+  dry: boolean
+  stoppedBy: string | null
+}
+
+export interface FeeOverride {
+  maxFeePerGasWei?: bigint
+  maxPriorityFeePerGasWei?: bigint
+}
+
+export interface ExecuteInput {
+  client: PublicClient
+  wallet: WalletClient | null
+  account: Account | null
+  cfg: Config
+  ledger: Ledger
+  runId: number
+  target: Target
+  sims: SingleSim[]
+  /** momentul in care am vazut ocazia, pentru masurarea intarzierii */
+  seenAtMs?: number
+  fees?: FeeOverride
+}
+
+export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
+  const { client, wallet, account, cfg, ledger, runId, target, sims } = input
+  const out: ExecuteResult = {
+    done: [],
+    skipped: [],
+    txHashes: [],
+    gasWei: 0n,
+    rewardWei: 0n,
+    dry: cfg.execution.dryRun,
+    stoppedBy: null
+  }
+  if (sims.length === 0) return out
+
+  // 0. veghea nu semneaza niciodata nimic; verificarea sta aici, nu doar in bucla
+  if (cfg.watchtower) {
+    out.stoppedBy = 'watchtower mode: nothing is sent'
+    for (const s of sims) {
+      ledger.recordJob(row(runId, cfg, s.item, 'skipped', 'watchtower'))
+      out.skipped.push({ key: s.item.key, reason: 'watchtower' })
+    }
+    return out
+  }
+
+  // 1. comutatorul de oprire, inaintea oricarui calcul
+  if (existsSync(cfg.execution.killSwitchFile)) {
+    out.stoppedBy = `kill switch present: ${cfg.execution.killSwitchFile}`
+    log.warn({ file: cfg.execution.killSwitchFile }, 'stopped by kill switch')
+    return out
+  }
+
+  // 2. pretul gazului, o data pentru toata rularea
+  const gasPriceWei = await client.getGasPrice()
+  const priceVerdict = gasPriceAcceptable(gasPriceWei, cfg)
+  if (!priceVerdict.go) {
+    out.stoppedBy = `gas too expensive: ${priceVerdict.detail}`
+    for (const s of sims) {
+      ledger.recordJob(row(runId, cfg, s.item, 'skipped', priceVerdict.detail))
+      out.skipped.push({ key: s.item.key, reason: 'gas-price-cap', detail: priceVerdict.detail })
+    }
+    return out
+  }
+
+  const dayStart = Math.floor(Date.now() / 1000) - 86400
+  let spentToday = ledger.gasSpentSince(dayStart)
+
+  for (const sim of sims) {
+    const item = sim.item
+    if (existsSync(cfg.execution.killSwitchFile)) {
+      out.stoppedBy = 'kill switch appeared mid-run'
+      out.skipped.push({ key: item.key, reason: 'watchtower', detail: 'kill switch' })
+      break
+    }
+
+    const q = await quote(client, sim, cfg)
+
+    // 3. rentabilitate
+    const verdict = decideProfit({
+      rewardWei: item.rewardWei,
+      rewardMeasured: item.rewardMeasured,
+      gasCostWei: q.gasCostWei,
+      cfg
+    })
+    if (!verdict.go) {
+      ledger.recordJob(row(runId, cfg, item, 'skipped', verdict.detail))
+      out.skipped.push({ key: item.key, reason: verdict.reason ?? 'unprofitable', detail: verdict.detail })
+      if (verdict.reason === 'reward-not-measured') {
+        out.stoppedBy = verdict.detail
+        log.error(verdict.detail)
+        break
+      }
+      continue
+    }
+
+    // 4. bugetul zilnic
+    const budget = withinDailyBudget({ spentTodayWei: spentToday, plannedWei: q.gasCostWei, cfg })
+    if (!budget.go) {
+      out.stoppedBy = `daily budget spent: ${budget.detail}`
+      ledger.recordJob(row(runId, cfg, item, 'skipped', budget.detail))
+      out.skipped.push({ key: item.key, reason: 'daily-budget', detail: budget.detail })
+      break
+    }
+
+    // 5. modul uscat: totul s-a calculat, nu se semneaza nimic
+    if (cfg.execution.dryRun) {
+      ledger.recordJob(row(runId, cfg, item, 'dry', 'dry run'))
+      out.gasWei += q.gasCostWei
+      out.rewardWei += item.rewardWei
+      continue
+    }
+
+    if (!wallet || !account) {
+      out.stoppedBy = 'no private key, nothing can be signed'
+      break
+    }
+
+    // 6. soldul operatorului
+    const balance = await client.getBalance({ address: account.address })
+    if (balance < q.gasCostWei) {
+      out.stoppedBy = `balance too low: ${balance} under the estimated gas ${q.gasCostWei}`
+      ledger.recordJob(row(runId, cfg, item, 'skipped', 'balance too low'))
+      break
+    }
+
+    // 7. trimitere
+    try {
+      const t0 = Date.now()
+      const nonce = await client.getTransactionCount({ address: account.address, blockTag: 'pending' })
+      const fees = await feesOf(client, cfg, input.fees)
+
+      const hash = await wallet.sendTransaction({
+        account,
+        chain: wallet.chain,
+        to: target.address,
+        data: calldataFor(target, item),
+        nonce,
+        gas: sim.gas > 0n ? (sim.gas * 12n) / 10n : cfg.policy.gasCapPerCall,
+        ...fees
+      })
+      const signedAtMs = Date.now()
+      out.txHashes.push(hash)
+      ledger.recordJob({ ...row(runId, cfg, item, 'sent', null), txHash: hash })
+
+      const receipt = await client.waitForTransactionReceipt({ hash, confirmations: cfg.execution.confirmations })
+      const effective = receipt.effectiveGasPrice ?? q.gasPriceWei
+      const gasWei = receipt.gasUsed * effective
+      spentToday += gasWei
+      out.gasWei += gasWei
+
+      const okStatus = receipt.status === 'success'
+      const rewardWei = okStatus ? item.rewardWei : 0n
+      ledger.settleTx(hash, {
+        gasWei,
+        rewardWei,
+        blockNumber: receipt.blockNumber,
+        status: okStatus ? 'confirmed' : 'reverted'
+      })
+      if (okStatus) {
+        out.rewardWei += rewardWei
+        ledger.clearOpportunity(item.key)
+        out.done.push({
+          item,
+          txHash: hash,
+          status: 'confirmed',
+          gasWei,
+          rewardWei,
+          latencyMs: input.seenAtMs ? signedAtMs - input.seenAtMs : signedAtMs - t0,
+          gasPriceWei: effective
+        })
+      } else {
+        out.done.push({
+          item,
+          txHash: hash,
+          status: 'reverted',
+          gasWei,
+          rewardWei: 0n,
+          latencyMs: input.seenAtMs ? signedAtMs - input.seenAtMs : signedAtMs - t0,
+          gasPriceWei: effective
+        })
+      }
+      log.info({ hash, key: item.key, gasWei: gasWei.toString(), okStatus }, okStatus ? 'work done' : 'work reverted')
+    } catch (e) {
+      const msg = (e as Error).message
+      log.error({ err: msg, key: item.key }, 'sending failed')
+      ledger.recordJob(row(runId, cfg, item, 'failed', msg))
+      out.stoppedBy = `send failed: ${msg}`
+      break
+    }
+  }
+
+  return out
+}
+
+/**
+ * Taxele tranzactiei.
+ *
+ * Aici sta o capcana care ar fi omorat pe tacute tot Ringer-ul: daca dai doar
+ * bacsisul (`maxPriorityFeePerGas`) si lasi plafonul (`maxFeePerGas`) pe seama
+ * bibliotecii, plafonul se calculeaza DOAR din pretul de baza, fara bacsis.
+ * Orice urcare serioasa iese peste plafonul propriu si tranzactia e respinsa
+ * inainte sa plece. Adica exact cand cursa e mai stransa, botul nu mai trimite
+ * nimic, si in jurnal apare "send failed", nu "am pierdut cursa".
+ *
+ * De aia plafonul se calculeaza aici: pretul de baza inmultit cu doi, ca sa
+ * tina si daca urca in blocul urmator, plus bacsisul intreg.
+ */
+async function feesOf(
+  client: PublicClient,
+  cfg: Config,
+  over: FeeOverride | undefined
+): Promise<{ maxFeePerGas?: bigint; maxPriorityFeePerGas?: bigint }> {
+  const maxPrio = over?.maxPriorityFeePerGasWei ?? cfg.execution.maxPriorityFeePerGasWei
+  const maxFee = over?.maxFeePerGasWei ?? cfg.execution.maxFeePerGasWei
+  if (maxPrio === null || maxPrio === undefined) {
+    return maxFee === null || maxFee === undefined ? {} : { maxFeePerGas: maxFee }
+  }
+  if (maxFee !== null && maxFee !== undefined) {
+    /* un plafon scris de mana sub bacsis e o configurare care nu poate pleca
+       niciodata; il ridicam la minimul care are sens si mergem mai departe */
+    return { maxPriorityFeePerGas: maxPrio, maxFeePerGas: maxFee < maxPrio ? maxPrio : maxFee }
+  }
+  let base = 0n
+  try {
+    const block = await client.getBlock({ blockTag: 'latest' })
+    base = block.baseFeePerGas ?? 0n
+  } catch {
+    base = 0n
+  }
+  return { maxPriorityFeePerGas: maxPrio, maxFeePerGas: base * 2n + maxPrio }
+}
+
+function row(
+  runId: number,
+  cfg: Config,
+  item: WorkItem,
+  status: 'sent' | 'skipped' | 'failed' | 'dry',
+  reason: string | null
+) {
+  return {
+    runId,
+    agentId: cfg.agent.id,
+    key: item.key,
+    label: item.label,
+    stakeWei: item.stakeWei,
+    rewardWei: 0n,
+    gasWei: 0n,
+    txHash: null as string | null,
+    blockNumber: null as bigint | null,
+    status,
+    reason
+  }
+}

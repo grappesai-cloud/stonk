@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+*.log
+data/
+out/
+cache/
+contracts/out
+contracts/cache
+data/econ

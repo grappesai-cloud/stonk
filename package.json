@@ -1,0 +1,33 @@
+{
+  "name": "stonk-fleet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ringer and Miner: the keeper agents of the Stonk Agents fleet. One core, one job module per agent.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "fleet": "./bin/fleet.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "fleet": "tsx src/cli.ts",
+    "ringer": "tsx src/cli.ts --config ./config/ringer.json",
+    "miner": "tsx src/cli.ts --config ./config/miner.json",
+    "test": "vitest run test/unit",
+    "test:e2e": "vitest run test/e2e --testTimeout=240000",
+    "test:all": "vitest run --testTimeout=240000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "pino": "^9.6.0",
+    "viem": "^2.23.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  }
+}
