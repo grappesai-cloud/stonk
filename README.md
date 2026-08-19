@@ -9,6 +9,44 @@ Nu e un demo si nu e un MVP. Are simulare inainte de fiecare tranzactie, frane
 de cheltuiala, reconciliere dupa cadere, alerte, API de citire si teste
 cap-coada pe un lant real cu contracte reale.
 
+## Contractul agentului
+
+`contracts/src/StonkAgent.sol`, desfasurabil oricand, cu 14 teste pe lant.
+Trei decizii sunt scrise in cod, nu in prezentare:
+
+**Un singur tip de agent, cu slot de rol.** Nu cinci clase. Daca vinzi cinci
+clase si exista o singura unealta care merge, patru cincimi din colectie e marfa
+moarta din prima zi. Rolul se instaleaza si se schimba cand apare o unealta noua,
+deci agentii vechi nu devin inutili.
+
+**Contractul nu promite niciun randament.** Nu tine bani, nu imparte castiguri,
+nu are functie de revendicare. Ce castiga agentul ajunge direct in portofelul lui
+6551. Un contract care promite venit din munca altcuiva e exact forma pe care nu
+vrei sa o ai.
+
+**Mintul arde si nu retine nimic.** Jumatate la adresa moarta, jumatate la
+trezorerie, procentele fixate la desfasurare. Testul verifica pe lant ca soldul
+contractului ramane zero.
+
+Pentru cine cumpara: `snapshot(tokenId)` da proprietarul, portofelul, soldul lui,
+rolul si un **contor care se misca la fiecare transfer**. Nimic on-chain nu
+opreste un vanzator sa isi goleasca portofelul in acelasi bloc cu vanzarea; ce se
+poate face e sa ii dai cumparatorului cu ce sa verifice atomic, in aceeasi
+tranzactie. Cumpararea in siguranta trece printr-un contract care compara si da
+revert daca nu se potriveste.
+
+Desfasurare:
+
+```bash
+cp config/deploy.example.json config/deploy.json   # completezi adresele
+npx tsx scripts/deploy-agent.ts                    # doar arata, nu desfasoara
+DEPLOYER_KEY=0x... npx tsx scripts/deploy-agent.ts --live
+```
+
+Rularea uscata verifica intai ca lantul e cel asteptat si ca fiecare adresa
+presupusa are cod, si se opreste daca nu. Mintul ramane **inchis** dupa
+desfasurare: se deschide separat, dupa ce definesti rolurile si scoti prototipul.
+
 ## Pregatirea de lansare
 
 Planul, blocajele si cine raspunde de fiecare: **[LAUNCH.md](LAUNCH.md)**.

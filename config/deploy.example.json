@@ -1,0 +1,24 @@
+{
+  "_": "Parametrii desfasurarii. Cheia vine din mediu (DEPLOYER_KEY), niciodata de aici. Ruleaza intai fara --live si citeste ce iese.",
+  "chainId": 4663,
+  "rpc": "https://rpc.mainnet.chain.robinhood.com",
+  "explorer": "https://robinhoodchain.blockscout.com",
+
+  "_payToken": "adresa lui $STONKBROKER",
+  "payToken": "0x0000000000000000000000000000000000000000",
+  "priceWei": "100000000000000000000",
+  "burnBps": 5000,
+
+  "_supply": "supply-ul se decide din venitul masurat, nu dintr-o cifra rotunda. Vezi LAUNCH.md.",
+  "maxSupply": 1000,
+  "reserveCap": 25,
+
+  "treasury": "0x0000000000000000000000000000000000000000",
+  "registry": "0x000000006551c19487814612e58FE06813775758",
+  "accountImplementation": "0x41C8f39463A868d3A88af00cd0fe7102F30E44eC",
+  "accountSalt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "baseURI": "https://stonk.grappes.dev/api/agent/",
+
+  "deployCourierBatch": true,
+  "courierBatchFeeBps": 1000
+}

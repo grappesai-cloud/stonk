@@ -83,6 +83,21 @@ export function agentPage(cfg: Config): string {
     <div class="box"><span class="t">working since</span><div class="box-b"><div class="mid" id="since">--</div></div></div>
   </div>
 
+  <div class="box" id="chainbox" hidden>
+    <span class="t">on chain</span>
+    <div class="box-b">
+      <div class="sum" style="margin-top:0">
+        <div><p class="k">owner</p><p class="mid" style="font-size:16px" id="c-owner">--</p></div>
+        <div><p class="k">wallet</p><p class="mid" style="font-size:16px" id="c-wallet">--</p></div>
+        <div><p class="k">wallet holds</p><p class="mid" style="font-size:16px" id="c-bal">--</p></div>
+        <div><p class="k">role</p><p class="mid" style="font-size:16px" id="c-role">--</p></div>
+      </div>
+      <p class="sub" style="margin-top:14px">The wallet belongs to the NFT, not to the owner, so whatever
+         it holds travels with the piece. Before buying one, check this page and the transfer counter in
+         the same transaction.</p>
+    </div>
+  </div>
+
   <div class="box">
     <span class="t">recent work</span>
     <div class="tscroll">
@@ -114,6 +129,13 @@ async function tick(){
     $('w').textContent = a.wallets.toLocaleString('en-US');
     $('v').textContent = num(a.deliveredEth, 3);
     $('since').textContent = when(a.firstAt);
+    if (a.onchain) {
+      $('chainbox').hidden = false;
+      $('c-owner').textContent = short(a.onchain.owner);
+      $('c-wallet').textContent = short(a.onchain.wallet);
+      $('c-bal').textContent = num(a.onchain.walletEth, 4);
+      $('c-role').textContent = a.onchain.role === 0 ? 'none' : String(a.onchain.role);
+    }
     const body = $('rows'); body.replaceChildren();
     for (const h of a.history) {
       const tr = document.createElement('tr');

@@ -59,12 +59,16 @@ of 50, so the free campaign is effectively free. Measured, not guessed.
 
 ## Stage 3 — The collection
 
-Do not start this before stage 2 has a month of measured numbers.
+The contract is written and tested. Do not deploy it before stage 2 has a month
+of measured numbers, because those numbers set the supply and the price.
 
 - [ ] decide supply from the measured monthly revenue, not from a nice round number
-- [ ] one agent type with a **role slot**, not five classes; four fifths of a
-      five-class collection is dead inventory on day one
-- [ ] solve the ERC-6551 drain-on-transfer problem before any marketplace talk
+- [ ] fill `config/deploy.json`, run the deploy script **without** `--live` and read it
+- [ ] deploy, then `defineRole` for every tool that actually works
+- [ ] `mintReserved` the prototype agents, install their roles
+- [ ] only then `setMintOpen(true)`
+- [ ] a marketplace must verify `snapshot()` and the transfer counter in the same
+      transaction, otherwise a seller can empty the wallet as the sale lands
 - [ ] no APR, no yield projections, no "passive income" in any copy
 - [ ] mint price must be justified by the tool that already works, never by the roadmap
 

@@ -11,6 +11,23 @@ import { formatEther } from 'viem'
 import type { Ctx } from '../context.js'
 import { wallPage } from './page.js'
 import { agentPage, walletPage } from './pages.js'
+
+/** doar bucata din ABI-ul colectiei de care are nevoie pagina publica */
+const AGENT_ABI = [
+  {
+    type: 'function',
+    name: 'snapshot',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      { name: 'tokenOwner', type: 'address' },
+      { name: 'wallet', type: 'address' },
+      { name: 'walletBalance', type: 'uint256' },
+      { name: 'role', type: 'uint8' },
+      { name: 'nonce', type: 'uint64' }
+    ]
+  }
+] as const
 import { serveFont } from '../ui/assets.js'
 import { log } from '../log.js'
 
@@ -111,13 +128,38 @@ export function createApi(ctx: Ctx) {
         const id = Number(raw)
         if (!Number.isInteger(id) || id < 0) return json(res, 400, { error: 'invalid agent id' }, cors)
         const t = ledger.agentTotals(id)
+
+        /* daca colectia e desfasurata, adevarul despre bucata vine de pe lant,
+           nu din configurare: proprietar, rol, portofel si soldul lui */
+        let onchain: { owner: string; wallet: string; walletEth: number; role: number; nonce: string } | null = null
+        if (cfg.agent.collection) {
+          try {
+            const snap = (await ctx.client.readContract({
+              address: cfg.agent.collection,
+              abi: AGENT_ABI,
+              functionName: 'snapshot',
+              args: [BigInt(id)]
+            })) as [string, string, bigint, number, bigint]
+            onchain = {
+              owner: snap[0],
+              wallet: snap[1],
+              walletEth: eth(snap[2]),
+              role: snap[3],
+              nonce: snap[4].toString()
+            }
+          } catch {
+            /* bucata poate sa nu existe inca; pagina merge si fara */
+          }
+        }
+
         return json(
           res,
           200,
           {
             id,
             name: cfg.agent.id === id ? cfg.agent.name : `AGENT #${String(id).padStart(4, '0')}`,
-            wallet: cfg.agent.id === id ? cfg.agent.wallet : null,
+            wallet: onchain?.wallet ?? (cfg.agent.id === id ? cfg.agent.wallet : null),
+            onchain,
             deliveries: t.deliveries,
             wallets: t.wallets,
             deliveredEth: eth(t.valueWei),

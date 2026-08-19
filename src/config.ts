@@ -89,6 +89,8 @@ export const ConfigSchema = z.object({
    */
   agent: z.object({
     id: z.number().int().min(0).nullable().default(null),
+    /** contractul colectiei de agenti; gol pana e desfasurat */
+    collection: zAddress.nullable().default(null),
     name: z.string().default('COURIER #0000'),
     /** portofelul 6551 al agentului; acolo ajung bacsisurile */
     wallet: zAddress.nullable().default(null),
