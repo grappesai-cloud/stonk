@@ -44,12 +44,12 @@ export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
   await reconcile(ctx)
 
   const ids = await discoverTokenIds(client, cfg)
-  log.info({ ids: ids.length }, 'brokeri descoperiti')
+  log.info({ ids: ids.length }, 'brokers discovered')
 
   const scan = await scanClaims(client, cfg, ids)
   log.info(
     { withSomething: scan.claims.length, failed: scan.failed, value: formatEther(scan.totalValueWei) },
-    'scanare terminata'
+    'scan complete'
   )
 
   const owners = await ownersOf(
@@ -103,9 +103,9 @@ export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
       gasWei: 0n,
       tipsWei: 0n,
       valueWei: 0n,
-      note: `veghe: ${found.length} descoperiri noi`
+      note: `watch: ${found.length} new finds`
     })
-    log.info({ found: found.length, wall: wall.count }, 'veghe incheiata')
+    log.info({ found: found.length, wall: wall.count }, 'watch pass complete')
     return outcome
   }
 
@@ -136,13 +136,13 @@ export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
       const probe = await probeGating(client, cfg, screened.pass, from, (id) => owners.get(id))
       if (probe.kind === 'owner-gated') {
         gatingWarning =
-          `deliver() e rezervata proprietarului (dovedit pe #${probe.testedTokenId}: ${probe.reason}). ` +
-          `Fara o schimbare de contract sau un opt-in, Courier-ul nu poate livra in numele nimanui.`
+          `deliver() is owner-gated (proven on #${probe.testedTokenId}: ${probe.reason}). ` +
+          `Without a contract change or an opt-in, Courier cannot deliver on anyone's behalf.`
         log.error({ tested: probe.testedTokenId }, gatingWarning)
       }
     }
     for (const s of sims) {
-      if (!s.ok) log.debug({ tokenId: s.claim.tokenId.toString(), kind: s.kind, reason: s.reason }, 'livrare exclusa')
+      if (!s.ok) log.debug({ tokenId: s.claim.tokenId.toString(), kind: s.kind, reason: s.reason }, 'delivery excluded')
     }
   }
 
@@ -238,15 +238,15 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
           gas: formatEther(o.gasWei),
           tips: formatEther(o.tipsWei)
         },
-        'rulare incheiata'
+        'run complete'
       )
     } catch (e) {
       consecutiveFailures++
-      log.error({ err: (e as Error).message, consecutiveFailures }, 'rulare picata')
+      log.error({ err: (e as Error).message, consecutiveFailures }, 'run failed')
       if (consecutiveFailures >= ctx.cfg.execution.maxConsecutiveFailures) {
         control.running = false
         control.attached = false
-        log.fatal('prea multe rulari picate la rand, ma opresc')
+        log.fatal('too many consecutive failed runs, stopping')
         throw e
       }
     } finally {

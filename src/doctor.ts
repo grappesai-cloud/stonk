@@ -28,51 +28,51 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
   const add = (name: string, ok: boolean, detail: string, fatal = false) => checks.push({ name, ok, detail, fatal })
 
   if (cfg.watchtower) {
-    add('mod', true, 'VEGHE: scaneaza, tine indexul si anunta. Nu simuleaza, nu semneaza, nu livreaza.')
+    add('mode', true, 'WATCHTOWER: scans, keeps the index, alerts. No simulation, no signing, no delivery.')
   }
 
   if (missingEnv.length > 0) {
-    add('mediu', false, `variabile lipsa, campurile raman goale: ${missingEnv.join(', ')}`)
+    add('env', false, `missing variables, those fields stay empty: ${missingEnv.join(', ')}`)
   }
 
   // ---- lantul
   try {
     const id = await client.getChainId()
-    add('rpc', id === cfg.network.chainId, id === cfg.network.chainId ? `chainId ${id}` : `RPC raspunde cu ${id}, configurarea cere ${cfg.network.chainId}`, true)
+    add('rpc', id === cfg.network.chainId, id === cfg.network.chainId ? `chainId ${id}` : `RPC answers ${id}, config expects ${cfg.network.chainId}`, true)
     const block = await client.getBlockNumber()
-    add('bloc', true, `la blocul ${block}`)
+    add('block', true, `at block ${block}`)
   } catch (e) {
-    add('rpc', false, `RPC-ul nu raspunde: ${(e as Error).message}`, true)
+    add('rpc', false, `RPC not responding: ${(e as Error).message}`, true)
     return checks
   }
 
   // ---- multicall
   if (cfg.network.multicall3) {
     const ok = await hasCode(client, cfg.network.multicall3)
-    add('multicall3', ok, ok ? 'prezent, citirile intra intr-un singur apel' : 'configurat dar nedesfasurat, cad pe citiri individuale')
+    add('multicall3', ok, ok ? 'present, reads collapse into one call' : 'configured but not deployed, falling back to single reads')
   } else {
-    add('multicall3', true, 'neconfigurat, citirile merg individual dar grupate pe HTTP')
+    add('multicall3', true, 'not configured, reads go one by one but batched over HTTP')
   }
 
   // ---- registrul 6551 si matematica adreselor
   const regOk = await hasCode(client, cfg.erc6551.registry)
-  add('registru 6551', regOk, regOk ? cfg.erc6551.registry : `nu exista cod la ${cfg.erc6551.registry}`, true)
+  add('6551 registry', regOk, regOk ? cfg.erc6551.registry : `no code at ${cfg.erc6551.registry}`, true)
   if (regOk) {
     const check = await verifyTbaMath(client, cfg.erc6551.registry, cfg.erc6551.implementation, cfg.erc6551.salt, cfg.network.chainId, cfg.brokers.address)
-    add('adrese 6551', check.ok, check.detail, true)
+    add('6551 addresses', check.ok, check.detail, true)
   }
 
   // ---- contractele
   const brokersOk = await hasCode(client, cfg.brokers.address)
-  add('contract brokeri', brokersOk, brokersOk ? cfg.brokers.address : `fara cod la ${cfg.brokers.address}`, true)
+  add('brokers contract', brokersOk, brokersOk ? cfg.brokers.address : `no code at ${cfg.brokers.address}`, true)
   const dropsOk = await hasCode(client, cfg.drops.address)
-  add('contract drop-uri', dropsOk, dropsOk ? cfg.drops.address : `fara cod la ${cfg.drops.address}`, true)
+  add('drops contract', dropsOk, dropsOk ? cfg.drops.address : `no code at ${cfg.drops.address}`, true)
 
   if (cfg.execution.batchContract) {
     const b = await hasCode(client, cfg.execution.batchContract)
-    add('contract de lot', b, b ? cfg.execution.batchContract : 'configurat dar nedesfasurat')
+    add('batch contract', b, b ? cfg.execution.batchContract : 'configured but not deployed')
   } else {
-    add('contract de lot', true, 'neconfigurat: livrarile pleaca una cate una, bacsisul nu poate fi masurat inainte')
+    add('batch contract', true, 'not configured: deliveries go one by one and the tip cannot be measured up front')
   }
 
   if (!brokersOk || !dropsOk) return checks
@@ -81,9 +81,9 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
   let ids: bigint[] = []
   try {
     ids = await discoverTokenIds(client, cfg)
-    add('descoperire', ids.length > 0, `${ids.length} id-uri`, ids.length === 0)
+    add('discovery', ids.length > 0, `${ids.length} ids`, ids.length === 0)
   } catch (e) {
-    add('descoperire', false, (e as Error).message, true)
+    add('discovery', false, (e as Error).message, true)
     return checks
   }
 
@@ -92,11 +92,11 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
   try {
     const scan = await scanClaims(client, cfg, sample)
     add(
-      'citire drop-uri',
+      'reading drops',
       scan.failed === 0,
       scan.failed === 0
-        ? `${scan.claims.length} din ${sample.length} au ceva, valoare ${formatEther(scan.totalValueWei)} ${cfg.network.nativeSymbol}`
-        : `${scan.failed} citiri picate din ${sample.length}, verifica semnatura din drops.pending`
+        ? `${scan.claims.length} of ${sample.length} hold something, worth ${formatEther(scan.totalValueWei)} ${cfg.network.nativeSymbol}`
+        : `${scan.failed} reads failed of ${sample.length}, check the drops.pending signature`
     )
 
     // ---- INTREBAREA
@@ -107,20 +107,20 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
          rezervata proprietarului. */
       const probe = await probeGating(client, cfg, scan.claims, STRANGER as Address, (id) => owners.get(id))
       add(
-        'deliver() apelabila de un strain',
+        'deliver() callable by a stranger',
         probe.callableByStranger || cfg.watchtower,
         probe.callableByStranger
-          ? `da, testat pe #${probe.testedTokenId}`
+          ? `yes, tested on #${probe.testedTokenId}`
           : cfg.watchtower
-            ? `NU (${probe.kind}), dar in modul de veghe nu conteaza: nu se livreaza nimic.`
-            : `NU (${probe.kind}): ${probe.reason ?? 'motiv necunoscut'}. Fara asta Courier-ul nu poate livra pentru altii.`,
+            ? `NO (${probe.kind}), but in watchtower mode it does not matter: nothing is delivered.`
+            : `NO (${probe.kind}): ${probe.reason ?? 'unknown reason'}. Without this, Courier cannot deliver for others.`,
         !probe.callableByStranger && !cfg.watchtower
       )
     } else {
-      add('deliver() apelabila de un strain', false, 'nu exista nimic nerevendicat de testat acum')
+      add('deliver() callable by a stranger', false, 'nothing unclaimed to test against right now')
     }
   } catch (e) {
-    add('citire drop-uri', false, (e as Error).message, true)
+    add('reading drops', false, (e as Error).message, true)
   }
 
   // ---- cate portofele 6551 sunt chiar desfasurate
@@ -130,10 +130,10 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
     const deployed = await Promise.all([...wallets.values()].map((w) => hasCode(client, w)))
     const n = deployed.filter(Boolean).length
     add(
-      'portofele 6551 desfasurate',
+      '6551 wallets deployed',
       true,
-      `${n} din ${sampleIds.length} verificate au cod. Livrarea merge si catre unul nedesfasurat: adresa e determinista, ` +
-        `banii stau acolo si devin accesibili cand contul e creat.`
+      `${n} of ${sampleIds.length} checked have code. Delivery works to an undeployed one too: the address is deterministic, ` +
+        `the funds sit there and become reachable once the account is created.`
     )
   }
 
@@ -146,8 +146,8 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
       'operator',
       true,
       cfg.watchtower
-        ? 'fara cheie, si asa trebuie: in modul de veghe nu se semneaza nimic'
-        : 'fara cheie privata: se poate scana si simula, nu se poate livra'
+        ? 'no key, and that is correct: watchtower mode signs nothing'
+        : 'no private key: scanning and simulation work, delivery does not'
     )
   }
 
@@ -157,9 +157,9 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
       'getMe',
       {}
     )
-    add('telegram', !!me, me?.username ? `@${me.username}` : 'jetonul nu a fost acceptat')
+    add('telegram', !!me, me?.username ? `@${me.username}` : 'token was rejected')
   } else {
-    add('telegram', true, 'oprit')
+    add('telegram', true, 'off')
   }
 
   return checks
@@ -186,10 +186,10 @@ export async function verifyTbaMath(
     return {
       ok,
       detail: ok
-        ? `calculul local bate cu registrul (${local})`
-        : `NEPOTRIVIRE: local ${local}, registru ${onchain}. Verifica implementarea si saltul.`
+        ? `local math matches the registry (${local})`
+        : `MISMATCH: local ${local}, registry ${onchain}. Check the implementation and salt.`
     }
   } catch (e) {
-    return { ok: false, detail: `registrul nu raspunde la account(): ${(e as Error).message}` }
+    return { ok: false, detail: `registry does not answer account(): ${(e as Error).message}` }
   }
 }

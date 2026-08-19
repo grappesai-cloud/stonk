@@ -14,12 +14,12 @@ import { z } from 'zod'
 
 const zAddress = z
   .string()
-  .refine((v) => isAddress(v), 'adresa EVM invalida')
+  .refine((v) => isAddress(v), 'invalid EVM address')
   .transform((v) => getAddress(v) as Address)
 
 const zHex32 = z
   .string()
-  .regex(/^0x[0-9a-fA-F]{64}$/, 'trebuie sa fie 32 de octeti hex')
+  .regex(/^0x[0-9a-fA-F]{64}$/, 'must be 32 hex bytes')
   .transform((v) => v as Hex)
 
 const zBig = z
@@ -28,7 +28,7 @@ const zBig = z
     try {
       return BigInt(v as string)
     } catch {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `numar intreg invalid: ${String(v)}` })
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `invalid integer: ${String(v)}` })
       return BigInt(0)
     }
   })
@@ -259,15 +259,15 @@ function resolveEnv(value: unknown, path = '', missing: string[] = []): unknown 
 export let missingEnv: string[] = []
 
 export function loadConfig(file: string): Config {
-  if (!existsSync(file)) throw new Error(`fisierul de configurare lipseste: ${file}`)
+  if (!existsSync(file)) throw new Error(`config file missing: ${file}`)
   const raw = JSON.parse(readFileSync(file, 'utf8'))
   const missing: string[] = []
   const withEnv = resolveEnv(raw, '', missing)
   missingEnv = missing
   const parsed = ConfigSchema.safeParse(withEnv)
   if (!parsed.success) {
-    const lines = parsed.error.issues.map((i) => `  ${i.path.join('.') || '(radacina)'}: ${i.message}`)
-    throw new Error(`configurare invalida in ${file}:\n${lines.join('\n')}`)
+    const lines = parsed.error.issues.map((i) => `  ${i.path.join('.') || '(root)'}: ${i.message}`)
+    throw new Error(`invalid config in ${file}:\n${lines.join('\n')}`)
   }
   return parsed.data
 }
@@ -277,6 +277,6 @@ export function abiOf(signature: string, what: string): Abi {
   try {
     return parseAbi([signature]) as Abi
   } catch (e) {
-    throw new Error(`semnatura invalida pentru ${what}: ${signature}\n${(e as Error).message}`)
+    throw new Error(`invalid signature for ${what}: ${signature}\n${(e as Error).message}`)
   }
 }

@@ -22,11 +22,11 @@ import { log } from './log.js'
 const program = new Command()
 program
   .name('courier')
-  .description('Courier: gaseste drop-urile nerevendicate din portofelele 6551 si le livreaza')
-  .option('-c, --config <path>', 'fisierul de configurare', './config/default.json')
-  .option('--live', 'chiar trimite tranzactii (implicit e rulare uscata)', false)
-  .option('--campaign', 'modul campanie: livreaza si cand nu se plateste singur', false)
-  .option('--watchtower', 'mod de veghe: scaneaza si anunta, nu livreaza si nu semneaza nimic', false)
+  .description('Courier: finds the unclaimed drops sitting in ERC-6551 wallets and delivers them')
+  .option('-c, --config <path>', 'config file', './config/default.json')
+  .option('--live', 'actually send transactions (dry run by default)', false)
+  .option('--campaign', 'campaign mode: deliver even when it does not pay for itself', false)
+  .option('--watchtower', 'watchtower mode: scan and alert, never deliver, never sign', false)
 
 function ctxOf(): Ctx {
   const opts = program.opts<{ config: string; live: boolean; campaign: boolean; watchtower: boolean }>()
@@ -43,47 +43,47 @@ const sym = (ctx: Ctx) => ctx.cfg.network.nativeSymbol
 
 program
   .command('init <dropsAddress>')
-  .description('citeste ABI-ul verificat de pe explorer si propune semnaturile pentru configurare')
+  .description('read the verified ABI from the explorer and propose config signatures')
   .action(async (dropsAddress: string) => {
     const ctx = ctxOf()
     const explorer = ctx.cfg.network.explorer
     if (!explorer) {
-      process.stdout.write('nu e configurat niciun explorer, nu am de unde lua ABI-ul\n')
+      process.stdout.write('no explorer configured, nowhere to fetch the ABI from\n')
       ctx.ledger.close()
       return
     }
     const d = await discover(explorer, dropsAddress)
     if (!d.verified) {
       process.stdout.write(
-        `\nContractul ${dropsAddress} nu are ABI verificat pe ${explorer}.\n` +
-          `Scrie semnaturile de mana in configurare, sau cere-le echipei.\n`
+        `\nContract ${dropsAddress} has no verified ABI on ${explorer}.\n` +
+          `Write the signatures by hand in the config, or ask the team for them.\n`
       )
       ctx.ledger.close()
       return
     }
     process.stdout.write(`\n${d.name ?? 'contract'} ${d.address}\n`)
-    process.stdout.write('\nCANDIDATI PENTRU CITIREA NEREVENDICATULUI (drops.pending.signature)\n')
+    process.stdout.write('\nCANDIDATES FOR READING WHAT IS UNCLAIMED (drops.pending.signature)\n')
     for (const c of d.pending) {
       process.stdout.write(`  [${String(c.score).padStart(2)}] ${c.signature}\n        ${c.why.join('; ')}\n`)
     }
-    process.stdout.write('\nCANDIDATI PENTRU LIVRARE (drops.deliverSignature)\n')
+    process.stdout.write('\nCANDIDATES FOR DELIVERY (drops.deliverSignature)\n')
     for (const c of d.deliver) {
       process.stdout.write(`  [${String(c.score).padStart(2)}] ${c.signature}\n        ${c.why.join('; ')}\n`)
     }
     if (d.errors.length) {
-      process.stdout.write('\nERORI PROPRII (drops.errorSignatures), pune-le ca simularea sa spuna nume, nu hex\n')
+      process.stdout.write('\nCUSTOM ERRORS (drops.errorSignatures), add them so simulation prints names, not hex\n')
       for (const e of d.errors) process.stdout.write(`  ${e}\n`)
     }
     process.stdout.write(
-      '\nAlegi tu, nu ghicesc eu: un nume ca `claim` poate face trei lucruri diferite.\n' +
-        'Dupa ce le pui in configurare, `courier doctor` iti spune daca ai nimerit.\n'
+      '\nYou pick, I do not guess: a name like claim can mean three different things.\n' +
+        'Once they are in the config, courier doctor tells you if you got it right.\n'
     )
     ctx.ledger.close()
   })
 
 program
   .command('doctor')
-  .description('verifica tot ce trebuie sa fie adevarat ca botul sa poata munci')
+  .description('check everything that must be true before the bot can work')
   .action(async () => {
     const ctx = ctxOf()
     const checks = await doctor(ctx)
@@ -99,8 +99,8 @@ program
 
 program
   .command('scan')
-  .description('cine are ceva nerevendicat si cat valoreaza')
-  .option('--limit <n>', 'cate randuri afisez', '25')
+  .description('who holds something unclaimed and what it is worth')
+  .option('--limit <n>', 'rows to print', '25')
   .action(async (o: { limit: string }) => {
     const ctx = ctxOf()
     const ids = await discoverTokenIds(ctx.client, ctx.cfg)
@@ -110,8 +110,8 @@ program
       ctx.ledger.seeClaim(c.tokenId.toString(), c.wallet, owners.get(c.tokenId) ?? null, c.valueWei, c.native)
     }
     const rows = [...scan.claims].sort((a, b) => (a.valueWei > b.valueWei ? -1 : 1)).slice(0, Number(o.limit))
-    process.stdout.write(`\nbrokeri: ${scan.scanned}   cu ceva nerevendicat: ${scan.claims.length}   citiri picate: ${scan.failed}\n`)
-    process.stdout.write(`valoare totala: ${formatEther(scan.totalValueWei)} ${sym(ctx)}\n\n`)
+    process.stdout.write(`\nbrokers: ${scan.scanned}   holding something: ${scan.claims.length}   failed reads: ${scan.failed}\n`)
+    process.stdout.write(`total value: ${formatEther(scan.totalValueWei)} ${sym(ctx)}\n\n`)
     for (const c of rows) {
       const tok = c.tokens.map((t) => `${formatUnits(t.amount, t.decimals)} ${t.symbol}`).join(', ')
       process.stdout.write(
@@ -123,7 +123,7 @@ program
 
 program
   .command('simulate')
-  .description('ce s-ar livra, cu ce gaz, cu ce bacsis si de ce nu se livreaza restul')
+  .description('what would be delivered, at what gas and tip, and why the rest is not')
   .action(async () => {
     const ctx = ctxOf()
     const from = ctx.account?.address ?? STRANGER
@@ -142,20 +142,20 @@ program
     const gas = sims.reduce((s, x) => s + x.gas, 0n)
     const gasPrice = await ctx.client.getGasPrice()
 
-    process.stdout.write(`\ncandidati: ${screened.pass.length}   simulari reusite: ${okCount}\n`)
-    process.stdout.write(`gaz estimat: ${gas} unitati la ${gasPrice} wei = ${formatEther(gas * gasPrice)} ${sym(ctx)}\n\n`)
+    process.stdout.write(`\ncandidates: ${screened.pass.length}   simulations passed: ${okCount}\n`)
+    process.stdout.write(`estimated gas: ${gas} units at ${gasPrice} wei = ${formatEther(gas * gasPrice)} ${sym(ctx)}\n\n`)
     const byReason = new Map<string, number>()
     for (const s of sims) if (!s.ok) byReason.set(s.kind, (byReason.get(s.kind) ?? 0) + 1)
-    for (const [k, v] of byReason) process.stdout.write(`  respinse (${k}): ${v}\n`)
+    for (const [k, v] of byReason) process.stdout.write(`  rejected (${k}): ${v}\n`)
     for (const s of screened.skipped.slice(0, 10)) {
-      process.stdout.write(`  sarit #${s.tokenId}: ${s.reason}${s.detail ? ' · ' + s.detail : ''}\n`)
+      process.stdout.write(`  skipped #${s.tokenId}: ${s.reason}${s.detail ? ' · ' + s.detail : ''}\n`)
     }
     ctx.ledger.close()
   })
 
 program
   .command('run')
-  .description('o singura rulare completa')
+  .description('one full pass')
   .action(async () => {
     const ctx = ctxOf()
     const o = await runOnce(ctx)
@@ -166,7 +166,7 @@ program
 
 program
   .command('start')
-  .description('bucla continua, plus API si botul de Telegram')
+  .description('continuous loop, plus the API and the Telegram bot')
   .action(async () => {
     const ctx = ctxOf()
     const server = startApi(ctx)
@@ -174,7 +174,7 @@ program
     const tgTimer = ctx.tg.enabled ? setInterval(() => void ctx.tg.poll(), 3000) : null
 
     const shutdown = () => {
-      log.info('opresc')
+      log.info('shutting down')
       if (tgTimer) clearInterval(tgTimer)
       server?.close()
       consoleServer?.close()
@@ -189,7 +189,7 @@ program
 
 program
   .command('console')
-  .description('doar consola de operator (jeton din console.token)')
+  .description('operator console only (token from console.token)')
   .action(async () => {
     const ctx = ctxOf()
     ctx.cfg.console.enabled = true
@@ -198,7 +198,7 @@ program
 
 program
   .command('serve')
-  .description('doar API-ul de citire')
+  .description('read-only API only')
   .action(async () => {
     const ctx = ctxOf()
     startApi(ctx)
@@ -206,18 +206,18 @@ program
 
 program
   .command('wall')
-  .description('peretele uitatilor: ce zace nerevendicat, dupa ultima scanare')
-  .option('--limit <n>', 'cate randuri', '25')
+  .description('the wall of the forgotten: what sits unclaimed, from the last scan')
+  .option('--limit <n>', 'rows', '25')
   .action(async (o: { limit: string }) => {
     const ctx = ctxOf()
     const w = ctx.ledger.wallTotals()
     const s = sym(ctx)
     process.stdout.write(
-      `\n${w.count} portofele cu ceva nerevendicat, ${formatEther(w.valueWei)} ${s} in total, cel mai vechi de ${w.oldestDays} zile\n\n`
+      `\n${w.count} wallets holding something unclaimed, ${formatEther(w.valueWei)} ${s} in total, oldest waiting ${w.oldestDays} days\n\n`
     )
     for (const r of ctx.ledger.wall(Number(o.limit))) {
       process.stdout.write(
-        `#${r.tokenId.padStart(5)}  ${r.wallet}  ${formatEther(r.valueWei).padStart(12)} ${s}  de ${r.ageDays} zile\n`
+        `#${r.tokenId.padStart(5)}  ${r.wallet}  ${formatEther(r.valueWei).padStart(12)} ${s}  waiting ${r.ageDays} days\n`
       )
     }
     ctx.ledger.close()
@@ -225,7 +225,7 @@ program
 
 program
   .command('tba <tokenId>')
-  .description('adresa portofelului 6551 al unui broker, calculata local')
+  .description('the ERC-6551 wallet address of a broker, computed locally')
   .action(async (tokenId: string) => {
     const ctx = ctxOf()
     const addr = tbaAddress({
@@ -244,13 +244,13 @@ program
       ctx.cfg.network.chainId,
       ctx.cfg.brokers.address
     )
-    process.stdout.write(`${addr}\n${check.ok ? 'verificat cu registrul de pe lant' : 'ATENTIE: ' + check.detail}\n`)
+    process.stdout.write(`${addr}\n${check.ok ? 'verified against the on-chain registry' : 'WARNING: ' + check.detail}\n`)
     ctx.ledger.close()
   })
 
 program
   .command('report')
-  .description('cat a livrat, cat a castigat, cat a ars pe gaz')
+  .description('what it delivered, what it earned, what it burned on gas')
   .action(async () => {
     const ctx = ctxOf()
     const day = Math.floor(Date.now() / 1000) - 86400
@@ -258,31 +258,31 @@ program
     const s = sym(ctx)
     for (const [label, since] of [
       ['24h', day],
-      ['7 zile', week],
-      ['total', 0]
+      ['7 days', week],
+      ['all time', 0]
     ] as const) {
       const t = ctx.ledger.totals(since)
       process.stdout.write(
-        `${label.padEnd(8)} livrari ${String(t.deliveries).padStart(6)}  portofele ${String(t.wallets).padStart(6)}  ` +
-          `livrat ${formatEther(t.valueWei).padStart(12)} ${s}  castigat ${formatEther(t.tipsWei).padStart(12)} ${s}  ` +
-          `gaz ${formatEther(t.gasWei).padStart(12)} ${s}  net ${formatEther(t.netWei).padStart(12)} ${s}\n`
+        `${label.padEnd(9)} deliveries ${String(t.deliveries).padStart(6)}  wallets ${String(t.wallets).padStart(6)}  ` +
+          `delivered ${formatEther(t.valueWei).padStart(12)} ${s}  earned ${formatEther(t.tipsWei).padStart(12)} ${s}  ` +
+          `gas ${formatEther(t.gasWei).padStart(12)} ${s}  net ${formatEther(t.netWei).padStart(12)} ${s}\n`
       )
     }
     const w = ctx.ledger.wallTotals()
-    process.stdout.write(`\nnerevendicat acum: ${w.count} portofele, ${formatEther(w.valueWei)} ${s}, cel mai vechi de ${w.oldestDays} zile\n`)
+    process.stdout.write(`\nunclaimed right now: ${w.count} wallets, ${formatEther(w.valueWei)} ${s}, oldest waiting ${w.oldestDays} days\n`)
     ctx.ledger.close()
   })
 
 function printOutcome(ctx: Ctx, o: Awaited<ReturnType<typeof runOnce>>): void {
   const s = sym(ctx)
   process.stdout.write(
-    `\nrulare #${o.runId}${ctx.cfg.execution.dryRun ? ' (uscata)' : ''}\n` +
-      `  scanati ${o.scanned}, cu ceva ${o.withSomething}, candidati ${o.candidates}, simulari bune ${o.simulatedOk}\n` +
-      `  livrati ${o.delivered}, sariti ${o.skipped}\n` +
-      `  valoare ${formatEther(o.valueWei)} ${s}, bacsis ${formatEther(o.tipsWei)} ${s}, gaz ${formatEther(o.gasWei)} ${s}\n` +
-      `  nerevendicat ramas: ${o.wallCount} portofele, ${formatEther(o.wallValueWei)} ${s}\n` +
-      (o.stoppedBy ? `  oprit de: ${o.stoppedBy}\n` : '') +
-      (o.gatingWarning ? `  ATENTIE: ${o.gatingWarning}\n` : '')
+    `\nrun #${o.runId}${ctx.cfg.execution.dryRun ? ' (dry)' : ''}\n` +
+      `  scanned ${o.scanned}, holding something ${o.withSomething}, candidates ${o.candidates}, simulations ok ${o.simulatedOk}\n` +
+      `  delivered ${o.delivered}, skipped ${o.skipped}\n` +
+      `  value ${formatEther(o.valueWei)} ${s}, tips ${formatEther(o.tipsWei)} ${s}, gas ${formatEther(o.gasWei)} ${s}\n` +
+      `  still unclaimed: ${o.wallCount} wallets, ${formatEther(o.wallValueWei)} ${s}\n` +
+      (o.stoppedBy ? `  stopped by: ${o.stoppedBy}\n` : '') +
+      (o.gatingWarning ? `  WARNING: ${o.gatingWarning}\n` : '')
   )
 }
 
@@ -294,6 +294,6 @@ function formatUnits(v: bigint, decimals: number): string {
 }
 
 program.parseAsync(process.argv).catch((e) => {
-  log.fatal({ err: (e as Error).message }, 'a picat')
+  log.fatal({ err: (e as Error).message }, 'failed')
   process.exit(1)
 })

@@ -225,6 +225,15 @@ din hero devin reale.
 Nicio ruta nu scrie, deci nu exista suprafata de atac de aparat. Limita de
 cereri pe adresa IP e pornita implicit.
 
+## Limba
+
+**Tot ce vede omul e in engleza**: consola, peretele public, mesajele de
+Telegram, linia de comanda, diagnosticul si motivele din log. Produsul se
+adreseaza unui public global.
+
+Comentariile din cod si documentul asta raman in romana, ca sunt pentru cine
+lucreaza la el. Daca vrei si README-ul in engleza, se schimba dintr-o trecere.
+
 ## Pielea: terminal de trading
 
 Peretele si consola folosesc o piele proprie, de terminal: **totul monospace,
@@ -264,7 +273,12 @@ in productie intrebarea nu e niciodata "ce a livrat", e "de ce nu".
 Trei butoane sus: **proba uscata** (calculeaza tot si nu trimite nimic),
 **ruleaza acum** (rupe somnul buclei si porneste imediat) si **opreste**.
 
-![consola](docs/consola-sus.jpg)
+![consola in modul curier](docs/consola-sus.jpg)
+
+Acelasi panou in modul de veghe: numarul erou devine cat zace nerevendicat,
+logul arata descoperiri, si raman doua butoane.
+
+![consola in modul de veghe](docs/console-watchtower.jpg)
 
 Si are un buton mare de oprit. Ala e motivul pentru care exista: la doua
 noaptea vrei sa opresti de pe telefon, nu sa cauti laptopul si cheia de SSH.

@@ -78,7 +78,7 @@ describe('franele', () => {
     })
     const o = await runOnce(ctx)
     expect(o.delivered).toBe(0)
-    expect(o.stoppedBy).toMatch(/buget zilnic/)
+    expect(o.stoppedBy).toMatch(/daily budget/)
     ctx.ledger.close()
   }, 60_000)
 
@@ -89,7 +89,7 @@ describe('franele', () => {
     })
     const o = await runOnce(ctx)
     expect(o.delivered).toBe(0)
-    expect(o.stoppedBy).toMatch(/gaz prea scump/)
+    expect(o.stoppedBy).toMatch(/gas too expensive/)
     ctx.ledger.close()
   }, 60_000)
 
@@ -104,7 +104,7 @@ describe('franele', () => {
     const o = await runOnce(ctx)
     const after = await d.client.getBalance({ address: d.operator })
     expect(o.delivered).toBe(0)
-    expect(o.stoppedBy).toMatch(/comutator/)
+    expect(o.stoppedBy).toMatch(/kill switch/)
     expect(after).toBe(before)
     rmSync(STOP, { force: true })
     ctx.ledger.close()
@@ -138,7 +138,7 @@ describe('franele', () => {
     const o = await runOnce(ctx)
     expect(o.simulatedOk).toBeGreaterThan(0)
     expect(o.delivered).toBe(0)
-    expect(o.stoppedBy).toMatch(/cheia privata/)
+    expect(o.stoppedBy).toMatch(/no private key/)
     ctx.ledger.close()
   }, 60_000)
 })
@@ -151,7 +151,7 @@ describe('fara contract de lot', () => {
     })
     const o = await runOnce(ctx)
     expect(o.delivered).toBe(0)
-    expect(o.stoppedBy).toMatch(/bacsis masurat/)
+    expect(o.stoppedBy).toMatch(/measured tip/)
     expect(o.stoppedBy).toMatch(/CourierBatch/)
     ctx.ledger.close()
   }, 60_000)
@@ -231,7 +231,7 @@ describe('modul de veghe', () => {
     })
     expect(res.delivered.length).toBe(0)
     expect(res.txHashes.length).toBe(0)
-    expect(res.stoppedBy).toMatch(/veghe/)
+    expect(res.stoppedBy).toMatch(/watchtower/)
     ctx.ledger.close()
   }, 60_000)
 
@@ -247,7 +247,7 @@ describe('modul de veghe', () => {
     const checks = await doctor(ctx)
     expect(checks.filter((c) => !c.ok && c.fatal)).toEqual([])
     const gating = checks.find((c) => c.name.startsWith('deliver()'))
-    expect(gating?.detail).toMatch(/nu conteaza/)
+    expect(gating?.detail).toMatch(/does not matter/)
 
     await d.client.waitForTransactionReceipt({
       hash: await d.wallet.writeContract({

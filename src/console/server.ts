@@ -83,7 +83,7 @@ export function createConsole(ctx: Ctx) {
     if (serveFont(url.pathname, res)) return
 
     if (!token) {
-      return html(res, 503, loginPage().replace('Jetonul de operator.', 'Nu e configurat niciun jeton (console.token).'))
+      return html(res, 503, loginPage().replace('Jetonul de operator.', 'No token configured (console.token).'))
     }
 
     /* intrarea cu jeton in adresa: se pune in cookie si se scoate din bara */
@@ -101,7 +101,7 @@ export function createConsole(ctx: Ctx) {
     if (url.pathname === '/login') return html(res, 200, loginPage())
 
     if (!authed(req)) {
-      if (url.pathname.startsWith('/api/')) return json(res, 401, { error: 'jeton lipsa' })
+      if (url.pathname.startsWith('/api/')) return json(res, 401, { error: 'missing token' })
       return html(res, 401, loginPage())
     }
 
@@ -234,11 +234,11 @@ export function createConsole(ctx: Ctx) {
     if (req.method === 'POST' && url.pathname === '/api/run') {
       const dry = url.searchParams.get('dry') === '1'
       if (!ctx.control.attached) {
-        return json(res, 409, { error: 'nu ruleaza nicio bucla; porneste cu `courier start`' })
+        return json(res, 409, { error: 'no loop is running; start it with courier start' })
       }
-      if (ctx.control.running) return json(res, 409, { error: 'deja ruleaza' })
+      if (ctx.control.running) return json(res, 409, { error: 'already running' })
       const ok = ctx.control.request(dry)
-      log.warn({ dry }, 'rulare ceruta din consola')
+      log.warn({ dry }, 'run requested from the console')
       return json(res, ok ? 200 : 409, { ok, dry })
     }
 
@@ -247,24 +247,24 @@ export function createConsole(ctx: Ctx) {
       try {
         if (pause) {
           mkdirSync(dirname(killFile), { recursive: true })
-          writeFileSync(killFile, `oprit din consola la ${new Date().toISOString()}\n`)
+          writeFileSync(killFile, `stopped from the console at ${new Date().toISOString()}\n`)
         } else {
           rmSync(killFile, { force: true })
         }
-        log.warn({ pause }, pause ? 'oprit din consola' : 'pornit din consola')
+        log.warn({ pause }, pause ? 'stopped from the console' : 'started from the console')
         return json(res, 200, { ok: true, paused: existsSync(killFile) })
       } catch (e) {
         return json(res, 500, { error: (e as Error).message })
       }
     }
 
-    return json(res, 404, { error: 'ruta inexistenta' })
+    return json(res, 404, { error: 'no such route' })
   }
 
   return createServer((req, res) => {
     void handler(req, res).catch((e) => {
-      log.error({ err: (e as Error).message }, 'consola a picat')
-      if (!res.headersSent) json(res, 500, { error: 'eroare interna' })
+      log.error({ err: (e as Error).message }, 'console failed')
+      if (!res.headersSent) json(res, 500, { error: 'internal error' })
     })
   })
 }
@@ -272,12 +272,12 @@ export function createConsole(ctx: Ctx) {
 export function startConsole(ctx: Ctx): ReturnType<typeof createServer> | null {
   if (!ctx.cfg.console.enabled) return null
   if (!ctx.cfg.console.token) {
-    log.error('consola e pornita dar nu are jeton; nu o expun fara jeton')
+    log.error('console is enabled but has no token; refusing to expose it')
     return null
   }
   const server = createConsole(ctx)
   server.listen(ctx.cfg.console.port, ctx.cfg.console.host, () => {
-    log.info({ host: ctx.cfg.console.host, port: ctx.cfg.console.port }, 'consola de operator pornita')
+    log.info({ host: ctx.cfg.console.host, port: ctx.cfg.console.port }, 'operator console listening')
   })
   return server
 }

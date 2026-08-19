@@ -108,16 +108,16 @@ export interface ProfitVerdict {
 export function decideProfit(i: ProfitInput): ProfitVerdict {
   const { tipWei, gasCostWei, cfg } = i
   if (cfg.policy.mode === 'campaign') {
-    return { go: true, reason: null, detail: 'campanie: livram si in pierdere' }
+    return { go: true, reason: null, detail: 'campaign mode: deliver even at a loss' }
   }
   if (tipWei < cfg.policy.minTipWei) {
-    return { go: false, reason: 'unprofitable', detail: `bacsis ${tipWei} sub pragul ${cfg.policy.minTipWei}` }
+    return { go: false, reason: 'unprofitable', detail: `tip ${tipWei} below floor ${cfg.policy.minTipWei}` }
   }
   const needed = scaleWei(gasCostWei, cfg.policy.profitMultiple)
   if (tipWei < needed) {
-    return { go: false, reason: 'unprofitable', detail: `bacsis ${tipWei} sub ${needed} (gaz ${gasCostWei} x ${cfg.policy.profitMultiple})` }
+    return { go: false, reason: 'unprofitable', detail: `tip ${tipWei} below ${needed} (gas ${gasCostWei} x ${cfg.policy.profitMultiple})` }
   }
-  return { go: true, reason: null, detail: `bacsis ${tipWei} peste pragul ${needed}` }
+  return { go: true, reason: null, detail: `tip ${tipWei} clears the ${needed} bar` }
 }
 
 /** inmultire cu un numar zecimal, fara sa pierdem precizia weiului */
@@ -134,22 +134,22 @@ export interface BudgetInput {
 
 export function withinDailyBudget(i: BudgetInput): ProfitVerdict {
   const cap = i.cfg.policy.dailyGasBudgetWei
-  if (cap === null) return { go: true, reason: null, detail: 'fara buget zilnic' }
+  if (cap === null) return { go: true, reason: null, detail: 'no daily budget' }
   if (i.spentTodayWei + i.plannedWei > cap) {
     return {
       go: false,
       reason: 'daily-budget',
-      detail: `${i.spentTodayWei} + ${i.plannedWei} depaseste ${cap}`
+      detail: `${i.spentTodayWei} + ${i.plannedWei} exceeds ${cap}`
     }
   }
-  return { go: true, reason: null, detail: `sub buget: ${i.spentTodayWei + i.plannedWei} din ${cap}` }
+  return { go: true, reason: null, detail: `within budget: ${i.spentTodayWei + i.plannedWei} of ${cap}` }
 }
 
 export function gasPriceAcceptable(gasPriceWei: bigint, cfg: Config): ProfitVerdict {
   const cap = cfg.policy.maxGasPriceWei
-  if (cap === null) return { go: true, reason: null, detail: 'fara plafon de gaz' }
+  if (cap === null) return { go: true, reason: null, detail: 'no gas price cap' }
   if (gasPriceWei > cap) {
-    return { go: false, reason: 'gas-price-cap', detail: `${gasPriceWei} peste plafonul ${cap}` }
+    return { go: false, reason: 'gas-price-cap', detail: `${gasPriceWei} above cap ${cap}` }
   }
-  return { go: true, reason: null, detail: `gaz ${gasPriceWei} sub plafon` }
+  return { go: true, reason: null, detail: `gas ${gasPriceWei} under cap` }
 }

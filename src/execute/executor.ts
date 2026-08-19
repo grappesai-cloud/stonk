@@ -85,15 +85,15 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
      doar in bucla, ca sa nu existe niciun drum prin care sa se ajunga la
      semnare dintr-o configurare de veghe. */
   if (cfg.watchtower) {
-    out.stoppedBy = 'mod de veghe: nu se livreaza nimic'
-    for (const c of claims) out.skipped.push({ tokenId: c.tokenId, reason: 'over-run-cap', detail: 'veghe' })
+    out.stoppedBy = 'watchtower mode: nothing is delivered'
+    for (const c of claims) out.skipped.push({ tokenId: c.tokenId, reason: 'over-run-cap', detail: 'watchtower' })
     return out
   }
 
   // 1. comutatorul de oprire, inaintea oricarui calcul
   if (existsSync(cfg.execution.killSwitchFile)) {
-    out.stoppedBy = `comutator de oprire prezent: ${cfg.execution.killSwitchFile}`
-    log.warn({ file: cfg.execution.killSwitchFile }, 'oprit de comutator')
+    out.stoppedBy = `kill switch present: ${cfg.execution.killSwitchFile}`
+    log.warn({ file: cfg.execution.killSwitchFile }, 'stopped by kill switch')
     return out
   }
 
@@ -103,7 +103,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
   const gasPriceWei = await client.getGasPrice()
   const priceVerdict = gasPriceAcceptable(gasPriceWei, cfg)
   if (!priceVerdict.go) {
-    out.stoppedBy = `gaz prea scump: ${priceVerdict.detail}`
+    out.stoppedBy = `gas too expensive: ${priceVerdict.detail}`
     for (const c of claims) out.skipped.push({ tokenId: c.tokenId, reason: 'gas-price-cap' })
     return out
   }
@@ -120,7 +120,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
 
   for (const group of chunks) {
     if (existsSync(cfg.execution.killSwitchFile)) {
-      out.stoppedBy = 'comutator de oprire aparut in timpul rularii'
+      out.stoppedBy = 'kill switch appeared mid-run'
       for (const c of group) out.skipped.push({ tokenId: c.tokenId, reason: 'over-run-cap' })
       break
     }
@@ -129,10 +129,10 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     try {
       sim = await simulateBatch(client, cfg, account ?? from, group)
     } catch (e) {
-      log.error({ err: (e as Error).message }, 'simularea lotului a picat, lotul se sare')
+      log.error({ err: (e as Error).message }, 'batch simulation failed, skipping the batch')
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', `simulare picata: ${(e as Error).message}`))
-        out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail: 'simulare picata' })
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', `simulation failed: ${(e as Error).message}`))
+        out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail: 'simulation failed' })
       }
       continue
     }
@@ -140,8 +140,8 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     // 3. rentabilitate, pe lot
     if (cfg.policy.mode === 'profit' && !sim.tipsMeasured && cfg.policy.requireMeasuredTips) {
       const detail =
-        'modul profit cere bacsis masurat, dar nu exista contract de lot. ' +
-        'Desfasoara CourierBatch, sau treci pe modul campanie, sau pune requireMeasuredTips pe false si accepta ca livrezi orbeste.'
+        'profit mode needs a measured tip, but there is no batch contract. ' +
+        'Deploy CourierBatch, switch to campaign mode, or set requireMeasuredTips to false and accept delivering blind.'
       out.stoppedBy = detail
       for (const c of group) {
         ledger.recordDelivery(row(runId, c, owners, 'skipped', detail))
@@ -163,7 +163,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     // 4. bugetul zilnic
     const budget = withinDailyBudget({ spentTodayWei: spentToday, plannedWei: sim.gasCostWei, cfg })
     if (!budget.go) {
-      out.stoppedBy = `buget zilnic epuizat: ${budget.detail}`
+      out.stoppedBy = `daily budget spent: ${budget.detail}`
       for (const c of group) {
         ledger.recordDelivery(row(runId, c, owners, 'skipped', budget.detail))
         out.skipped.push({ tokenId: c.tokenId, reason: 'daily-budget', detail: budget.detail })
@@ -174,7 +174,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     // 5. modul uscat: totul s-a calculat, nu se semneaza nimic
     if (cfg.execution.dryRun) {
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'dry', 'rulare uscata'))
+        ledger.recordDelivery(row(runId, c, owners, 'dry', 'dry run'))
       }
       out.tipsWei += sim.tipsWei
       out.gasWei += sim.gasCostWei
@@ -183,16 +183,16 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     }
 
     if (!wallet || !account) {
-      out.stoppedBy = 'lipseste cheia privata, nu se poate semna'
+      out.stoppedBy = 'no private key, nothing can be signed'
       break
     }
 
     // 6. soldul operatorului
     const balance = await client.getBalance({ address: account.address })
     if (balance < sim.gasCostWei) {
-      out.stoppedBy = `sold insuficient: ${balance} sub gazul estimat ${sim.gasCostWei}`
+      out.stoppedBy = `balance too low: ${balance} under the estimated gas ${sim.gasCostWei}`
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', 'sold insuficient'))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', 'balance too low'))
       }
       break
     }
@@ -236,15 +236,15 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       }
       log.info(
         { hash, delivered: okStatus ? group.length : 0, gasWei: gasWei.toString(), tips: tips.toString() },
-        okStatus ? 'lot livrat' : 'lot dat revert'
+        okStatus ? 'batch delivered' : 'batch reverted'
       )
     } catch (e) {
       const msg = (e as Error).message
-      log.error({ err: msg }, 'trimiterea lotului a picat')
+      log.error({ err: msg }, 'sending the batch failed')
       for (const c of group) {
         ledger.recordDelivery(row(runId, c, owners, 'failed', msg))
       }
-      out.stoppedBy = `trimitere picata: ${msg}`
+      out.stoppedBy = `send failed: ${msg}`
       break
     }
   }
@@ -284,8 +284,8 @@ async function send(
 
   // fara contract de lot: exact o livrare, garantat, pentru ca lotul are unul
   const first = sim.claims[0]
-  if (!first) throw new Error('lot gol')
-  if (sim.claims.length > 1) throw new Error('fara contract de lot nu se pot trimite mai multe livrari intr-o tranzactie')
+  if (!first) throw new Error('empty batch')
+  if (sim.claims.length > 1) throw new Error('without a batch contract, one transaction carries exactly one delivery')
   return wallet.sendTransaction({
     account,
     chain: wallet.chain,

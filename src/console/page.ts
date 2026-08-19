@@ -97,9 +97,9 @@ ${TERM_LAYERS}
     <span class="logo">COURIER<b>//</b>CONSOLE</span>
     <span class="st"><i class="led" id="led"></i><span id="state">CONNECTING</span><i class="cur"></i></span>
     <span class="sp">
-      <button class="b" id="dry" disabled>proba uscata</button>
-      <button class="b" id="now" disabled>ruleaza acum</button>
-      <button class="b" id="scan" disabled hidden>scaneaza acum</button>
+      <button class="b" id="dry" disabled>dry run</button>
+      <button class="b" id="now" disabled>run now</button>
+      <button class="b" id="scan" disabled hidden>scan now</button>
       <button class="b danger stop" id="toggle" disabled>--</button>
     </span>
   </header>
@@ -119,7 +119,7 @@ ${TERM_LAYERS}
     <div class="box">
       <span class="t" id="log-t">log</span>
       <div class="log" id="log"></div>
-      <div class="empty" id="log-empty" hidden>NICIUN EVENIMENT INCA</div>
+      <div class="empty" id="log-empty" hidden>NO EVENTS YET</div>
     </div>
   </section>
 
@@ -127,13 +127,13 @@ ${TERM_LAYERS}
 
   <section class="two">
     <div class="box">
-      <span class="t" id="backlog-t">restanta</span>
+      <span class="t" id="backlog-t">backlog</span>
       <div class="box-b">
         <div id="backlog-head">
           <div class="big" id="backlog-val">--</div>
           <div class="under" style="margin-top:8px">
-            <span>portofele <b id="backlog-n">0</b></span>
-            <span>cost golire <b id="backlog-cost">0</b></span>
+            <span>wallets <b id="backlog-n">0</b></span>
+            <span>clearing cost <b id="backlog-cost">0</b></span>
           </div>
           <div style="margin-top:12px" id="backlog-bar"></div>
         </div>
@@ -142,21 +142,21 @@ ${TERM_LAYERS}
     </div>
 
     <div class="box">
-      <span class="t">de ce nu s-a livrat</span>
+      <span class="t">why nothing shipped</span>
       <div class="box-b" id="skips"></div>
-      <div class="empty" id="skips-empty" hidden>NIMIC SARIT</div>
+      <div class="empty" id="skips-empty" hidden>NOTHING SKIPPED</div>
     </div>
   </section>
 
   <div class="box">
-    <span class="t">rulari</span>
+    <span class="t">runs</span>
     <div class="tscroll">
       <table>
-        <thead><tr><th>#</th><th>mod</th><th>scanat</th><th>livrat</th><th>gaz</th><th>bacsis</th></tr></thead>
+        <thead><tr><th>#</th><th>mode</th><th>scanned</th><th>delivered</th><th>gas</th><th>tips</th></tr></thead>
         <tbody id="runs"></tbody>
       </table>
     </div>
-    <div class="empty" id="runs-empty" hidden>NICIO RULARE INCA</div>
+    <div class="empty" id="runs-empty" hidden>NO RUNS YET</div>
   </div>
 
   <p class="msg" id="foot" style="margin-top:20px">COURIER CONSOLE</p>
@@ -266,16 +266,16 @@ function strip(s){
   item('CHAIN', s.chainId + (s.latencyMs != null ? ' \\u00b7 ' + s.latencyMs + 'ms' : ''),
     s.latencyMs == null ? 'bad' : s.latencyMs > 1500 ? 'warn' : '');
   item('BLK', s.block ?? '--', s.block ? '' : 'bad');
-  item('MOD', s.watchtower ? 'VEGHE' : String(s.mode).toUpperCase() + (s.dryRun ? ' \\u00b7 USCAT' : ''),
+  item('MODE', s.watchtower ? 'WATCH' : String(s.mode).toUpperCase() + (s.dryRun ? ' \\u00b7 USCAT' : ''),
     s.watchtower ? '' : (s.dryRun ? 'warn' : ''));
-  item('OPERATOR', s.operator ? num(s.operatorBalanceEth, 4) + ' ' + s.symbol : 'fara cheie', s.operatorLow ? 'bad' : '');
+  item('OPERATOR', s.operator ? num(s.operatorBalanceEth, 4) + ' ' + s.symbol : 'no key', s.operatorLow ? 'bad' : '');
   item('LAST', s.lastRunAt ? ago(s.lastRunAt) : '--');
-  const nb = item('NEXT', s.running ? 'ACUM' : (s.nextRunAt ? mmss(s.nextRunAt - Math.floor(Date.now()/1000)) : '--'));
+  const nb = item('NEXT', s.running ? 'NOW' : (s.nextRunAt ? mmss(s.nextRunAt - Math.floor(Date.now()/1000)) : '--'));
   nb.id = 'next-b';
 }
 setInterval(() => {
   const b = $('next-b');
-  if (b && nextRunAt) { const l = nextRunAt - Math.floor(Date.now()/1000); b.textContent = l > 0 ? mmss(l) : 'ACUM'; }
+  if (b && nextRunAt) { const l = nextRunAt - Math.floor(Date.now()/1000); b.textContent = l > 0 ? mmss(l) : 'NOW'; }
 }, 1000);
 
 const OPS = {deliver: 'DELIVER', skip: 'SKIP   ', fail: 'FAIL   ', dry: 'DRY    '};
@@ -307,19 +307,19 @@ async function load(){
     if (r.status === 401) { location.href = '/login'; return; }
     s = await r.json();
   }catch{
-    $('state').textContent = 'FARA LEGATURA'; $('led').className = 'led off'; return;
+    $('state').textContent = 'NO CONNECTION'; $('led').className = 'led off'; return;
   }
   paused = s.paused; nextRunAt = s.nextRunAt;
 
   const wt = !!s.watchtower;
-  $('state').textContent = s.running ? (wt ? 'SCANEAZA' : 'RULEAZA')
-    : s.paused ? 'OPRIT' : (wt ? 'VEGHE' : (s.dryRun ? 'USCAT' : 'ONLINE'));
+  $('state').textContent = s.running ? (wt ? 'SCANNING' : 'RUNNING')
+    : s.paused ? 'STOPPED' : (wt ? 'WATCH' : (s.dryRun ? 'DRY' : 'ONLINE'));
   $('led').className = 'led' + (s.paused ? ' off' : (s.dryRun && !wt ? ' warn' : ''));
 
   const t = $('toggle');
   t.disabled = false;
   if (!armed) {
-    t.textContent = s.paused ? 'porneste' : 'opreste';
+    t.textContent = s.paused ? 'start' : 'stop';
     t.className = 'b stop ' + (s.paused ? 'hot' : 'danger');
   }
   /* in veghe nu exista livrare, deci nici proba uscata sau rulare live:
@@ -341,13 +341,13 @@ async function load(){
   };
 
   if (wt) {
-    $('hero-t').textContent = 'nerevendicat acum';
+    $('hero-t').textContent = 'unclaimed right now';
     $('net').classList.remove('neg');
     setNetRaw(num(s.wall.valueEth, 3) + ' ' + s.symbol);
-    put('portofele', String(s.wall.count));
-    put('cel mai vechi', s.wall.oldestDays > 0 ? s.wall.oldestDays + ' zile' : 'azi');
-    put('gasite ultima data', s.lastOutcome ? String(s.lastOutcome.found ?? 0) : '—');
-    put('cost golire', num(s.backlogCostEth, 5) + ' ' + s.symbol);
+    put('wallets', String(s.wall.count));
+    put('oldest', s.wall.oldestDays > 0 ? s.wall.oldestDays + ' days' : 'today');
+    put('found last scan', s.lastOutcome ? String(s.lastOutcome.found ?? 0) : '—');
+    put('clearing cost', num(s.backlogCostEth, 5) + ' ' + s.symbol);
     $('spark').hidden = true;
     const hb = $('hero-bar'); hb.hidden = false; hb.replaceChildren();
     hb.style.marginTop = '18px';
@@ -355,21 +355,21 @@ async function load(){
     hb.appendChild(blocks(all > 0 ? s.wall.count / all : 0, 30));
     const pc = document.createElement('div');
     pc.className = 'k'; pc.style.marginTop = '8px';
-    pc.textContent = all > 0 ? Math.round((s.wall.count / all) * 100) + '% din tot ce a existat inca asteapta' : '';
+    pc.textContent = all > 0 ? Math.round((s.wall.count / all) * 100) + '% of everything ever seen is still waiting' : '';
     hb.appendChild(pc);
-    $('log-t').textContent = 'descoperiri';
+    $('log-t').textContent = 'finds';
     findsLog(s.finds || []);
   } else {
     $('hero-t').textContent = 'net / 24h';
     $('spark').hidden = false;
     $('hero-bar').hidden = true;
     setNet(s.day.netEth);
-    put('incasat', num(s.day.earnedEth) + ' ' + s.symbol);
-    put('gaz', num(s.day.gasEth) + ' ' + s.symbol);
-    put('livrari', String(s.day.deliveries));
-    put('valoare', num(s.day.deliveredEth, 3) + ' ' + s.symbol);
+    put('earned', num(s.day.earnedEth) + ' ' + s.symbol);
+    put('gas', num(s.day.gasEth) + ' ' + s.symbol);
+    put('deliveries', String(s.day.deliveries));
+    put('value', num(s.day.deliveredEth, 3) + ' ' + s.symbol);
     $('net-note').textContent = s.lastOutcome && s.lastOutcome.dry
-      ? '· ultima proba uscata ' + s.lastOutcome.delivered + '/' + s.lastOutcome.candidates : '';
+      ? '· last dry run ' + s.lastOutcome.delivered + '/' + s.lastOutcome.candidates : '';
     drawSpark(s.series || []);
     $('log-t').textContent = 'log';
     log(s.events || []);
@@ -378,7 +378,7 @@ async function load(){
 
   /* in veghe totalul e deja numarul erou, deci panoul arata altceva:
      cine tine banii, nu cati sunt */
-  $('backlog-t').textContent = wt ? 'cine tine banii' : 'restanta';
+  $('backlog-t').textContent = wt ? 'who holds it' : 'backlog';
   $('backlog-head').hidden = wt;
   $('backlog-val').textContent = num(s.wall.valueEth, 3) + ' ' + s.symbol;
   $('backlog-n').textContent = s.wall.count;
@@ -389,7 +389,7 @@ async function load(){
   bar.appendChild(blocks(all > 0 ? s.wall.count / all : 0, 26));
   const pct = document.createElement('span');
   pct.className = 'k'; pct.style.marginLeft = '10px';
-  pct.textContent = all > 0 ? Math.round((s.wall.count / all) * 100) + '% inca de livrat' : '';
+  pct.textContent = all > 0 ? Math.round((s.wall.count / all) * 100) + '% still to deliver' : '';
   bar.appendChild(pct);
 
   const ow = $('owners');
@@ -397,7 +397,7 @@ async function load(){
   for (const o of s.topOwners || []) {
     const row = document.createElement('div'); row.className = 'rowline';
     const l = document.createElement('span');
-    l.textContent = short(o.owner) + ' \\u00b7 ' + o.wallets + (o.wallets === 1 ? ' broker' : ' brokeri');
+    l.textContent = short(o.owner) + ' \\u00b7 ' + o.wallets + (o.wallets === 1 ? ' broker' : ' brokers');
     const b = document.createElement('b'); b.textContent = num(o.valueEth, 3);
     row.append(l, b); ow.appendChild(row);
   }
@@ -444,26 +444,26 @@ async function post(path, okText){
     const r = await fetch(path, {method:'POST'});
     const j = await r.json();
     msg.className = r.ok ? 'msg ok' : 'msg err';
-    msg.textContent = r.ok ? okText : String(j.error || 'NU A MERS').toUpperCase();
-  }catch{ msg.className = 'msg err'; msg.textContent = 'NU A MERS'; }
+    msg.textContent = r.ok ? okText : String(j.error || 'FAILED').toUpperCase();
+  }catch{ msg.className = 'msg err'; msg.textContent = 'FAILED'; }
   await load();
 }
 
-$('dry').addEventListener('click', () => post('/api/run?dry=1', 'PROBA USCATA CERUTA \\u00b7 NU PLEACA NICIO TRANZACTIE'));
-$('now').addEventListener('click', () => post('/api/run', 'RULARE CERUTA'));
-$('scan').addEventListener('click', () => post('/api/run', 'SCANARE CERUTA'));
+$('dry').addEventListener('click', () => post('/api/run?dry=1', 'DRY RUN QUEUED \\u00b7 NOTHING WILL BE SENT'));
+$('now').addEventListener('click', () => post('/api/run', 'RUN QUEUED'));
+$('scan').addEventListener('click', () => post('/api/run', 'SCAN QUEUED'));
 $('toggle').addEventListener('click', async () => {
   const btn = $('toggle');
   /* oprirea dintr-un clic; pornirea cere doua, ca sa nu repornesti din greseala
      ceva oprit dintr-un motiv. Confirmarea sta in buton, nu intr-o fereastra. */
   if (paused && !armed) {
-    armed = true; btn.textContent = 'sigur? apasa iar';
+    armed = true; btn.textContent = 'sure? press again';
     clearTimeout(armTimer);
-    armTimer = setTimeout(() => { armed = false; btn.textContent = 'porneste'; }, 10000);
+    armTimer = setTimeout(() => { armed = false; btn.textContent = 'start'; }, 10000);
     return;
   }
   clearTimeout(armTimer); armed = false; btn.disabled = true;
-  await post(paused ? '/api/resume' : '/api/pause', paused ? 'PORNIT' : 'OPRIT \\u00b7 NU MAI PLEACA NICIO TRANZACTIE');
+  await post(paused ? '/api/resume' : '/api/pause', paused ? 'RUNNING' : 'STOPPED \\u00b7 NOTHING WILL BE SENT');
 });
 
 addEventListener('resize', () => load());
@@ -495,9 +495,9 @@ input::placeholder{color:var(--faint);letter-spacing:.16em}
 ${TERM_LAYERS}
 <form method="GET" action="/">
   <span class="logo">COURIER<b>//</b>CONSOLE</span>
-  <p>Jetonul de operator. Nu e un cont si nu deschide niciun portofel.</p>
+  <p>Operator token. It is not an account and it opens no wallet.</p>
   <input name="token" type="password" placeholder="token" autocomplete="off" autofocus>
-  <button class="b hot" type="submit">intra</button>
+  <button class="b hot" type="submit">enter</button>
 </form>
 </body></html>`
 }

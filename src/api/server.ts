@@ -74,13 +74,13 @@ export function createApi(ctx: Ctx) {
       res.end()
       return
     }
-    if (req.method !== 'GET') return json(res, 405, { error: 'doar GET' }, cors)
+    if (req.method !== 'GET') return json(res, 405, { error: 'GET only' }, cors)
 
     const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
       req.socket.remoteAddress ?? 'necunoscut'
     if (!limiter.allow(ip)) {
       res.writeHead(429, { 'content-type': 'application/json', 'retry-after': '60', 'access-control-allow-origin': cors })
-      res.end(JSON.stringify({ error: 'prea multe cereri' }))
+      res.end(JSON.stringify({ error: 'too many requests' }))
       return
     }
 
@@ -203,11 +203,11 @@ export function createApi(ctx: Ctx) {
         }
 
         default:
-          return json(res, 404, { error: 'ruta inexistenta' }, cors)
+          return json(res, 404, { error: 'no such route' }, cors)
       }
     } catch (e) {
-      log.error({ err: (e as Error).message, path: url.pathname }, 'api a picat')
-      return json(res, 500, { error: 'eroare interna' }, cors)
+      log.error({ err: (e as Error).message, path: url.pathname }, 'api failed')
+      return json(res, 500, { error: 'internal error' }, cors)
     }
   }
 
@@ -220,7 +220,7 @@ export function startApi(ctx: Ctx): ReturnType<typeof createServer> | null {
   if (!ctx.cfg.api.enabled) return null
   const server = createApi(ctx)
   server.listen(ctx.cfg.api.port, ctx.cfg.api.host, () => {
-    log.info({ host: ctx.cfg.api.host, port: ctx.cfg.api.port }, 'api pornit')
+    log.info({ host: ctx.cfg.api.host, port: ctx.cfg.api.port }, 'api listening')
   })
   return server
 }

@@ -64,7 +64,7 @@ for (let i = 0; i < 4; i++) {
     gasWei: parseEther('0.00002'), tipsWei: parseEther('0.004'), valueWei: parseEther('2.2'), note: null
   })
 }
-for (const [reason, n] of [['sub pragul de valoare', 31], ['pauza intre livrari', 12], ['nu mai era nimic de livrat', 7], ['bacsis sub gaz', 3]] as const) {
+for (const [reason, n] of [['below the value floor', 31], ['delivery cooldown', 12], ['nothing left to deliver', 7], ['tip under gas', 3]] as const) {
   for (let i = 0; i < n; i++) {
     ledger.recordDelivery({
       runId: run, tokenId: String(900 + i), wallet: addr(900 + i), owner: null,
@@ -95,8 +95,8 @@ const control = new Controller()
 /* in demo nu exista bucla, deci butoanele de rulare raman inactive, cum trebuie */
 const ctx = { cfg, client: publicClientOf(cfg), account: null, wallet: null, ledger, tg: new Telegram(cfg, ledger), control }
 createApi(ctx).listen(cfg.api.port, '127.0.0.1', () => {
-  process.stdout.write(`peretele pe http://127.0.0.1:${cfg.api.port}/\n`)
+  process.stdout.write(`wall on http://127.0.0.1:${cfg.api.port}/\n`)
 })
 createConsole(ctx).listen(cfg.console.port, '127.0.0.1', () => {
-  process.stdout.write(`consola pe http://127.0.0.1:${cfg.console.port}/?token=demo\n`)
+  process.stdout.write(`console on http://127.0.0.1:${cfg.console.port}/?token=demo\n`)
 })

@@ -41,6 +41,6 @@ export async function reconcile(ctx: Ctx): Promise<Reconciled> {
     }
   }
 
-  if (out.checked > 0) log.info(out, 'reconciliere la pornire')
+  if (out.checked > 0) log.info(out, 'startup reconciliation')
   return out
 }
