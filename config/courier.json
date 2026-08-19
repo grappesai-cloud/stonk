@@ -1,11 +1,11 @@
 {
-  "_": "RINGER, legat de contractul ADEVARAT: SafetyDepositClockInV3. Apasa startRound(token) in secunda in care expira racirea de 7 zile. Contractul NU plateste apelantul, deci modul e 'campaign': lucram dinadins in pierdere, fiindca runda pornita e ce face banii revendicabili pentru brokerii pe care ii servim.",
+  "_": "COURIER, legat de contractul ADEVARAT. Impinge in portofelele 6551 ce si-au uitat brokerii acolo. Contractul NU plateste apelantul: raportul acestui agent nu arata profit, arata CAT a livrat si cui. Aia e dovada pe care o vinde un Stonk Agent.",
   "_watchtower": "Pornit inseamna: masoara cursa, nu cheltui nimic. E modul cu care se incepe, fiindca raspunde la singura intrebare care conteaza inainte sa arzi gaz: butonul asta e liber sau il apasa deja altcineva mai rapid?",
   "watchtower": true,
   "agent": {
-    "kind": "ringer",
+    "kind": "courier",
     "id": 0,
-    "name": "RINGER #0000",
+    "name": "COURIER #0000",
     "collection": null,
     "wallet": null,
     "owner": null
@@ -37,51 +37,44 @@
     "deployBlock": 0
   },
   "job": {
-    "_": "Butonul se apasa pe cate un jeton, nu pe un id: de aia sloturile sunt adrese.",
-    "slots": [
+    "brokers": {
+      "address": "0x539CdD042c2f3d93EbC5BE7DfFf0c79F3B4fAbF0",
+      "firstId": 1,
+      "count": null,
+      "supply": null
+    },
+    "_tokens": "jetoanele de stoc, luate din colectie cu stockTokenAt()",
+    "tokens": [
       "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
       "0x12f190a9F9d7D37a250758b26824B97CE941bF54",
       "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC"
     ],
-    "_pot": "Oala urmatoarei runde e soldul de jetoane al contractului, care se citeste de pe JETON, nu de pe tinta, si difera de la slot la slot. Nu se poate scrie ca o singura citire, deci ramane pe seama simularii.",
-    "pot": null,
-    "_ready": "Runda se poate redeschide la 7 zile de la pornire. Contractul mai permite si mai devreme daca s-a revendicat tot, caz pe care il prinde simularea, nu citirea de aici.",
-    "ready": {
-      "mode": "deadline",
-      "call": {
-        "signature": "function rounds(address token) view returns (uint64 round, uint64 startedAt, uint256 pot, uint256 remaining, uint256 totalWeight)",
-        "args": [
-          "$id"
-        ],
-        "field": "startedAt",
-        "address": null
-      },
-      "plusSec": 604800,
-      "graceSec": 0
-    },
-    "_reward": "Contractul NU plateste nimic apelantului. Verificat in sursa, nu presupus. De aia 'none' si de aia modul e campanie.",
-    "reward": {
-      "mode": "none"
-    },
-    "action": {
-      "signature": "function startRound(address token)",
+    "claimable": {
+      "signature": "function claimable(address token, uint256 tokenId) view returns (uint256)",
       "args": [
+        "$gauge",
         "$id"
       ],
       "field": null,
       "address": null
     },
-    "event": {
-      "_": "RoundStarted nu spune cine a apasat, deci caietul de curse ia expeditorul tranzactiei.",
-      "signature": "event RoundStarted(address token, uint64 round, uint256 pot, uint256 totalWeight)",
-      "callerField": null,
-      "rewardField": null,
-      "slotField": "token"
+    "_action": "$gauges = lista de jetoane, $weights = lista de brokeri din lot. Contractul primeste liste, deci o tranzactie duce tot lotul.",
+    "action": {
+      "signature": "function clockIn(address[] tokens, uint256[] tokenIds)",
+      "args": [
+        "$gauges",
+        "$weights"
+      ],
+      "field": null,
+      "address": null
     },
-    "race": {
-      "priorityBumpBps": 2000,
-      "maxPriorityFeeWei": null,
-      "staleBlocks": 3
+    "batchSize": 40,
+    "readChunk": 250,
+    "event": {
+      "signature": "event ClockedIn(address token, uint64 round, uint256 tokenId, address wallet, uint256 amount)",
+      "callerField": null,
+      "idField": "tokenId",
+      "amountField": "amount"
     }
   },
   "policy": {
@@ -90,32 +83,31 @@
     "minRewardWei": "0",
     "minStakeWei": "0",
     "requireMeasuredReward": false,
-    "cooldownSec": 300,
-    "maxJobsPerRun": 3,
+    "cooldownSec": 900,
+    "maxJobsPerRun": 20,
     "batchSize": 1,
-    "gasCapPerCall": "1500000",
+    "gasCapPerCall": "8000000",
     "maxGasPriceWei": null,
     "dailyGasBudgetWei": "20000000000000000",
     "denyKeys": []
   },
   "execution": {
     "dryRun": true,
-    "privateKey": "env:RINGER_KEY",
+    "privateKey": "env:COURIER_KEY",
     "beneficiary": null,
     "confirmations": 1,
     "maxFeePerGasWei": null,
     "maxPriorityFeePerGasWei": null,
-    "killSwitchFile": "./data/STOP-ringer",
+    "killSwitchFile": "./data/STOP-courier",
     "maxConsecutiveFailures": 5
   },
   "runner": {
-    "_": "'block' e obligatoriu la Ringer: cine se uita din 5 in 5 minute nu apasa niciodata butonul.",
-    "mode": "block",
-    "intervalSec": 60,
-    "jitterSec": 0,
+    "mode": "interval",
+    "intervalSec": 300,
+    "jitterSec": 30,
     "pollMs": 2000,
-    "staleAfterSec": 600,
-    "watchdogSec": 1800
+    "staleAfterSec": 1200,
+    "watchdogSec": 2400
   },
   "alerts": {
     "telegram": {
@@ -134,7 +126,7 @@
   "api": {
     "enabled": true,
     "host": "127.0.0.1",
-    "port": 8790,
+    "port": 8798,
     "cors": [
       "*"
     ],
@@ -143,11 +135,11 @@
   "console": {
     "enabled": false,
     "host": "127.0.0.1",
-    "port": 8791,
+    "port": 8799,
     "token": "env:CONSOLE_TOKEN"
   },
   "storage": {
-    "file": "./data/ringer.db",
+    "file": "./data/courier.db",
     "backup": {
       "enabled": true,
       "dir": "./data/backups",

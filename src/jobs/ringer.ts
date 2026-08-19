@@ -15,7 +15,7 @@
  */
 import { z } from 'zod'
 import { decodeEventLog, parseAbi, type Abi, type Address, type PublicClient } from 'viem'
-import { abiOf, abiWithErrors, zBig, type Config } from '../core/config.js'
+import { abiOf, abiWithErrors, zAddress, zBig, type Config } from '../core/config.js'
 import { functionNameOf } from '../core/chain/reader.js'
 import { readCall, valueOf, zCall, zSource, asBig } from '../core/read.js'
 import { resolveArgs } from '../core/args.js'
@@ -23,10 +23,15 @@ import type { DiscoverInput, Job, JobCheck, Press, Target, WorkItem } from '../c
 
 export const RingerSchema = z.object({
   /**
-   * Cate butoane pastoreste agentul. Gol = unul singur. Cu id-uri, fiecare id
-   * devine o bucata de munca separata si `$id` se umple in sabloane.
+   * Cate butoane pastoreste agentul. Gol = unul singur. Fiecare element devine
+   * o bucata de munca separata si `$id` se umple in sabloane.
+   *
+   * Elementul poate fi un numar SAU o adresa: in contractul real al rundelor,
+   * butonul se apasa pe cate un jeton (`startRound(address token)`), nu pe un
+   * id. Un camp care accepta doar numere ar fi facut meseria imposibila din
+   * schema, nu din realitate.
    */
-  slots: z.array(zBig).nullable().default(null),
+  slots: z.array(z.union([zAddress, zBig])).nullable().default(null),
 
   /** cat s-a strans in oala; miza dupa care se judeca daca merita */
   pot: zCall.nullable().default(null),
@@ -37,7 +42,13 @@ export const RingerSchema = z.object({
       /** contractul spune singur da sau nu */
       z.object({ mode: z.literal('call-bool'), call: zCall, expect: z.boolean().default(true) }),
       /** contractul da un moment; e copt cand a trecut */
-      z.object({ mode: z.literal('deadline'), call: zCall, graceSec: z.number().int().min(0).default(0) }),
+      z.object({
+        mode: z.literal('deadline'),
+        call: zCall,
+        /** cat se adauga la valoarea citita: racirea, cand contractul da doar cand a inceput */
+        plusSec: z.number().int().min(0).default(0),
+        graceSec: z.number().int().min(0).default(0)
+      }),
       /** e copt cand oala trece de un prag */
       z.object({ mode: z.literal('threshold'), minWei: zBig }),
       /** mereu; simularea ramane singurul filtru */
@@ -59,8 +70,15 @@ export const RingerSchema = z.object({
   event: z
     .object({
       signature: z.string().min(5),
-      /** campul cu adresa celui care a apasat */
-      callerField: z.string().default('caller'),
+      /**
+       * Campul cu adresa celui care a apasat. Gol inseamna ca evenimentul nu
+       * o spune, si atunci se ia expeditorul tranzactiei.
+       *
+       * Nu e un caz rar: `RoundStarted` din contractul adevarat nu logheaza
+       * apelantul deloc. Un caiet de curse care are nevoie de un camp anume ar
+       * fi ramas gol exact pe contractul pentru care a fost scris.
+       */
+      callerField: z.string().nullable().default('caller'),
       /** campul cu cat a incasat, daca exista */
       rewardField: z.string().nullable().default(null),
       /** campul cu id-ul butonului, cand agentul pastoreste mai multe */
@@ -83,8 +101,10 @@ export const RingerSchema = z.object({
 
 export type RingerJob = z.infer<typeof RingerSchema>
 
-function keyOf(id: bigint | null): string {
-  return id === null ? 'clockin' : `clockin:${id}`
+type Slot = bigint | Address
+
+function keyOf(id: Slot | null): string {
+  return id === null ? 'clockin' : `clockin:${String(id).toLowerCase()}`
 }
 
 export const ringer: Job<RingerJob> = {
@@ -113,12 +133,18 @@ export const ringer: Job<RingerJob> = {
   },
 
   async discover({ client, cfg, job }): Promise<WorkItem[]> {
-    const ids: (bigint | null)[] = job.slots && job.slots.length > 0 ? job.slots : [null]
+    const ids: (Slot | null)[] = job.slots && job.slots.length > 0 ? (job.slots as Slot[]) : [null]
     const out: WorkItem[] = []
     const nowSec = Math.floor(Date.now() / 1000)
 
     for (const id of ids) {
-      const ctx = { id: id ?? undefined, account: cfg.execution.beneficiary, beneficiary: cfg.execution.beneficiary, nowSec }
+      /* `$id` poate fi si adresa: sablonul il pune ca atare in apel */
+      const ctx = {
+        id: (id ?? undefined) as never,
+        account: cfg.execution.beneficiary,
+        beneficiary: cfg.execution.beneficiary,
+        nowSec
+      }
       let stakeWei: bigint | undefined
       if (job.pot) {
         const { pick } = await readCall(client, cfg.target.address, job.pot, ctx, 'job.pot')
@@ -134,7 +160,7 @@ export const ringer: Job<RingerJob> = {
 
       out.push({
         key: keyOf(id),
-        label: id === null ? 'CLOCK IN' : `CLOCK IN #${id}`,
+        label: id === null ? 'CLOCK IN' : `CLOCK IN ${typeof id === 'bigint' ? '#' + id : String(id).slice(0, 10)}`,
         args: resolveArgs(job.action.args, ctx),
         rewardWei: reward.wei,
         rewardMeasured: reward.measured,
@@ -224,7 +250,7 @@ async function isReady(
     }
     case 'deadline': {
       const { pick } = await readCall(client, cfg.target.address, r.call, ctx, 'job.ready.call')
-      const at = asBig(pick(r.call.field))
+      const at = asBig(pick(r.call.field)) + BigInt(r.plusSec)
       /* ceasul lantului, nu al masinii noastre: pe un lant cu blocuri rare
          diferenta e chiar fereastra in care se castiga sau se pierde cursa */
       const block = await client.getBlock()
@@ -266,15 +292,17 @@ export async function pressesIn(
       continue
     }
     const args = decoded.args as Record<string, unknown>
-    const caller = args[job.event.callerField] as Address | undefined
-    if (!caller) continue
+    let caller = (job.event.callerField ? (args[job.event.callerField] as Address | undefined) : undefined) ?? undefined
     let gasPriceWei = 0n
     try {
       const tx = await client.getTransaction({ hash: l.transactionHash! })
       gasPriceWei = tx.gasPrice ?? tx.maxFeePerGas ?? 0n
+      /* fara camp in eveniment, cine a apasat e chiar cine a trimis tranzactia */
+      if (!caller) caller = tx.from
     } catch {
       gasPriceWei = 0n
     }
+    if (!caller) continue
     const slot = job.event.slotField && args[job.event.slotField] !== undefined ? asBig(args[job.event.slotField]) : null
     out.push({
       key: keyOf(slot),

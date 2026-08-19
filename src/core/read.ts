@@ -8,7 +8,7 @@
  */
 import { z } from 'zod'
 import type { Address, PublicClient } from 'viem'
-import { abiOf, zBig } from './config.js'
+import { abiOf, zAddress, zBig } from './config.js'
 import { functionNameOf, outputCount, outputIndex } from './chain/reader.js'
 import { resolveArgs, type ArgContext } from './args.js'
 
@@ -17,7 +17,15 @@ export const zCall = z.object({
   signature: z.string().min(5),
   args: z.array(z.unknown()).default([]),
   /** numele campului din raspuns; gol = primul */
-  field: z.string().nullable().default(null)
+  field: z.string().nullable().default(null),
+  /**
+   * De la ce contract se citeste. Gol = tinta agentului.
+   *
+   * Trebuie, fiindca in realitate cifra dupa care se ia decizia nu sta mereu
+   * in contractul pe care apesi: oala urmatoarei runde e soldul de jetoane al
+   * contractului, adica o citire de pe JETON, nu de pe el.
+   */
+  address: zAddress.nullable().default(null)
 })
 export type CallSpec = z.infer<typeof zCall>
 
@@ -55,7 +63,7 @@ export async function readCall(
   const fn = functionNameOf(abi)
   const n = outputCount(abi, fn)
   const result = await client.readContract({
-    address,
+    address: spec.address ?? address,
     abi,
     functionName: fn,
     args: resolveArgs(spec.args, ctx) as never

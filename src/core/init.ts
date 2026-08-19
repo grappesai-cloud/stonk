@@ -66,6 +66,12 @@ const WORDS: Record<AgentKind, { action: RegExp; value: RegExp; discovery: RegEx
     discovery: /machine|slot|inventory|stock|level|capacity|low|empty|needs/i,
     event: /restock|refill|stocked|filled|empty|depleted/i
   },
+  courier: {
+    action: /deliver|clock ?in|clockin|claim|push|distribute|sweep|payout|flush/i,
+    value: /claimable|pending|owed|unclaimed|credit|earned|share/i,
+    discovery: /claimable|pending|owed|credit|supply|total|rounds?|brokers?/i,
+    event: /delivered|clockedin|clocked|claimed|distributed|credited/i
+  },
   lobbyist: {
     action: /vote|cast|poke|claim|harvest|collect/i,
     value: /bribe|reward|fee|incentive|payout|claimable|earned/i,

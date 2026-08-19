@@ -7,7 +7,7 @@ const clientOf = (result: unknown): PublicClient => ({ readContract: async () =>
 
 describe('de unde vine cifra castigului', () => {
   it('citita de pe lant = masurata', async () => {
-    const m = await valueOf(clientOf(500n), ADDR, { mode: 'call', call: { signature: 'function tip() view returns (uint256)', args: [], field: null } }, {})
+    const m = await valueOf(clientOf(500n), ADDR, { mode: 'call', call: { signature: 'function tip() view returns (uint256)', args: [], field: null, address: null } }, {})
     expect(m.wei).toBe(500n)
     expect(m.measured).toBe(true)
   })
