@@ -160,7 +160,9 @@ window.SITE = {
        mailto, si pe telefoanele fara client de mail omul apasa degeaba.
        Nu lansa asa. */
     web3formsKey: '',
-    endpoint: '',
+    /* Serviciul nostru, prin nginx-ul paginii. Acelasi domeniu, deci fara CORS,
+       si lista ramane la noi, nu la un tert care poate disparea. */
+    endpoint: '/api/whitelist',
 
     wallet: 'WALLET', walletPh: '0x... or name.eth',
     handle: 'X HANDLE', handlePh: '@degen',
