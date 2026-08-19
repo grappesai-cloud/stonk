@@ -69,7 +69,13 @@ describe('configurare', () => {
   })
 
   it('o meserie necunoscuta e respinsa la pornire', () => {
-    expect(() => loadConfig(write({ ...base, agent: { kind: 'stocker' } }))).toThrow(/agent.kind/)
+    expect(() => loadConfig(write({ ...base, agent: { kind: 'plumber' } }))).toThrow(/agent.kind/)
+  })
+
+  it('cele patru meserii sunt primite', () => {
+    for (const kind of ['ringer', 'miner', 'stocker', 'lobbyist']) {
+      expect(loadConfig(write({ ...base, agent: { kind } })).agent.kind).toBe(kind)
+    }
   })
 })
 

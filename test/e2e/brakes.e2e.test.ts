@@ -113,7 +113,7 @@ describe('franele', () => {
     const ctx = await ready({ policy: { dailyGasBudgetWei: '1' } })
     const o = await runOnce(ctx)
     expect(o.done).toBe(0)
-    expect(o.stoppedBy).toMatch(/daily budget/)
+    expect(o.stoppedBy).toMatch(/daily gas budget/)
     ctx.ledger.close()
   })
 

@@ -139,6 +139,10 @@ export const ringer: Job<RingerJob> = {
         rewardWei: reward.wei,
         rewardMeasured: reward.measured,
         stakeWei: stakeWei ?? 0n,
+        valueWei: 0n,
+        costWei: 0n,
+        costMeasured: true,
+        costToken: null,
         meta: { ready: ready.detail, reward: reward.detail }
       })
     }

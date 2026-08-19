@@ -51,20 +51,46 @@ export async function simulateEach(
   target: Target,
   from: Address,
   items: WorkItem[],
-  concurrency = 8
+  concurrency = 8,
+  /**
+   * Da conturilor din simulare un sold inventat.
+   *
+   * Se foloseste DOAR la proba de autorizare, si acolo e obligatoriu: pe o
+   * functie platibila, un strain fara bani cade pe lipsa fondurilor, nu pe
+   * autorizare, si atunci si strainul si proprietarul primesc refuz. Proba ar
+   * raspunde "nu se stie" exact acolo unde trebuie sa raspunda.
+   *
+   * In rulare normala NU se foloseste: acolo lipsa banilor e un raspuns
+   * adevarat si trebuie sa opreasca.
+   */
+  fundProbe = false
 ): Promise<SingleSim[]> {
+  const override = fundProbe
+    ? [{ address: from, balance: 10n ** 24n }]
+    : undefined
   return pool(items, concurrency, async (item) => {
     try {
+      /* Valoarea apelului NU se poate sari la simulare. O functie platibila
+         simulata fara bani cade pe verificarea de plata, si atunci si strainul
+         si proprietarul primesc acelasi refuz: proba de autorizare devine
+         inutila si niciun agent care plateste nu ar trece vreodata de simulare. */
       await client.simulateContract({
         address: target.address,
         abi: target.abi,
         functionName: target.functionName,
         args: item.args as never,
-        account: from
+        account: from,
+        value: item.valueWei,
+        ...(override ? { stateOverride: override } : {})
       })
       let gas = 0n
       try {
-        gas = await client.estimateGas({ account: from, to: target.address, data: calldataFor(target, item) })
+        gas = await client.estimateGas({
+          account: from,
+          to: target.address,
+          data: calldataFor(target, item),
+          value: item.valueWei
+        })
       } catch {
         gas = 0n
       }
@@ -109,7 +135,7 @@ export async function probeGating(
   if (!candidate) {
     return { callableByStranger: false, reason: 'nothing to try it on', kind: 'error', testedKey: null, authority }
   }
-  const [asStranger] = await simulateEach(client, target, stranger, [candidate], 1)
+  const [asStranger] = await simulateEach(client, target, stranger, [candidate], 1, true)
   const testedKey = candidate.key
 
   if (asStranger!.ok) {
@@ -117,7 +143,7 @@ export async function probeGating(
   }
 
   if (authority && authority.toLowerCase() !== stranger.toLowerCase()) {
-    const [asAuthority] = await simulateEach(client, target, authority, [candidate], 1)
+    const [asAuthority] = await simulateEach(client, target, authority, [candidate], 1, true)
     if (asAuthority!.ok) {
       return {
         callableByStranger: false,

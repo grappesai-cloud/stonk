@@ -59,6 +59,18 @@ const WORDS: Record<AgentKind, { action: RegExp; value: RegExp; discovery: RegEx
     value: /bounty|reward|fee|tip|payout|prize|pot/i,
     discovery: /pending|open|active|unsettled|awaiting|next|count|total|rounds?|requests?/i,
     event: /settled|fulfilled|resolved|closed|drawn|revealed|opened|requested/i
+  },
+  stocker: {
+    action: /restock|refill|resupply|stock|load|replenish|fill/i,
+    value: /commission|reward|fee|price|cost|payout|margin/i,
+    discovery: /machine|slot|inventory|stock|level|capacity|low|empty|needs/i,
+    event: /restock|refill|stocked|filled|empty|depleted/i
+  },
+  lobbyist: {
+    action: /vote|cast|poke|claim|harvest|collect/i,
+    value: /bribe|reward|fee|incentive|payout|claimable|earned/i,
+    discovery: /gauge|pool|epoch|period|weight|votes?|power|balanceOfNFT|locked/i,
+    event: /voted|abstained|claimed|notify|bribe|deposit/i
   }
 }
 

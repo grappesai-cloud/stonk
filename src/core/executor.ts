@@ -18,7 +18,7 @@ import type { Config } from './config.js'
 import type { Ledger } from './ledger/db.js'
 import type { Target, WorkItem } from './work.js'
 import { calldataFor, quote, type SingleSim } from './simulate.js'
-import { decideProfit, gasPriceAcceptable, withinDailyBudget, type Skipped } from './policy/rules.js'
+import { decideProfit, gasPriceAcceptable, withinDailyBudget, withinSpendBudget, type Skipped } from './policy/rules.js'
 import { log } from './log.js'
 
 export interface DoneItem {
@@ -27,6 +27,7 @@ export interface DoneItem {
   status: 'sent' | 'confirmed' | 'reverted'
   gasWei: bigint
   rewardWei: bigint
+  costWei: bigint
   /** cat a durat de la vederea ocaziei pana la semnatura */
   latencyMs: number | null
   gasPriceWei: bigint
@@ -38,6 +39,7 @@ export interface ExecuteResult {
   txHashes: Hex[]
   gasWei: bigint
   rewardWei: bigint
+  costWei: bigint
   dry: boolean
   stoppedBy: string | null
 }
@@ -55,6 +57,8 @@ export interface ExecuteInput {
   ledger: Ledger
   runId: number
   target: Target
+  /** tinta pentru o bucata anume, cand meseria are mai multe apeluri */
+  targetOf?: (item: WorkItem) => Target
   sims: SingleSim[]
   /** momentul in care am vazut ocazia, pentru masurarea intarzierii */
   seenAtMs?: number
@@ -69,6 +73,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     txHashes: [],
     gasWei: 0n,
     rewardWei: 0n,
+    costWei: 0n,
     dry: cfg.execution.dryRun,
     stoppedBy: null
   }
@@ -104,10 +109,12 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
   }
 
   const dayStart = Math.floor(Date.now() / 1000) - 86400
-  let spentToday = ledger.gasSpentSince(dayStart)
+  let gasToday = ledger.gasSpentSince(dayStart)
+  let spentToday = ledger.spentSince(dayStart)
 
   for (const sim of sims) {
     const item = sim.item
+    const itemTarget = input.targetOf ? input.targetOf(item) : target
     if (existsSync(cfg.execution.killSwitchFile)) {
       out.stoppedBy = 'kill switch appeared mid-run'
       out.skipped.push({ key: item.key, reason: 'watchtower', detail: 'kill switch' })
@@ -116,17 +123,19 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
 
     const q = await quote(client, sim, cfg)
 
-    // 3. rentabilitate
+    // 3. rentabilitate, cu ce dam din portofel scazut din ce incasam
     const verdict = decideProfit({
       rewardWei: item.rewardWei,
       rewardMeasured: item.rewardMeasured,
+      costWei: item.costWei,
+      costMeasured: item.costMeasured,
       gasCostWei: q.gasCostWei,
       cfg
     })
     if (!verdict.go) {
       ledger.recordJob(row(runId, cfg, item, 'skipped', verdict.detail))
       out.skipped.push({ key: item.key, reason: verdict.reason ?? 'unprofitable', detail: verdict.detail })
-      if (verdict.reason === 'reward-not-measured') {
+      if (verdict.reason === 'reward-not-measured' || verdict.reason === 'cost-not-measured') {
         out.stoppedBy = verdict.detail
         log.error(verdict.detail)
         break
@@ -134,12 +143,19 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       continue
     }
 
-    // 4. bugetul zilnic
-    const budget = withinDailyBudget({ spentTodayWei: spentToday, plannedWei: q.gasCostWei, cfg })
+    // 4. bugetele zilnice: gazul si cheltuiala sunt robinete diferite
+    const budget = withinDailyBudget({ spentTodayWei: gasToday, plannedWei: q.gasCostWei, cfg })
     if (!budget.go) {
-      out.stoppedBy = `daily budget spent: ${budget.detail}`
+      out.stoppedBy = `daily gas budget spent: ${budget.detail}`
       ledger.recordJob(row(runId, cfg, item, 'skipped', budget.detail))
       out.skipped.push({ key: item.key, reason: 'daily-budget', detail: budget.detail })
+      break
+    }
+    const spend = withinSpendBudget({ spentTodayWei: spentToday, plannedWei: item.costWei, cfg })
+    if (!spend.go) {
+      out.stoppedBy = `daily spend budget spent: ${spend.detail}`
+      ledger.recordJob(row(runId, cfg, item, 'skipped', spend.detail))
+      out.skipped.push({ key: item.key, reason: 'daily-spend-budget', detail: spend.detail })
       break
     }
 
@@ -148,6 +164,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       ledger.recordJob(row(runId, cfg, item, 'dry', 'dry run'))
       out.gasWei += q.gasCostWei
       out.rewardWei += item.rewardWei
+      out.costWei += item.costWei
       continue
     }
 
@@ -156,11 +173,16 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       break
     }
 
-    // 6. soldul operatorului
+    /* 6. soldul operatorului: gazul PLUS ce trimite odata cu apelul. Fara
+       partea a doua, un agent care plateste marfa ar trimite o tranzactie care
+       cade pe lant, adica ar plati gaz ca sa afle ca n-are bani. */
+    const needed = q.gasCostWei + item.valueWei
     const balance = await client.getBalance({ address: account.address })
-    if (balance < q.gasCostWei) {
-      out.stoppedBy = `balance too low: ${balance} under the estimated gas ${q.gasCostWei}`
-      ledger.recordJob(row(runId, cfg, item, 'skipped', 'balance too low'))
+    if (balance < needed) {
+      const detail = `balance ${balance} under the ${needed} needed (gas ${q.gasCostWei} + value ${item.valueWei})`
+      out.stoppedBy = `balance too low: ${detail}`
+      ledger.recordJob(row(runId, cfg, item, 'skipped', detail))
+      out.skipped.push({ key: item.key, reason: 'no-funds', detail })
       break
     }
 
@@ -173,8 +195,9 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       const hash = await wallet.sendTransaction({
         account,
         chain: wallet.chain,
-        to: target.address,
-        data: calldataFor(target, item),
+        to: itemTarget.address,
+        data: calldataFor(itemTarget, item),
+        value: item.valueWei,
         nonce,
         gas: sim.gas > 0n ? (sim.gas * 12n) / 10n : cfg.policy.gasCapPerCall,
         ...fees
@@ -186,40 +209,37 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       const receipt = await client.waitForTransactionReceipt({ hash, confirmations: cfg.execution.confirmations })
       const effective = receipt.effectiveGasPrice ?? q.gasPriceWei
       const gasWei = receipt.gasUsed * effective
-      spentToday += gasWei
+      gasToday += gasWei
       out.gasWei += gasWei
 
       const okStatus = receipt.status === 'success'
       const rewardWei = okStatus ? item.rewardWei : 0n
+      /* o tranzactie cazuta nu a cheltuit marfa: ETH-ul trimis se intoarce,
+         iar jetoanele nu au plecat. Doar gazul e pierdut. */
+      const costWei = okStatus ? item.costWei : 0n
+      spentToday += costWei
       ledger.settleTx(hash, {
         gasWei,
         rewardWei,
+        costWei,
         blockNumber: receipt.blockNumber,
         status: okStatus ? 'confirmed' : 'reverted'
       })
+      out.costWei += costWei
       if (okStatus) {
         out.rewardWei += rewardWei
         ledger.clearOpportunity(item.key)
-        out.done.push({
-          item,
-          txHash: hash,
-          status: 'confirmed',
-          gasWei,
-          rewardWei,
-          latencyMs: input.seenAtMs ? signedAtMs - input.seenAtMs : signedAtMs - t0,
-          gasPriceWei: effective
-        })
-      } else {
-        out.done.push({
-          item,
-          txHash: hash,
-          status: 'reverted',
-          gasWei,
-          rewardWei: 0n,
-          latencyMs: input.seenAtMs ? signedAtMs - input.seenAtMs : signedAtMs - t0,
-          gasPriceWei: effective
-        })
       }
+      out.done.push({
+        item,
+        txHash: hash,
+        status: okStatus ? 'confirmed' : 'reverted',
+        gasWei,
+        rewardWei,
+        costWei,
+        latencyMs: input.seenAtMs ? signedAtMs - input.seenAtMs : signedAtMs - t0,
+        gasPriceWei: effective
+      })
       log.info({ hash, key: item.key, gasWei: gasWei.toString(), okStatus }, okStatus ? 'work done' : 'work reverted')
     } catch (e) {
       const msg = (e as Error).message
@@ -285,6 +305,7 @@ function row(
     label: item.label,
     stakeWei: item.stakeWei,
     rewardWei: 0n,
+    costWei: 0n,
     gasWei: 0n,
     txHash: null as string | null,
     blockNumber: null as bigint | null,

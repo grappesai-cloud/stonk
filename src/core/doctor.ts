@@ -89,8 +89,31 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
   }
 
   // ---- INTREBAREA
-  const target = job.target(cfg, jobCfg)
-  if (items.length > 0) {
+  const target = job.target(cfg, jobCfg, items[0])
+  if (items.length > 0 && job.actsOnOwnPosition) {
+    /**
+     * Agentul lucreaza cu pozitia lui, deci intrebarea nu e daca poate un
+     * strain, ci daca putem NOI. Un strain respins aici e semnul ca protocolul
+     * e in regula, nu ca agentul nu poate exista.
+     */
+    const [mine] = await simulateEach(client, target, from, [items[0]!], 1)
+    add(
+      `${target.functionName}() callable by us`,
+      !!mine?.ok,
+      mine?.ok
+        ? `yes, tested on ${items[0]!.key} from ${from}`
+        : `NO: ${mine?.reason ?? 'unknown'}. The position may not be ours, or the window may be closed.`,
+      !mine?.ok
+    )
+    const [asStranger] = await simulateEach(client, target, STRANGER as Address, [items[0]!], 1)
+    add(
+      'a stranger cannot vote with our position',
+      !asStranger?.ok,
+      asStranger?.ok
+        ? 'WARNING: a stranger can make this call too. Check what you are actually calling.'
+        : 'correct: rejected for anyone else'
+    )
+  } else if (items.length > 0) {
     const authority = job.authority ? await job.authority(client, cfg, jobCfg) : null
     const probe = await probeGating(client, target, items, STRANGER as Address, authority)
     add(

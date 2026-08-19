@@ -136,6 +136,10 @@ export const miner: Job<MinerJob> = {
           rewardWei: reward.wei,
           rewardMeasured: reward.measured,
           stakeWei: 0n,
+          valueWei: 0n,
+          costWei: 0n,
+          costMeasured: true,
+          costToken: null,
           meta: { reward: reward.detail }
         })
       }
@@ -175,6 +179,10 @@ export const miner: Job<MinerJob> = {
         rewardWei: reward.wei,
         rewardMeasured: reward.measured,
         stakeWei,
+        valueWei: 0n,
+        costWei: 0n,
+        costMeasured: true,
+        costToken: null,
         meta: { reward: reward.detail }
       })
     }

@@ -30,7 +30,7 @@ export const zBig = z.union([z.string(), z.number(), z.bigint()]).transform((v, 
   }
 })
 
-export const AGENT_KINDS = ['ringer', 'miner'] as const
+export const AGENT_KINDS = ['ringer', 'miner', 'stocker', 'lobbyist'] as const
 export type AgentKind = (typeof AGENT_KINDS)[number]
 
 export const ConfigSchema = z.object({
@@ -94,6 +94,16 @@ export const ConfigSchema = z.object({
      * dar nu se aplica niciodata e mai rea decat una care lipseste.
      */
     requireMeasuredReward: z.boolean().default(true),
+    /**
+     * Aceeasi regula, pentru banii care IES. Un agent care cheltuie o suma pe
+     * care nu a putut sa o citeasca inainte cheltuie orbeste, si asta se
+     * refuza implicit.
+     */
+    requireMeasuredCost: z.boolean().default(true),
+    /** cat are voie sa coste o singura bucata de munca, in afara de gaz */
+    maxCostPerJobWei: zBig.nullable().default(null),
+    /** cat are voie sa cheltuie pe zi, in afara de gaz */
+    dailySpendBudgetWei: zBig.nullable().default(null),
     cooldownSec: z.number().int().min(0).default(0),
     maxJobsPerRun: z.number().int().positive().default(50),
     batchSize: z.number().int().positive().default(1),

@@ -18,6 +18,10 @@ const item = (over: Partial<WorkItem> = {}): WorkItem => ({
   rewardWei: 1000n,
   rewardMeasured: true,
   stakeWei: 10_000n,
+  valueWei: 0n,
+  costWei: 0n,
+  costMeasured: true,
+  costToken: null,
   meta: {},
   ...over
 })
@@ -96,5 +100,22 @@ describe('politica', () => {
     const cfg = cfgOf({ policy: { maxGasPriceWei: '100' } })
     expect(gasPriceAcceptable(101n, cfg).go).toBe(false)
     expect(gasPriceAcceptable(100n, cfg).go).toBe(true)
+  })
+})
+
+describe('treaba care se face o singura data', () => {
+  it('nu se mai propune dupa ce a fost facuta', () => {
+    const cfg = cfgOf()
+    const once = item({ key: 'vote:100', once: true })
+    expect(screen({ items: [once], cfg, lastDoneAt: () => null, nowSec: 0 }).pass.length).toBe(1)
+    const done = screen({ items: [once], cfg, lastDoneAt: () => 12345, nowSec: 99999 })
+    expect(done.pass).toEqual([])
+    expect(done.skipped[0]!.reason).toBe('already-done')
+  })
+
+  it('o bucata obisnuita se propune din nou, oricat de demult a fost facuta', () => {
+    const cfg = cfgOf()
+    const r = screen({ items: [item()], cfg, lastDoneAt: () => 1, nowSec: 99999 })
+    expect(r.pass.length).toBe(1)
   })
 })

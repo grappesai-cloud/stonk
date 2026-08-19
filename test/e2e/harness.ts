@@ -210,7 +210,82 @@ export interface ConfigOverrides {
 }
 
 /** o configurare completa si valida pentru bancul de proba */
-export function writeTestConfig(file: string, kind: 'ringer' | 'miner', rig: Rig, target: Address, over: ConfigOverrides = {}): string {
+export type Kind = 'ringer' | 'miner' | 'stocker' | 'lobbyist'
+
+const JOB_DEFAULTS: Record<Kind, unknown> = {
+  ringer: {
+    slots: null,
+    pot: { signature: 'function pot() view returns (uint256)' },
+    ready: { mode: 'call-bool', call: { signature: 'function canClockIn() view returns (bool)' } },
+    reward: { mode: 'call', call: { signature: 'function clockInTip() view returns (uint256)' } },
+    action: { signature: 'function clockIn()' },
+    event: {
+      signature: 'event ClockIn(address indexed caller, uint256 pot, uint256 tip)',
+      callerField: 'caller',
+      rewardField: 'tip'
+    },
+    race: { priorityBumpBps: 0, maxPriorityFeeWei: null, staleBlocks: 3 }
+  },
+  miner: {
+    discovery: { mode: 'list', call: { signature: 'function pendingRounds() view returns (uint256[])' } },
+    state: {
+      call: {
+        signature: 'function roundOf(uint256 id) view returns (uint8 status, uint256 bounty, uint256 pot)',
+        args: ['$id']
+      },
+      readyWhen: { mode: 'equals', field: 'status', value: 2 },
+      stakeField: 'pot'
+    },
+    reward: { mode: 'field', field: 'bounty' },
+    action: { signature: 'function settle(uint256 id)', args: ['$id'] },
+    readChunk: 100
+  },
+  stocker: {
+    discovery: { mode: 'list', call: { signature: 'function machines_() view returns (uint256[])' } },
+    state: {
+      call: {
+        signature:
+          'function machineOf(uint256 id) view returns (uint8 status, uint256 stock, uint256 capacity, uint256 price, uint256 commission)',
+        args: ['$id']
+      },
+      stockField: 'stock',
+      capacityField: 'capacity',
+      lowWhen: { mode: 'belowFraction', bps: 5000 }
+    },
+    amount: { mode: 'toCapacity' },
+    maxUnitsPerJob: '1000',
+    unitCost: { mode: 'field', field: 'price' },
+    payment: { mode: 'native' },
+    reward: { mode: 'field', field: 'commission' },
+    action: { signature: 'function restock(uint256 id, uint256 units)', args: ['$id', '$amount'] },
+    readChunk: 100
+  },
+  lobbyist: {
+    position: {
+      tokenId: '1',
+      power: { signature: 'function balanceOfNFT(uint256 id) view returns (uint256)', args: ['$id'] }
+    },
+    epoch: { end: { signature: 'function epochEnd() view returns (uint256)' }, voteBeforeSec: 3600 },
+    gauges: { mode: 'call', call: { signature: 'function gauges() view returns (address[])' } },
+    bribes: { signature: 'function bribesOf(address gauge) view returns (uint256)', args: ['$gauge'] },
+    votes: { signature: 'function votesOf(address gauge) view returns (uint256)', args: ['$gauge'] },
+    weights: { mode: 'bps', topN: 1 },
+    vote: { signature: 'function vote(uint256 tokenId, address[] gauges, uint256[] weights)', args: ['$id', '$gauges', '$weights'] },
+    claim: {
+      claimable: { signature: 'function claimable(uint256 id) view returns (uint256)', args: ['$id'] },
+      action: { signature: 'function claim(uint256 id)', args: ['$id'] }
+    }
+  }
+}
+
+const ERRORS: Record<Kind, string[]> = {
+  ringer: ['error NotAuthorized()', 'error NotReady(uint256 nextAt)', 'error EmptyPot()'],
+  miner: ['error NotOracle()', 'error NotReady(uint256 id)', 'error AlreadySettled(uint256 id)'],
+  stocker: ['error NotAuthorized()', 'error NoRoom(uint256 id)', 'error WrongPayment(uint256 want, uint256 got)'],
+  lobbyist: ['error NotLockOwner(uint256 tokenId)', 'error VotingClosed(uint256 epochEnd)', 'error BadWeights()']
+}
+
+export function writeTestConfig(file: string, kind: Kind, rig: Rig, target: Address, over: ConfigOverrides = {}): string {
   const base: Record<string, unknown> = {
     watchtower: false,
     agent: { kind, id: 0, name: `${kind.toUpperCase()} #0000` },
@@ -222,43 +297,8 @@ export function writeTestConfig(file: string, kind: 'ringer' | 'miner', rig: Rig
       multicall3: null,
       blockTimeMs: 100
     },
-    target: {
-      address: target,
-      errorSignatures:
-        kind === 'ringer'
-          ? ['error NotAuthorized()', 'error NotReady(uint256 nextAt)', 'error EmptyPot()']
-          : ['error NotOracle()', 'error NotReady(uint256 id)', 'error AlreadySettled(uint256 id)'],
-      deployBlock: 0
-    },
-    job:
-      kind === 'ringer'
-        ? {
-            slots: null,
-            pot: { signature: 'function pot() view returns (uint256)' },
-            ready: { mode: 'call-bool', call: { signature: 'function canClockIn() view returns (bool)' } },
-            reward: { mode: 'call', call: { signature: 'function clockInTip() view returns (uint256)' } },
-            action: { signature: 'function clockIn()' },
-            event: {
-              signature: 'event ClockIn(address indexed caller, uint256 pot, uint256 tip)',
-              callerField: 'caller',
-              rewardField: 'tip'
-            },
-            race: { priorityBumpBps: 0, maxPriorityFeeWei: null, staleBlocks: 3 }
-          }
-        : {
-            discovery: { mode: 'list', call: { signature: 'function pendingRounds() view returns (uint256[])' } },
-            state: {
-              call: {
-                signature: 'function roundOf(uint256 id) view returns (uint8 status, uint256 bounty, uint256 pot)',
-                args: ['$id']
-              },
-              readyWhen: { mode: 'equals', field: 'status', value: 2 },
-              stakeField: 'pot'
-            },
-            reward: { mode: 'field', field: 'bounty' },
-            action: { signature: 'function settle(uint256 id)', args: ['$id'] },
-            readChunk: 100
-          },
+    target: { address: target, errorSignatures: ERRORS[kind], deployBlock: 0 },
+    job: JOB_DEFAULTS[kind],
     policy: {
       mode: 'profit',
       profitMultiple: 0,

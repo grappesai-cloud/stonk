@@ -1,6 +1,6 @@
 import { loadConfig } from '../src/core/config.js'
 import { jobFor } from '../src/jobs/index.js'
-for (const f of ['ringer', 'miner']) {
+for (const f of ['ringer', 'miner', 'stocker', 'lobbyist']) {
   const c = loadConfig(`./config/${f}.example.json`)
   const j = jobFor(c.agent.kind)
   const parsed = j.parse(c.job) as never

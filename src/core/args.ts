@@ -9,8 +9,9 @@
  *   [{ roundId: "$id", recipient: "$beneficiary" }]
  *
  * Locuri goale: $id, $key, $account, $beneficiary, $now, $max128, $max256,
- * $zero. Orice sir format doar din cifre devine numar intreg, ca sa nu fie
- * nevoie sa scrii sume mari altfel decat ca text.
+ * $zero, $amount, $gauge, $gauges, $weights, $power. Orice sir format doar din
+ * cifre devine numar intreg, ca sa nu fie nevoie sa scrii sume mari altfel
+ * decat ca text.
  */
 import type { Address } from 'viem'
 
@@ -27,6 +28,13 @@ export interface ArgContext {
   /** unde vrem sa ajunga castigul */
   beneficiary?: Address | null
   nowSec?: number
+  /** cate unitati punem la loc (Stocker) */
+  amount?: bigint
+  /** pe cine votam si cu cat (Lobbyist) */
+  gauge?: Address
+  gauges?: Address[]
+  weights?: bigint[]
+  power?: bigint
 }
 
 export function resolveArgs(template: unknown[], ctx: ArgContext): unknown[] {
@@ -64,6 +72,16 @@ function resolveOne(node: unknown, ctx: ArgContext): unknown {
       return MAX_UINT256
     case '$zero':
       return 0n
+    case '$amount':
+      return need(ctx.amount, '$amount')
+    case '$gauge':
+      return need(ctx.gauge, '$gauge')
+    case '$gauges':
+      return need(ctx.gauges, '$gauges')
+    case '$weights':
+      return need(ctx.weights, '$weights')
+    case '$power':
+      return need(ctx.power, '$power')
     default:
       if (/^\d+$/.test(node)) return BigInt(node)
       return node

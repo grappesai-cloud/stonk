@@ -34,6 +34,8 @@ export interface RunOutcome {
   skipped: number
   gasWei: bigint
   rewardWei: bigint
+  /** ce a plecat din portofel, in afara de gaz */
+  costWei: bigint
   openCount: number
   openStakeWei: bigint
   stoppedBy: string | null
@@ -84,6 +86,7 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
       label: '',
       stakeWei: 0n,
       rewardWei: 0n,
+      costWei: 0n,
       gasWei: 0n,
       txHash: null,
       blockNumber: null,
@@ -92,13 +95,19 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
     })
   }
 
+  /* Tinta se ia PE BUCATA: Lobbyist voteaza cu un apel si isi incaseaza
+     partea cu altul, deci o singura tinta pe rulare ar insemna doua meserii
+     pentru acelasi agent. */
+  const targetOf = (it: (typeof screened.pass)[number]) => job.target(cfg, jobCfg, it)
   const target = job.target(cfg, jobCfg)
   let gatingWarning: string | null = null
   let sims: Awaited<ReturnType<typeof simulateEach>> = []
   let simulatedOk = 0
 
   if (screened.pass.length > 0) {
-    sims = await simulateEach(client, target, from, screened.pass)
+    sims = (
+      await Promise.all(screened.pass.map((it) => simulateEach(client, targetOf(it), from, [it], 1)))
+    ).flat()
     simulatedOk = sims.filter((s) => s.ok).length
 
     /**
@@ -107,9 +116,11 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
      * dintre cele doua raspunsuri e singurul lucru care demonstreaza ca
      * functia e rezervata.
      */
-    if (simulatedOk === 0) {
+    /* Cand agentul lucreaza cu pozitia lui, un strain respins e normal si nu
+       are ce cauta in alerta. */
+    if (simulatedOk === 0 && !job.actsOnOwnPosition) {
       const authority = job.authority ? await job.authority(client, cfg, jobCfg) : null
-      const probe = await probeGating(client, target, screened.pass, STRANGER as Address, authority)
+      const probe = await probeGating(client, targetOf(screened.pass[0]!), screened.pass, STRANGER as Address, authority)
       if (probe.kind === 'authority-gated') {
         gatingWarning =
           `${target.functionName}() is authority-gated (proven on ${probe.testedKey}: only ${probe.authority} gets through). ` +
@@ -130,6 +141,7 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
     ledger,
     runId,
     target,
+    targetOf,
     sims: sims.filter((s) => s.ok),
     seenAtMs,
     ...(await feesFor(ctx))
@@ -180,6 +192,7 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
     skipped: screened.skipped.length + res.skipped.length,
     gasWei: res.gasWei,
     rewardWei: res.rewardWei,
+    costWei: res.costWei,
     openCount: open.count,
     openStakeWei: open.stakeWei,
     stoppedBy: res.stoppedBy,
@@ -195,6 +208,7 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
     failed: res.skipped.length,
     gasWei: outcome.gasWei,
     rewardWei: outcome.rewardWei,
+    costWei: outcome.costWei,
     note: outcome.gatingWarning ?? outcome.stoppedBy
   })
 

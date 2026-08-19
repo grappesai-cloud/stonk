@@ -75,6 +75,10 @@ const item = (args: unknown[]): WorkItem => ({
   rewardWei: 0n,
   rewardMeasured: false,
   stakeWei: 0n,
+  valueWei: 0n,
+  costWei: 0n,
+  costMeasured: true,
+  costToken: null,
   meta: {}
 })
 

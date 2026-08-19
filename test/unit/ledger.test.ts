@@ -9,6 +9,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   label: 'K1',
   stakeWei: 100n,
   rewardWei: 0n,
+  costWei: 0n,
   gasWei: 0n,
   txHash: null as string | null,
   blockNumber: null as bigint | null,
@@ -26,12 +27,15 @@ describe('registrul', () => {
     led.recordJob(row({ key: 'a', txHash: '0xaa' }))
     led.recordJob(row({ key: 'b', txHash: '0xaa' }))
     led.recordJob(row({ key: 'c', txHash: '0xaa' }))
-    led.settleTx('0xaa', { gasWei: 100n, rewardWei: 10n, blockNumber: 5n, status: 'confirmed' })
+    led.settleTx('0xaa', { gasWei: 100n, rewardWei: 10n, costWei: 7n, blockNumber: 5n, status: 'confirmed' })
     const t = led.totals()
-    /* nimic nu se pierde prin impartire: 100/3 si 10/3 se intorc intregi */
+    /* nimic nu se pierde prin impartire: 100/3, 10/3 si 7/3 se intorc intregi */
     expect(t.gasWei).toBe(100n)
     expect(t.rewardWei).toBe(10n)
+    expect(t.costWei).toBe(7n)
     expect(t.done).toBe(3)
+    /* si netul scade si ce a plecat din portofel, nu doar gazul */
+    expect(t.netWei).toBe(10n - 7n - 100n)
   })
 
   it('nu scrie de doua ori aceeasi bucata pentru aceeasi tranzactie', () => {

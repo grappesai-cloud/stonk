@@ -27,6 +27,8 @@ export interface JobRow {
   label: string
   stakeWei: bigint
   rewardWei: bigint
+  /** ce a plecat din portofel pentru bucata asta, in afara de gaz */
+  costWei: bigint
   gasWei: bigint
   txHash: string | null
   blockNumber: bigint | null
@@ -41,6 +43,7 @@ export interface RunStats {
   failed: number
   gasWei: bigint
   rewardWei: bigint
+  costWei: bigint
   note?: string | null
 }
 
@@ -81,6 +84,7 @@ CREATE TABLE IF NOT EXISTS runs (
   failed INTEGER DEFAULT 0,
   gas_wei TEXT DEFAULT '0',
   reward_wei TEXT DEFAULT '0',
+  cost_wei TEXT DEFAULT '0',
   note TEXT
 );
 
@@ -92,6 +96,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   label TEXT NOT NULL DEFAULT '',
   stake_wei TEXT NOT NULL DEFAULT '0',
   reward_wei TEXT NOT NULL DEFAULT '0',
+  cost_wei TEXT NOT NULL DEFAULT '0',
   gas_wei TEXT NOT NULL DEFAULT '0',
   tx_hash TEXT,
   block_number TEXT,
@@ -147,6 +152,24 @@ export class Ledger {
     if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true })
     this.db = new DatabaseSync(file)
     this.db.exec(SCHEMA)
+    this.migrate()
+  }
+
+  /**
+   * Baze facute inainte sa existe agenti care cheltuie nu au coloana de
+   * cheltuiala. Se adauga la pornire. Registrul e produsul, nu se arunca
+   * pentru o coloana.
+   */
+  private migrate(): void {
+    for (const [table, col] of [
+      ['jobs', 'cost_wei'],
+      ['runs', 'cost_wei']
+    ] as const) {
+      const cols = this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
+      if (!cols.some((c) => c.name === col)) {
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} TEXT NOT NULL DEFAULT '0'`)
+      }
+    }
   }
 
   close(): void {
@@ -167,9 +190,20 @@ export class Ledger {
   finishRun(id: number, s: RunStats): void {
     this.db
       .prepare(
-        `UPDATE runs SET finished_at=?, seen=?, candidates=?, done=?, failed=?, gas_wei=?, reward_wei=?, note=? WHERE id=?`
+        `UPDATE runs SET finished_at=?, seen=?, candidates=?, done=?, failed=?, gas_wei=?, reward_wei=?, cost_wei=?, note=? WHERE id=?`
       )
-      .run(now(), s.seen, s.candidates, s.done, s.failed, s.gasWei.toString(), s.rewardWei.toString(), s.note ?? null, id)
+      .run(
+        now(),
+        s.seen,
+        s.candidates,
+        s.done,
+        s.failed,
+        s.gasWei.toString(),
+        s.rewardWei.toString(),
+        s.costWei.toString(),
+        s.note ?? null,
+        id
+      )
   }
 
   lastFinishedAt(): number | null {
@@ -182,8 +216,8 @@ export class Ledger {
     this.db
       .prepare(
         `INSERT OR IGNORE INTO jobs
-         (run_id, agent_id, key, label, stake_wei, reward_wei, gas_wei, tx_hash, block_number, status, reason, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+         (run_id, agent_id, key, label, stake_wei, reward_wei, cost_wei, gas_wei, tx_hash, block_number, status, reason, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         j.runId,
@@ -192,6 +226,7 @@ export class Ledger {
         j.label,
         j.stakeWei.toString(),
         j.rewardWei.toString(),
+        j.costWei.toString(),
         j.gasWei.toString(),
         j.txHash,
         j.blockNumber === null ? null : j.blockNumber.toString(),
@@ -206,19 +241,33 @@ export class Ledger {
    * rest, ca sa nu se piarda wei prin impartire. Lectia asta a costat la
    * Courier un raport care arata castig zero dupa treburi adevarate.
    */
-  settleTx(txHash: string, p: { gasWei: bigint; rewardWei: bigint; blockNumber: bigint | null; status: JobStatus }): void {
+  settleTx(
+    txHash: string,
+    p: { gasWei: bigint; rewardWei: bigint; costWei?: bigint; blockNumber: bigint | null; status: JobStatus }
+  ): void {
     const ids = this.db.prepare('SELECT id FROM jobs WHERE tx_hash=? ORDER BY id').all(txHash) as Array<{ id: number }>
     if (ids.length === 0) return
     const n = BigInt(ids.length)
+    const cost = p.costWei ?? 0n
     const gasEach = p.gasWei / n
     const rewardEach = p.rewardWei / n
+    const costEach = cost / n
     const gasRest = p.gasWei - gasEach * n
     const rewardRest = p.rewardWei - rewardEach * n
-    const st = this.db.prepare('UPDATE jobs SET status=?, gas_wei=?, reward_wei=?, block_number=? WHERE id=?')
+    const costRest = cost - costEach * n
+    const st = this.db.prepare('UPDATE jobs SET status=?, gas_wei=?, reward_wei=?, cost_wei=?, block_number=? WHERE id=?')
     ids.forEach((r, i) => {
       const gas = i === 0 ? gasEach + gasRest : gasEach
       const reward = i === 0 ? rewardEach + rewardRest : rewardEach
-      st.run(p.status, gas.toString(), reward.toString(), p.blockNumber === null ? null : p.blockNumber.toString(), r.id)
+      const c = i === 0 ? costEach + costRest : costEach
+      st.run(
+        p.status,
+        gas.toString(),
+        reward.toString(),
+        c.toString(),
+        p.blockNumber === null ? null : p.blockNumber.toString(),
+        r.id
+      )
     })
   }
 
@@ -399,17 +448,29 @@ export class Ledger {
   }
 
   // ------------------------------------------------------------- socoteala
-  totals(sinceTs = 0): { done: number; rewardWei: bigint; gasWei: bigint; netWei: bigint } {
+  totals(sinceTs = 0): { done: number; rewardWei: bigint; costWei: bigint; gasWei: bigint; netWei: bigint } {
     const rows = this.db
-      .prepare(`SELECT reward_wei, gas_wei FROM jobs WHERE created_at >= ? AND status IN ('sent','confirmed')`)
-      .all(sinceTs) as Array<{ reward_wei: string; gas_wei: string }>
+      .prepare(`SELECT reward_wei, cost_wei, gas_wei FROM jobs WHERE created_at >= ? AND status IN ('sent','confirmed')`)
+      .all(sinceTs) as Array<{ reward_wei: string; cost_wei: string; gas_wei: string }>
     let rewardWei = 0n
+    let costWei = 0n
     let gasWei = 0n
     for (const r of rows) {
       rewardWei += BigInt(r.reward_wei)
+      costWei += BigInt(r.cost_wei)
       gasWei += BigInt(r.gas_wei)
     }
-    return { done: rows.length, rewardWei, gasWei, netWei: rewardWei - gasWei }
+    /* net = ce a intrat minus ce a iesit minus ce s-a ars. Un raport care nu
+       scade cheltuiala arata profit la un agent care pierde bani. */
+    return { done: rows.length, rewardWei, costWei, gasWei, netWei: rewardWei - costWei - gasWei }
+  }
+
+  /** cat s-a cheltuit (in afara de gaz) de la un moment incoace */
+  spentSince(ts: number): bigint {
+    const rows = this.db
+      .prepare(`SELECT cost_wei FROM jobs WHERE created_at >= ? AND status IN ('sent','confirmed')`)
+      .all(ts) as Array<{ cost_wei: string }>
+    return rows.reduce((s, r) => s + BigInt(r.cost_wei), 0n)
   }
 
   gasSpentSince(ts: number): bigint {

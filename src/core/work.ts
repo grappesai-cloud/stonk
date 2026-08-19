@@ -32,6 +32,42 @@ export interface WorkItem {
   rewardMeasured: boolean
   /** cat valoreaza lucrul asupra caruia se lucreaza (oala, runda), pentru afisare */
   stakeWei: bigint
+
+  /**
+   * Cat ETH pleaca ODATA cu apelul. Executorul il trimite ca `value`.
+   *
+   * Ringer si Miner nu trimit nimic; Stocker plateste marfa. De aia campul e
+   * separat de cost: sunt bani care trebuie sa fie in portofel ACUM, nu doar
+   * o socoteala.
+   */
+  valueWei: bigint
+
+  /**
+   * Cat ne costa bucata asta in total, in afara de gaz: ETH-ul trimis plus
+   * valoarea a ce dam din portofel (marfa, jetoane).
+   *
+   * Frana de rentabilitate lucreaza cu castigul MINUS costul, nu cu castigul.
+   * Un agent care incaseaza mai putin decat a dat nu e profitabil pentru ca
+   * are comision, e in pierdere cu pasi mai mari.
+   */
+  costWei: bigint
+  /** true doar cand costul a fost citit de pe lant, nu scris in configurare */
+  costMeasured: boolean
+  /** ce jetoane pleaca din portofel, cand plata nu e in ETH */
+  costToken: { token: Address; amount: bigint; symbol: string; decimals: number } | null
+  /**
+   * Bucata se face O SINGURA DATA, si cheia ei spune care anume.
+   *
+   * Votul unei epoci e asa: cheia contine sfarsitul epocii, deci un al doilea
+   * vot cu aceeasi cheie nu e "inca o treaba", e aceeasi treaba facuta de doua
+   * ori. Fara steagul asta, agentul voteaza la fiecare rulare pana se inchide
+   * epoca: arde gaz si isi imparte singur puterea intre propriile voturi.
+   *
+   * Se sprijina pe registru, deci un registru pierdut inseamna cel mult inca o
+   * repetare. De aia registrul are copii verificate.
+   */
+  once?: boolean
+
   /** orice altceva merita tinut minte despre bucata asta */
   meta: Record<string, string>
 }
@@ -79,10 +115,31 @@ export interface Job<J = unknown> {
   required(cfg: Config, job: J): Array<{ what: string; address: Address }>
   /** ce e de facut acum */
   discover(input: DiscoverInput & { job: J }): Promise<WorkItem[]>
-  /** unde se trimite apelul si cum se cheama */
-  target(cfg: Config, job: J): Target
+  /**
+   * Unde se trimite apelul si cum se cheama.
+   *
+   * Primeste bucata, fiindca unele meserii au mai multe apeluri: Lobbyist
+   * voteaza cu unul si isi incaseaza partea cu altul. Fara bucata, ar trebui
+   * doua meserii pentru acelasi agent.
+   */
+  target(cfg: Config, job: J, item?: WorkItem): Target
   /** cine ar avea voie sa apeleze, daca functia e rezervata; se cauta pe lant */
   authority?(client: PublicClient, cfg: Config, job: J): Promise<Address | null>
+
+  /**
+   * Agentul lucreaza cu POZITIA LUI, nu in numele altora.
+   *
+   * Distinctia asta schimba intrebarea de la pasul zero. Pentru Ringer, Miner
+   * si Stocker, intrebarea e "poate un strain sa apeleze?", si daca raspunsul
+   * e nu, meseria nu exista. Pentru Lobbyist e pe dos: votul CU BLOCAREA
+   * NOASTRA trebuie sa fie rezervat noua, altfel ar putea vota oricine cu ea.
+   * Acolo intrebarea corecta e "putem NOI sa apelam?", iar un strain respins e
+   * exact cum trebuie sa fie.
+   *
+   * Fara steagul asta, diagnosticul ar da alarma falsa la fiecare pornire, si
+   * o alarma care suna mereu se opreste din a fi citita.
+   */
+  actsOnOwnPosition?: boolean
   /** verificari proprii meseriei, pe langa cele generice */
   checks?(input: DiscoverInput & { job: J }): Promise<JobCheck[]>
   /**
