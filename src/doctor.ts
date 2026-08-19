@@ -27,6 +27,10 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
   const checks: Check[] = []
   const add = (name: string, ok: boolean, detail: string, fatal = false) => checks.push({ name, ok, detail, fatal })
 
+  if (cfg.watchtower) {
+    add('mod', true, 'VEGHE: scaneaza, tine indexul si anunta. Nu simuleaza, nu semneaza, nu livreaza.')
+  }
+
   if (missingEnv.length > 0) {
     add('mediu', false, `variabile lipsa, campurile raman goale: ${missingEnv.join(', ')}`)
   }
@@ -98,14 +102,19 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
     // ---- INTREBAREA
     if (scan.claims.length > 0) {
       const owners = await ownersOf(client, cfg, scan.claims.map((c) => c.tokenId))
+      /* In modul de veghe intrebarea ramane interesanta, dar nu mai e fatala:
+         un supraveghetor nu livreaza nimic, deci poate porni si daca functia e
+         rezervata proprietarului. */
       const probe = await probeGating(client, cfg, scan.claims, STRANGER as Address, (id) => owners.get(id))
       add(
         'deliver() apelabila de un strain',
-        probe.callableByStranger,
+        probe.callableByStranger || cfg.watchtower,
         probe.callableByStranger
           ? `da, testat pe #${probe.testedTokenId}`
-          : `NU (${probe.kind}): ${probe.reason ?? 'motiv necunoscut'}. Fara asta Courier-ul nu poate livra pentru altii.`,
-        !probe.callableByStranger
+          : cfg.watchtower
+            ? `NU (${probe.kind}), dar in modul de veghe nu conteaza: nu se livreaza nimic.`
+            : `NU (${probe.kind}): ${probe.reason ?? 'motiv necunoscut'}. Fara asta Courier-ul nu poate livra pentru altii.`,
+        !probe.callableByStranger && !cfg.watchtower
       )
     } else {
       add('deliver() apelabila de un strain', false, 'nu exista nimic nerevendicat de testat acum')
@@ -133,7 +142,13 @@ export async function doctor(ctx: Ctx): Promise<Check[]> {
     const bal = await client.getBalance({ address: ctx.account.address })
     add('operator', bal > 0n, `${ctx.account.address} cu ${formatEther(bal)} ${cfg.network.nativeSymbol}`)
   } else {
-    add('operator', true, 'fara cheie privata: se poate scana si simula, nu se poate livra')
+    add(
+      'operator',
+      true,
+      cfg.watchtower
+        ? 'fara cheie, si asa trebuie: in modul de veghe nu se semneaza nimic'
+        : 'fara cheie privata: se poate scana si simula, nu se poate livra'
+    )
   }
 
   // ---- telegram

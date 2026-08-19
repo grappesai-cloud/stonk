@@ -62,6 +62,17 @@ const zPendingCall = z.object({
 })
 
 export const ConfigSchema = z.object({
+  /**
+   * Modul de veghe: scaneaza, tine indexul si anunta, dar NU livreaza si nu
+   * semneaza nimic, chiar daca exista o cheie in mediu.
+   *
+   * E modul cu care se poate lansa inainte sa fie limpede daca `deliver()`
+   * merge apelata de un strain: intrebarea aia blocheaza livrarea, nu si
+   * publicarea indexului. Un supraveghetor e util din prima zi si nu cere
+   * voie nimanui.
+   */
+  watchtower: z.boolean().default(false),
+
   network: z.object({
     name: z.string(),
     chainId: z.number().int().positive(),
@@ -174,7 +185,9 @@ export const ConfigSchema = z.object({
       /** rezumat zilnic, ora locala 0-23 */
       digestHour: z.number().int().min(0).max(23).nullable().default(9),
       /** avertisment cand portofelul operatorului scade sub prag */
-      gasLowWei: zBig.default(0n)
+      gasLowWei: zBig.default(0n),
+      /** in modul de veghe: anunta doar descoperirile peste pragul asta */
+      foundMinValueWei: zBig.default(0n)
     }).default({}),
     watchers: z.object({
       enabled: z.boolean().default(true),

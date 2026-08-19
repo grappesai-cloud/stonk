@@ -247,7 +247,23 @@ export class Ledger {
   }
 
   // --------------------------------------------------------- peretele uitatilor
-  seeClaim(tokenId: string, wallet: string, owner: string | null, valueWei: bigint, nativeWei: bigint): void {
+  /**
+   * Inregistreaza ce e nerevendicat si spune ce s-a schimbat fata de ultima
+   * data. Diferenta e tot ce conteaza pentru un supraveghetor: un index care
+   * nu stie ce e nou e doar o poza.
+   */
+  seeClaim(
+    tokenId: string,
+    wallet: string,
+    owner: string | null,
+    valueWei: bigint,
+    nativeWei: bigint
+  ): { isNew: boolean; previousWei: bigint; deltaWei: bigint } {
+    const prev = this.db.prepare('SELECT value_wei, delivered_at FROM claims WHERE token_id=?').get(tokenId) as
+      | { value_wei: string; delivered_at: number | null }
+      | undefined
+    const previousWei = prev && prev.delivered_at === null ? BigInt(prev.value_wei) : 0n
+    const isNew = !prev || prev.delivered_at !== null
     const t = now()
     this.db
       .prepare(
@@ -259,6 +275,7 @@ export class Ledger {
            last_seen=excluded.last_seen, delivered_at=NULL`
       )
       .run(tokenId, wallet, owner, valueWei.toString(), nativeWei.toString(), t, t)
+    return { isNew, previousWei, deltaWei: valueWei - previousWei }
   }
 
   clearClaim(tokenId: string): void {
@@ -400,6 +417,23 @@ export class Ledger {
       tipWei: BigInt(String(r.tip_wei ?? '0')),
       reason: r.reason === null ? null : String(r.reason),
       txHash: r.tx_hash === null ? null : String(r.tx_hash)
+    }))
+  }
+
+  /** ce a aparut nou nerevendicat, pentru logul modului de veghe */
+  recentFinds(limit = 14): Array<{ at: number; tokenId: string; wallet: string; valueWei: bigint }> {
+    const rows = this.db
+      .prepare(
+        `SELECT first_seen, token_id, wallet, value_wei FROM claims
+         WHERE delivered_at IS NULL AND value_wei != '0'
+         ORDER BY first_seen DESC, CAST(value_wei AS REAL) DESC LIMIT ?`
+      )
+      .all(limit) as Array<Record<string, string | number>>
+    return rows.map((r) => ({
+      at: Number(r.first_seen),
+      tokenId: String(r.token_id),
+      wallet: String(r.wallet),
+      valueWei: BigInt(String(r.value_wei))
     }))
   }
 

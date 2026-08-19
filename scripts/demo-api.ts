@@ -83,6 +83,9 @@ const stamp = ledger.raw().prepare('UPDATE deliveries SET created_at=? WHERE id=
    intrepatrunda, cum se intampla intr-o rulare adevarata */
 rows.forEach((r) => stamp.run(nowSec - Math.floor(r2() * 3600), r.id))
 
+/* `--watchtower` arata cum se vede modul de veghe, fara livrari */
+if (process.argv.includes('--watchtower')) cfg.watchtower = true
+
 cfg.console.enabled = true
 cfg.console.token = 'demo'
 cfg.console.port = 8789

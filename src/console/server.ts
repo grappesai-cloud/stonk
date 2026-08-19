@@ -144,6 +144,7 @@ export function createConsole(ctx: Ctx) {
       const backlogCostWei = avgGasWei * BigInt(wallTotals.count)
 
       return json(res, 200, {
+        watchtower: cfg.watchtower,
         paused: existsSync(killFile),
         running: ctx.control.running,
         canRun: ctx.control.attached,
@@ -168,6 +169,7 @@ export function createConsole(ctx: Ctx) {
               dry: ctx.control.lastOutcome.dry,
               at: ctx.control.lastOutcome.at,
               delivered: ctx.control.lastOutcome.delivered,
+              found: ctx.control.lastOutcome.found,
               candidates: ctx.control.lastOutcome.candidates,
               valueEth: eth(ctx.control.lastOutcome.valueWei),
               gasEth: eth(ctx.control.lastOutcome.gasWei),
@@ -202,6 +204,12 @@ export function createConsole(ctx: Ctx) {
           note: r.note
         })),
         skips: ledger.skipReasons(now - 7 * 86400),
+        finds: ledger.recentFinds(14).map((f) => ({
+          at: f.at,
+          tokenId: f.tokenId,
+          wallet: f.wallet,
+          valueEth: eth(f.valueWei)
+        })),
         events: ledger.recentEvents(14).map((e) => ({
           at: e.at,
           kind: e.kind,

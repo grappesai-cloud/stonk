@@ -99,6 +99,7 @@ ${TERM_LAYERS}
     <span class="sp">
       <button class="b" id="dry" disabled>proba uscata</button>
       <button class="b" id="now" disabled>ruleaza acum</button>
+      <button class="b" id="scan" disabled hidden>scaneaza acum</button>
       <button class="b danger stop" id="toggle" disabled>--</button>
     </span>
   </header>
@@ -106,21 +107,17 @@ ${TERM_LAYERS}
 
   <section class="top">
     <div class="box">
-      <span class="t">net / 24h <i id="net-note"></i></span>
+      <span class="t" id="hero-t">net / 24h <i id="net-note"></i></span>
       <div class="box-b">
         <div class="net" id="net">+0.0000</div>
-        <div class="under">
-          <span>incasat <b id="u-earned">0</b></span>
-          <span>gaz <b id="u-gas">0</b></span>
-          <span>livrari <b id="u-count">0</b></span>
-          <span>valoare <b id="u-value">0</b></span>
-        </div>
+        <div class="under" id="hero-under"></div>
         <canvas class="spark" id="spark"></canvas>
+        <div id="hero-bar" hidden></div>
       </div>
     </div>
 
     <div class="box">
-      <span class="t">log</span>
+      <span class="t" id="log-t">log</span>
       <div class="log" id="log"></div>
       <div class="empty" id="log-empty" hidden>NICIUN EVENIMENT INCA</div>
     </div>
@@ -130,14 +127,16 @@ ${TERM_LAYERS}
 
   <section class="two">
     <div class="box">
-      <span class="t">restanta</span>
+      <span class="t" id="backlog-t">restanta</span>
       <div class="box-b">
-        <div class="big" id="backlog-val">--</div>
-        <div class="under" style="margin-top:8px">
-          <span>portofele <b id="backlog-n">0</b></span>
-          <span>cost golire <b id="backlog-cost">0</b></span>
+        <div id="backlog-head">
+          <div class="big" id="backlog-val">--</div>
+          <div class="under" style="margin-top:8px">
+            <span>portofele <b id="backlog-n">0</b></span>
+            <span>cost golire <b id="backlog-cost">0</b></span>
+          </div>
+          <div style="margin-top:12px" id="backlog-bar"></div>
         </div>
-        <div style="margin-top:12px" id="backlog-bar"></div>
         <div style="margin-top:14px" id="owners"></div>
       </div>
     </div>
@@ -196,6 +195,28 @@ function setNet(v){
 }
 
 /* graficul, ca bare cu muchii drepte: acelasi limbaj cu restul paginii */
+function setNetRaw(text){ $('net').textContent = text; netShown = 0 }
+
+/* logul modului de veghe: ce a aparut, nu ce s-a livrat */
+function findsLog(finds){
+  const box = $('log');
+  $('log-empty').hidden = finds.length > 0;
+  const keys = finds.map(f => 'f' + f.tokenId + f.at);
+  box.replaceChildren();
+  finds.forEach((f, i) => {
+    const ln = document.createElement('div');
+    ln.className = 'ln' + (!first && !seen.has(keys[i]) ? ' fresh' : '');
+    const ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = hhmmss(f.at);
+    const op = document.createElement('span'); op.className = 'op'; op.textContent = 'FOUND  ';
+    const id = document.createElement('span'); id.className = 'id';
+    id.textContent = '#' + f.tokenId + ' → ' + short(f.wallet);
+    const am = document.createElement('span'); am.className = 'am'; am.textContent = num(f.valueEth, 4);
+    ln.append(ts, op, id, am);
+    box.appendChild(ln);
+  });
+  seen = new Set(keys);
+}
+
 function drawSpark(series){
   const c = $('spark'), ctx = c.getContext('2d');
   const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -245,7 +266,8 @@ function strip(s){
   item('CHAIN', s.chainId + (s.latencyMs != null ? ' \\u00b7 ' + s.latencyMs + 'ms' : ''),
     s.latencyMs == null ? 'bad' : s.latencyMs > 1500 ? 'warn' : '');
   item('BLK', s.block ?? '--', s.block ? '' : 'bad');
-  item('MOD', String(s.mode).toUpperCase() + (s.dryRun ? ' \\u00b7 USCAT' : ''), s.dryRun ? 'warn' : '');
+  item('MOD', s.watchtower ? 'VEGHE' : String(s.mode).toUpperCase() + (s.dryRun ? ' \\u00b7 USCAT' : ''),
+    s.watchtower ? '' : (s.dryRun ? 'warn' : ''));
   item('OPERATOR', s.operator ? num(s.operatorBalanceEth, 4) + ' ' + s.symbol : 'fara cheie', s.operatorLow ? 'bad' : '');
   item('LAST', s.lastRunAt ? ago(s.lastRunAt) : '--');
   const nb = item('NEXT', s.running ? 'ACUM' : (s.nextRunAt ? mmss(s.nextRunAt - Math.floor(Date.now()/1000)) : '--'));
@@ -289,8 +311,10 @@ async function load(){
   }
   paused = s.paused; nextRunAt = s.nextRunAt;
 
-  $('state').textContent = s.running ? 'RULEAZA' : s.paused ? 'OPRIT' : (s.dryRun ? 'USCAT' : 'ONLINE');
-  $('led').className = 'led' + (s.paused ? ' off' : (s.dryRun ? ' warn' : ''));
+  const wt = !!s.watchtower;
+  $('state').textContent = s.running ? (wt ? 'SCANEAZA' : 'RULEAZA')
+    : s.paused ? 'OPRIT' : (wt ? 'VEGHE' : (s.dryRun ? 'USCAT' : 'ONLINE'));
+  $('led').className = 'led' + (s.paused ? ' off' : (s.dryRun && !wt ? ' warn' : ''));
 
   const t = $('toggle');
   t.disabled = false;
@@ -298,20 +322,64 @@ async function load(){
     t.textContent = s.paused ? 'porneste' : 'opreste';
     t.className = 'b stop ' + (s.paused ? 'hot' : 'danger');
   }
+  /* in veghe nu exista livrare, deci nici proba uscata sau rulare live:
+     ramane o singura apasare, scanarea */
+  $('dry').hidden = wt; $('now').hidden = wt; $('scan').hidden = !wt;
   $('dry').disabled = !s.canRun || s.running;
   $('now').disabled = !s.canRun || s.running || s.paused;
+  $('scan').disabled = !s.canRun || s.running || s.paused;
 
-  setNet(s.day.netEth);
-  $('u-earned').textContent = num(s.day.earnedEth) + ' ' + s.symbol;
-  $('u-gas').textContent = num(s.day.gasEth) + ' ' + s.symbol;
-  $('u-count').textContent = s.day.deliveries;
-  $('u-value').textContent = num(s.day.deliveredEth, 3) + ' ' + s.symbol;
-  $('net-note').textContent = s.lastOutcome && s.lastOutcome.dry
-    ? '\\u00b7 ultima proba uscata ' + s.lastOutcome.delivered + '/' + s.lastOutcome.candidates : '';
-  drawSpark(s.series || []);
+  /* Numarul erou isi schimba subiectul dupa mod: un supraveghetor nu castiga
+     nimic, deci cifra lui nu e profitul, e cat zace nerevendicat. */
+  const under = $('hero-under');
+  under.replaceChildren();
+  const put = (label, value) => {
+    const sp = document.createElement('span');
+    sp.append(document.createTextNode(label + ' '));
+    const b = document.createElement('b'); b.textContent = value;
+    sp.appendChild(b); under.appendChild(sp);
+  };
+
+  if (wt) {
+    $('hero-t').textContent = 'nerevendicat acum';
+    $('net').classList.remove('neg');
+    setNetRaw(num(s.wall.valueEth, 3) + ' ' + s.symbol);
+    put('portofele', String(s.wall.count));
+    put('cel mai vechi', s.wall.oldestDays > 0 ? s.wall.oldestDays + ' zile' : 'azi');
+    put('gasite ultima data', s.lastOutcome ? String(s.lastOutcome.found ?? 0) : '—');
+    put('cost golire', num(s.backlogCostEth, 5) + ' ' + s.symbol);
+    $('spark').hidden = true;
+    const hb = $('hero-bar'); hb.hidden = false; hb.replaceChildren();
+    hb.style.marginTop = '18px';
+    const all = s.wall.count + s.all.deliveries;
+    hb.appendChild(blocks(all > 0 ? s.wall.count / all : 0, 30));
+    const pc = document.createElement('div');
+    pc.className = 'k'; pc.style.marginTop = '8px';
+    pc.textContent = all > 0 ? Math.round((s.wall.count / all) * 100) + '% din tot ce a existat inca asteapta' : '';
+    hb.appendChild(pc);
+    $('log-t').textContent = 'descoperiri';
+    findsLog(s.finds || []);
+  } else {
+    $('hero-t').textContent = 'net / 24h';
+    $('spark').hidden = false;
+    $('hero-bar').hidden = true;
+    setNet(s.day.netEth);
+    put('incasat', num(s.day.earnedEth) + ' ' + s.symbol);
+    put('gaz', num(s.day.gasEth) + ' ' + s.symbol);
+    put('livrari', String(s.day.deliveries));
+    put('valoare', num(s.day.deliveredEth, 3) + ' ' + s.symbol);
+    $('net-note').textContent = s.lastOutcome && s.lastOutcome.dry
+      ? '· ultima proba uscata ' + s.lastOutcome.delivered + '/' + s.lastOutcome.candidates : '';
+    drawSpark(s.series || []);
+    $('log-t').textContent = 'log';
+    log(s.events || []);
+  }
   strip(s);
-  log(s.events || []);
 
+  /* in veghe totalul e deja numarul erou, deci panoul arata altceva:
+     cine tine banii, nu cati sunt */
+  $('backlog-t').textContent = wt ? 'cine tine banii' : 'restanta';
+  $('backlog-head').hidden = wt;
   $('backlog-val').textContent = num(s.wall.valueEth, 3) + ' ' + s.symbol;
   $('backlog-n').textContent = s.wall.count;
   $('backlog-cost').textContent = num(s.backlogCostEth, 5) + ' ' + s.symbol;
@@ -383,6 +451,7 @@ async function post(path, okText){
 
 $('dry').addEventListener('click', () => post('/api/run?dry=1', 'PROBA USCATA CERUTA \\u00b7 NU PLEACA NICIO TRANZACTIE'));
 $('now').addEventListener('click', () => post('/api/run', 'RULARE CERUTA'));
+$('scan').addEventListener('click', () => post('/api/run', 'SCANARE CERUTA'));
 $('toggle').addEventListener('click', async () => {
   const btn = $('toggle');
   /* oprirea dintr-un clic; pornirea cere doua, ca sa nu repornesti din greseala

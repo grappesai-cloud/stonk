@@ -33,6 +33,10 @@ ${TERM_FONTS}
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 *{box-sizing:border-box}
+/* Fara asta, orice element cu o clasa care are display ramane vizibil chiar
+   daca ii pui atributul hidden: regula clasei bate regula implicita a
+   browserului. Accentele grave sunt interzise aici, pagina e un literal. */
+[hidden]{display:none !important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);
   font:400 13px/1.5 var(--mono);letter-spacing:.02em;

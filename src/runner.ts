@@ -12,6 +12,7 @@ import { scanClaims, type Claim } from './scan/claims.js'
 import { screenClaims } from './policy/rules.js'
 import { probeGating, simulateEach } from './simulate/simulate.js'
 import { execute } from './execute/executor.js'
+import type { FoundNews } from './alerts/telegram.js'
 import { reconcile } from './reconcile.js'
 import { log } from './log.js'
 
@@ -30,11 +31,13 @@ export interface RunOutcome {
   wallValueWei: bigint
   stoppedBy: string | null
   gatingWarning: string | null
+  /** cate descoperiri noi, folosit in modul de veghe */
+  found: number
 }
 
 export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
   const { cfg, client, ledger, tg } = ctx
-  const runId = ledger.startRun(cfg.policy.mode, cfg.execution.dryRun)
+  const runId = ledger.startRun(cfg.watchtower ? 'watchtower' : cfg.policy.mode, cfg.execution.dryRun)
   const from = ctx.account?.address ?? STRANGER
 
   // intai punem la punct ce a ramas in aer de la rularea trecuta
@@ -55,9 +58,55 @@ export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
     scan.claims.map((c) => c.tokenId)
   )
 
-  // peretele uitatilor se actualizeaza indiferent daca livram sau nu
+  /* Peretele uitatilor se actualizeaza indiferent daca livram sau nu, si tot
+     aici aflam ce e nou fata de rularea trecuta. Diferenta e tot ce conteaza
+     pentru veghe: un index care nu stie ce s-a schimbat e doar o poza. */
+  const found: FoundNews[] = []
   for (const c of scan.claims) {
-    ledger.seeClaim(c.tokenId.toString(), c.wallet, owners.get(c.tokenId) ?? null, c.valueWei, c.native)
+    const owner = owners.get(c.tokenId) ?? null
+    const d = ledger.seeClaim(c.tokenId.toString(), c.wallet, owner, c.valueWei, c.native)
+    if (d.isNew || d.deltaWei > 0n) {
+      found.push({ tokenId: c.tokenId.toString(), wallet: c.wallet, owner, valueWei: c.valueWei, isNew: d.isNew })
+    }
+  }
+
+  /* ------------------------------------------------------------- veghe ---
+     Modul de veghe se opreste aici: a scanat, a tinut indexul, a anuntat.
+     Nu simuleaza si nu semneaza nimic, deci nu are nevoie nici de cheie, nici
+     de raspunsul la intrebarea daca deliver() e apelabila de un strain. */
+  if (cfg.watchtower) {
+    await tg.announceFound(found)
+    await tg.maybeDigest()
+    const wall = ledger.wallTotals()
+    const outcome: RunOutcome = {
+      runId,
+      scanned: scan.scanned,
+      withSomething: scan.claims.length,
+      candidates: 0,
+      simulatedOk: 0,
+      delivered: 0,
+      skipped: 0,
+      gasWei: 0n,
+      tipsWei: 0n,
+      valueWei: 0n,
+      wallCount: wall.count,
+      wallValueWei: wall.valueWei,
+      stoppedBy: null,
+      gatingWarning: null,
+      found: found.length
+    }
+    ledger.finishRun(runId, {
+      scanned: outcome.scanned,
+      candidates: 0,
+      delivered: 0,
+      failed: 0,
+      gasWei: 0n,
+      tipsWei: 0n,
+      valueWei: 0n,
+      note: `veghe: ${found.length} descoperiri noi`
+    })
+    log.info({ found: found.length, wall: wall.count }, 'veghe incheiata')
+    return outcome
   }
 
   const screened = screenClaims({
@@ -141,7 +190,8 @@ export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
     wallCount: wall.count,
     wallValueWei: wall.valueWei,
     stoppedBy: res.stoppedBy,
-    gatingWarning
+    gatingWarning,
+    found: found.length
   }
 
   ledger.finishRun(runId, {

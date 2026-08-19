@@ -14,6 +14,14 @@ import type { Config } from '../config.js'
 import type { Ledger } from '../ledger/db.js'
 import { log } from '../log.js'
 
+export interface FoundNews {
+  tokenId: string
+  wallet: Address
+  owner: Address | null
+  valueWei: bigint
+  isNew: boolean
+}
+
 export interface DeliveryNews {
   tokenId: string
   wallet: Address
@@ -152,6 +160,48 @@ export class Telegram {
           ]
             .filter(Boolean)
             .join('\n')
+        )
+      }
+    }
+  }
+
+  /**
+   * Ce a aparut nou nerevendicat. Asta e mesajul modului de veghe, si tot el e
+   * partea care conteaza pentru om: nu ii spui ca botul a scanat, ii spui ca
+   * are bani care il asteapta.
+   */
+  async announceFound(items: FoundNews[]): Promise<void> {
+    if (!this.enabled || items.length === 0) return
+    const min = this.cfg.alerts.telegram.foundMinValueWei
+    const worth = items.filter((i) => i.valueWei >= min)
+    if (worth.length === 0) return
+
+    const total = worth.reduce((s, i) => s + i.valueWei, 0n)
+    const sym = this.cfg.network.nativeSymbol
+    await this.toChannel(
+      [
+        `<b>UNCLAIMED · ${worth.length} new</b>`,
+        `${fmt(total)} ${sym} just showed up in broker wallets and nobody has claimed it.`,
+        ...worth
+          .slice(0, 5)
+          .map((i) => `#${esc(i.tokenId)} · ${fmt(i.valueWei)} ${sym}`)
+      ].join('\n')
+    )
+
+    /* si fiecare om care urmareste adresa implicata: pe el nu il intereseaza
+       totalul, il intereseaza ca ai lui stau acolo */
+    for (const i of worth) {
+      const targets = new Set<string>()
+      for (const chat of this.ledger.watchersOf(i.wallet)) targets.add(chat)
+      if (i.owner) for (const chat of this.ledger.watchersOf(i.owner)) targets.add(chat)
+      for (const chat of targets) {
+        await this.send(
+          chat,
+          [
+            `<b>You have unclaimed value</b>`,
+            `Broker #${esc(i.tokenId)} is holding ${fmt(i.valueWei)} ${sym} that was never claimed.`,
+            `Nothing to do and nothing to sign. Courier delivers it when it runs.`
+          ].join('\n')
         )
       }
     }

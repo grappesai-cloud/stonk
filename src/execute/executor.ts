@@ -81,6 +81,15 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
   }
   if (claims.length === 0) return out
 
+  /* 0. modul de veghe nu semneaza niciodata nimic. Verificarea sta aici, nu
+     doar in bucla, ca sa nu existe niciun drum prin care sa se ajunga la
+     semnare dintr-o configurare de veghe. */
+  if (cfg.watchtower) {
+    out.stoppedBy = 'mod de veghe: nu se livreaza nimic'
+    for (const c of claims) out.skipped.push({ tokenId: c.tokenId, reason: 'over-run-cap', detail: 'veghe' })
+    return out
+  }
+
   // 1. comutatorul de oprire, inaintea oricarui calcul
   if (existsSync(cfg.execution.killSwitchFile)) {
     out.stoppedBy = `comutator de oprire prezent: ${cfg.execution.killSwitchFile}`

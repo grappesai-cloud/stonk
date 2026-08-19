@@ -26,12 +26,16 @@ program
   .option('-c, --config <path>', 'fisierul de configurare', './config/default.json')
   .option('--live', 'chiar trimite tranzactii (implicit e rulare uscata)', false)
   .option('--campaign', 'modul campanie: livreaza si cand nu se plateste singur', false)
+  .option('--watchtower', 'mod de veghe: scaneaza si anunta, nu livreaza si nu semneaza nimic', false)
 
 function ctxOf(): Ctx {
-  const opts = program.opts<{ config: string; live: boolean; campaign: boolean }>()
+  const opts = program.opts<{ config: string; live: boolean; campaign: boolean; watchtower: boolean }>()
   const ctx = buildContext(opts.config)
   if (opts.live) ctx.cfg.execution.dryRun = false
   if (opts.campaign) ctx.cfg.policy.mode = 'campaign'
+  if (opts.watchtower) ctx.cfg.watchtower = true
+  /* veghea bate orice: daca ai cerut-o, nu se semneaza nimic, punct */
+  if (ctx.cfg.watchtower) ctx.cfg.execution.dryRun = true
   return ctx
 }
 

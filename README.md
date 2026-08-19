@@ -9,6 +9,26 @@ Nu e un demo si nu e un MVP. Are simulare inainte de fiecare tranzactie, frane
 de cheltuiala, reconciliere dupa cadere, alerte, API de citire si teste
 cap-coada pe un lant real cu contracte reale.
 
+## Doua moduri
+
+**Veghe** (`courier start --watchtower`, sau `"watchtower": true` in config):
+scaneaza, tine indexul si anunta. **Nu simuleaza, nu semneaza, nu livreaza**,
+chiar daca exista o cheie in mediu, si exista un test care cheama executorul
+direct ca sa dovedeasca asta.
+
+E modul cu care se poate lansa **inainte** sa fie limpede daca `deliver()` merge
+apelata de un strain. Intrebarea aia blocheaza livrarea, nu si publicarea
+indexului. Un supraveghetor e util din prima zi, nu cere voie nimanui si nu are
+nimic de pierdut: fara cheie nu exista nici risc, nici gaz, nici greseala
+posibila. Diagnosticul stie asta si nu mai cade pe intrebarea cu autorizarea.
+
+Consola isi schimba singura subiectul: numarul erou nu mai e profitul, e **cat
+zace nerevendicat acum**, logul arata descoperiri in loc de livrari, si raman
+doua butoane, scanare si oprire.
+
+**Curier** (implicit): tot ce face veghea, plus filtrare, simulare, livrare si
+socoteala.
+
 ## De ce Courier si nu altul
 
 Dintre cele cinci clase, Courier e singura care poate rula **azi, fara
@@ -80,6 +100,7 @@ Implicit nu se trimite nimic. `--live` se scrie de mana de fiecare data.
 | comanda | ce face |
 |---|---|
 | `init <adresa>` | citeste ABI-ul verificat de pe explorer si propune semnaturile pentru configurare |
+| `start --watchtower` | mod de veghe: scaneaza si anunta, nu semneaza nimic |
 | `doctor` | verifica lantul, contractele, matematica adreselor si daca `deliver()` e apelabila de un strain |
 | `scan` | cine are ceva nerevendicat si cat valoreaza |
 | `wall` | peretele uitatilor, din ultima scanare |
