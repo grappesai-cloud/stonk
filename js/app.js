@@ -612,6 +612,18 @@
       if (Array.isArray(j.feed) && j.feed.length) {
         feed = j.feed
         feedIdx = 0
+        /**
+         * Randurile simulate se sterg din panou, nu se lasa sa se scurga.
+         *
+         * Fara linia asta, panoul scria LIVE si tot arata inca cateva secunde
+         * randuri inventate. Un flux etichetat live care contine si simulari e
+         * mai rau decat unul care spune cinstit SIM.
+         */
+        if (feedBox && !feedBox.dataset.live) {
+          feedBox.dataset.live = '1'
+          while (feedBox.firstChild) feedBox.removeChild(feedBox.firstChild)
+          for (let i = 0; i < Math.min(4, feed.length); i++) pushFeedRow()
+        }
       }
       const tag = $('[data-t="hero.feedTag"]')
       if (tag && j.feed?.length) tag.textContent = 'LIVE'
