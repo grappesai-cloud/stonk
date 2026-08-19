@@ -109,10 +109,10 @@
     "maxConsecutiveFailures": 5
   },
   "runner": {
-    "_": "'block' e obligatoriu la Ringer: cine se uita din 5 in 5 minute nu apasa niciodata butonul.",
-    "mode": "block",
-    "intervalSec": 60,
-    "jitterSec": 0,
+    "_": "Cadenta pe bloc a fost gandita pentru o cursa fierbinte, cand oala se umple si se apasa in secunda aia. Aici runda se poate redeschide la 7 zile, iar rundele au stat doua zile peste racire fara sa le atinga nimeni: nu e cursa, e o fereastra larga. Intrebarea la fiecare bloc ar insemna cateva cereri pe secunda catre un RPC care pune provocare de bot, adica ne-am scoate singuri din priza pentru un eveniment saptamanal.",
+    "mode": "interval",
+    "intervalSec": 30,
+    "jitterSec": 10,
     "pollMs": 2000,
     "staleAfterSec": 600,
     "watchdogSec": 1800

@@ -8,7 +8,7 @@
  *   ["$id"]
  *   [{ roundId: "$id", recipient: "$beneficiary" }]
  *
- * Locuri goale: $id, $key, $account, $beneficiary, $now, $max128, $max256,
+ * Locuri goale: $id, $key, $account, $beneficiary, $now, $deadline, $max128, $max256,
  * $zero, $amount, $gauge, $gauges, $weights, $power. Orice sir format doar din
  * cifre devine numar intreg, ca sa nu fie nevoie sa scrii sume mari altfel
  * decat ca text.
@@ -66,6 +66,16 @@ function resolveOne(node: unknown, ctx: ArgContext): unknown {
       return need(ctx.beneficiary ?? ctx.account, '$beneficiary')
     case '$now':
       return BigInt(ctx.nowSec ?? Math.floor(Date.now() / 1000))
+    /**
+     * Un termen limita cu sens pentru o tranzactie: un sfert de ora.
+     *
+     * Multe apeluri cer asa ceva, iar cele doua greseli usoare sunt amandoua
+     * costisitoare. Prea aproape si tranzactia pica in mempool asteptandu-si
+     * randul. Prea departe si ramane valabila mult dupa ce preturile s-au
+     * schimbat, adica o semnatura care poate fi folosita impotriva ta.
+     */
+    case '$deadline':
+      return BigInt((ctx.nowSec ?? Math.floor(Date.now() / 1000)) + 900)
     case '$max128':
       return MAX_UINT128
     case '$max256':

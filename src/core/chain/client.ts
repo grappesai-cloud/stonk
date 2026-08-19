@@ -33,8 +33,17 @@ export function chainOf(cfg: Config): Chain {
 
 export function publicClientOf(cfg: Config): PublicClient {
   const chain = chainOf(cfg)
+  /**
+   * Reincercari rabdatoare, dinadins.
+   *
+   * RPC-ul lantului sta in spatele Cloudflare, care nu raspunde cu "prea multe
+   * cereri", ci cu o pagina de provocare de bot. Reincercarile scurte o
+   * inrautatesc: mai multe cereri, exact cand esti deja pe lista. De aia pauza
+   * incepe de la o secunda si creste, si de aia lotul de cereri e mai mic:
+   * un pachet gras arata mai mult a robot decat trei subtiri.
+   */
   const transports = cfg.network.rpc.map((url) =>
-    http(url, { batch: { wait: 8, batchSize: 100 }, retryCount: 3, retryDelay: 250, timeout: 20_000 })
+    http(url, { batch: { wait: 16, batchSize: 40 }, retryCount: 5, retryDelay: 1_000, timeout: 30_000 })
   )
   return createPublicClient({
     chain,

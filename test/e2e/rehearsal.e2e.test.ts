@@ -27,6 +27,7 @@ const CHAIN_ID = 4663
 
 const CLOCK = getAddress('0x55642A3F10F1Af5145D3d59021B1D6b03BB8692c')
 const COLLECTION = getAddress('0x539CdD042c2f3d93EbC5BE7DfFf0c79F3B4fAbF0')
+const BOOSTER = getAddress('0x1f12fe622c11947f93F53d63f68f7F46B6D081c9')
 const AAPL = getAddress('0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9')
 const AMZN = getAddress('0x12f190a9F9d7D37a250758b26824B97CE941bF54')
 
@@ -39,6 +40,11 @@ const clockAbi = parseAbi([
   'function claimable(address token, uint256 tokenId) view returns (uint256)'
 ])
 const nftAbi = parseAbi(['function tokenWallet(uint256 tokenId) view returns (address)'])
+const boosterAbi = parseAbi([
+  'function phase() view returns (uint8)',
+  'function currentRound() view returns (uint256)',
+  'function roundPotWei() view returns (uint256)'
+])
 const erc20 = parseAbi(['function balanceOf(address) view returns (uint256)'])
 
 let anvil: Anvil | null = null
@@ -83,7 +89,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   anvil?.stop()
-  cleanup(['./data/test/reh-ringer.json', './data/test/reh-courier.json'])
+  cleanup(['./data/test/reh-ringer.json', './data/test/reh-courier.json', './data/test/reh-crank.json'])
 })
 
 describe('repetitie generala pe contractele reale StonkBrokers', () => {
@@ -158,6 +164,30 @@ describe('repetitie generala pe contractele reale StonkBrokers', () => {
     expect(t2.gasWei > 0n).toBe(true)
     ctx.ledger.close()
   }, 300_000)
+
+  it('CRANK invarte masina de runde a boosterului, si faza se schimba', async (t) => {
+    if (!up) return t.skip()
+    const file = write('./data/test/reh-crank.json', './config/crank.json', {})
+    const ctx: Ctx = buildContext(file)
+
+    const before = {
+      phase: (await rig.client.readContract({ address: BOOSTER, abi: boosterAbi, functionName: 'phase' })) as number,
+      round: (await rig.client.readContract({ address: BOOSTER, abi: boosterAbi, functionName: 'currentRound' })) as bigint,
+      pot: (await rig.client.readContract({ address: BOOSTER, abi: boosterAbi, functionName: 'roundPotWei' })) as bigint
+    }
+    const o = await runOnce(ctx)
+    const after = {
+      phase: (await rig.client.readContract({ address: BOOSTER, abi: boosterAbi, functionName: 'phase' })) as number,
+      round: (await rig.client.readContract({ address: BOOSTER, abi: boosterAbi, functionName: 'currentRound' })) as bigint
+    }
+    process.stdout.write(
+      `   crank: ${o.done} apel, gaz ${formatEther(o.gasWei)} ETH | faza ${before.phase} -> ${after.phase}, runda ${before.round} -> ${after.round}, oala ${formatEther(before.pot)}\n`
+    )
+    expect(o.done).toBe(1)
+    /* masina s-a miscat: ori a deschis runda urmatoare, ori a avansat faza */
+    expect(after.round > before.round || after.phase !== before.phase).toBe(true)
+    ctx.ledger.close()
+  }, 240_000)
 
   it('dupa livrare nu mai are ce livra din brokerii atinsi', async (t) => {
     if (!up) return t.skip()

@@ -1,4 +1,4 @@
-# Cinci agenti, acelasi cod, configurari diferite. Meseria se alege din
+# Sase procese, acelasi cod, configurari diferite. Meseria se alege din
 # `agent.kind`, nu din imagine, deci imaginea se construieste o data.
 #
 # Amandoi pornesc in VEGHE: masoara si tin indexul, nu semneaza nimic. Trecerea
@@ -81,6 +81,19 @@ services:
     command: ["start", "-c", "./config/courier.json"]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8798/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  crank:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8800:8800"
+      - "127.0.0.1:8801:8801"
+    command: ["start", "-c", "./config/crank.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8800/health"]
       interval: 30s
       timeout: 5s
       start_period: 20s

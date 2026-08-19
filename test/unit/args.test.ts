@@ -29,3 +29,12 @@ describe('sabloane de argumente', () => {
     expect(resolveArgs(['$beneficiary'], { account: ADDR })).toEqual([ADDR])
   })
 })
+
+describe('termenul limita', () => {
+  it('e in viitor, dar nu prea departe', () => {
+    const now = 1_700_000_000
+    const [d] = resolveArgs(['$deadline'], { nowSec: now }) as [bigint]
+    expect(d > BigInt(now)).toBe(true)
+    expect(d - BigInt(now)).toBe(900n)
+  })
+})

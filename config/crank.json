@@ -1,0 +1,146 @@
+{
+  "_": "RINGER #0001, pe masina de runde a boosterului. crank() e complet libera si duce tot ciclul: deschide runda, numara, schimba, distribuie. Nu plateste nimic apelantului, deci tot campanie.",
+  "_watchtower": "Pornit inseamna: masoara cursa, nu cheltui nimic. E modul cu care se incepe, fiindca raspunde la singura intrebare care conteaza inainte sa arzi gaz: butonul asta e liber sau il apasa deja altcineva mai rapid?",
+  "watchtower": true,
+  "agent": {
+    "kind": "ringer",
+    "id": 1,
+    "name": "RINGER #0001 (crank)",
+    "collection": null,
+    "wallet": null,
+    "owner": null
+  },
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": [
+      "https://rpc.mainnet.chain.robinhood.com"
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 2000
+  },
+  "target": {
+    "address": "0x1f12fe622c11947f93F53d63f68f7F46B6D081c9",
+    "_": "DirectedClockInBooster",
+    "errorSignatures": [
+      "error DropBelowThreshold()",
+      "error DropRoundInProgress()",
+      "error NoDropRoundInProgress()",
+      "error NoActiveWeight()",
+      "error InvalidConfig()",
+      "error Unauthorized()",
+      "error PublicStartNotConfigured()",
+      "error RouterNotAllowlisted()"
+    ],
+    "deployBlock": 0
+  },
+  "job": {
+    "slots": null,
+    "_pot": "oala rundei, ca sa se vada cat e in joc",
+    "pot": {
+      "signature": "function roundPotWei() view returns (uint256)",
+      "args": [],
+      "field": null,
+      "address": null
+    },
+    "_ready": "Nu exista o citire de tip 'e gata?'. Conditia adevarata e 'faza nu e Idle SAU oala trece de prag', si nu se poate scrie ca o singura citire. O lasam pe seama simularii, care raspunde exact si ieftin: la Idle fara bani, contractul spune DropBelowThreshold.",
+    "ready": {
+      "mode": "always"
+    },
+    "reward": {
+      "mode": "none"
+    },
+    "action": {
+      "signature": "function crank(uint256 maxRecipients, uint256 deadline)",
+      "args": [
+        "50",
+        "$deadline"
+      ],
+      "field": null,
+      "address": null
+    },
+    "event": {
+      "signature": "event RoundOpened(uint256 round, uint256 potWei, uint256 totalWeight, uint32 menuVersion)",
+      "callerField": null,
+      "rewardField": null,
+      "slotField": null
+    },
+    "race": {
+      "priorityBumpBps": 2000,
+      "maxPriorityFeeWei": null,
+      "staleBlocks": 3
+    }
+  },
+  "policy": {
+    "mode": "campaign",
+    "profitMultiple": 1.5,
+    "minRewardWei": "0",
+    "minStakeWei": "0",
+    "requireMeasuredReward": false,
+    "cooldownSec": 60,
+    "maxJobsPerRun": 1,
+    "batchSize": 1,
+    "gasCapPerCall": "12000000",
+    "maxGasPriceWei": null,
+    "dailyGasBudgetWei": "20000000000000000",
+    "denyKeys": []
+  },
+  "execution": {
+    "dryRun": true,
+    "privateKey": "env:CRANK_KEY",
+    "beneficiary": null,
+    "confirmations": 1,
+    "maxFeePerGasWei": null,
+    "maxPriorityFeePerGasWei": null,
+    "killSwitchFile": "./data/STOP-crank",
+    "maxConsecutiveFailures": 5
+  },
+  "runner": {
+    "mode": "interval",
+    "intervalSec": 60,
+    "jitterSec": 15,
+    "pollMs": 2000,
+    "staleAfterSec": 900,
+    "watchdogSec": 2400
+  },
+  "alerts": {
+    "telegram": {
+      "enabled": false,
+      "token": "env:TELEGRAM_TOKEN",
+      "channel": null,
+      "digestHour": 9,
+      "gasLowWei": "2000000000000000"
+    },
+    "heartbeat": {
+      "url": "env:HEARTBEAT_URL",
+      "failUrl": null,
+      "timeoutMs": 5000
+    }
+  },
+  "api": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8800,
+    "cors": [
+      "*"
+    ],
+    "rateLimitPerMinute": 120
+  },
+  "console": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 8801,
+    "token": "env:CONSOLE_TOKEN"
+  },
+  "storage": {
+    "file": "./data/crank.db",
+    "backup": {
+      "enabled": true,
+      "dir": "./data/backups",
+      "everyHours": 6,
+      "keep": 28
+    }
+  }
+}

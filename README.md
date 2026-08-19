@@ -4,10 +4,10 @@
 One core, one job module per agent. [Courier](../stonk-courier) stays where it
 is; this repo is where the other four live.
 
-All four are **written, tested, dockerised and standing by**. They cannot earn
-anything yet, and the reason is not the code: we do not have the StonkBrokers
-contract addresses. The day those arrive, each starts working from a config
-edit, with no redeploy.
+**Three of them are wired to the real StonkBrokers contracts and proven end to
+end on a fork of the live chain.** They are not earning yet for one reason
+only: the wallets have no gas. The other two are built and tested but have no
+contract to work on — see *What actually exists on chain* below.
 
 ```
 fleet init <address>    read the verified ABI, propose the signatures
@@ -27,7 +27,27 @@ Every command takes `-c <config>`; there is one config per agent.
 
 ---
 
-## The four jobs
+## What actually exists on chain
+
+The landing page describes five jobs. On chain, three exist, and none of them
+pays the caller anything:
+
+| job | contract | callable by anyone | pays the caller |
+|---|---|---|---|
+| `startRound(token)` | SafetyDepositClockInV3 | yes, proven | no |
+| `clockIn(tokens[], ids[])` | SafetyDepositClockInV3 | yes, proven | no |
+| `crank(max, deadline)` | DirectedClockInBooster | yes, proven | no |
+
+**There is no VRNG round machine, no goods restocking, and no gauge voting.**
+`StonkUpLockerCL` is a liquidity locker, not a voter; `StockBooster` is another
+drop machine, not an inventory contract. So Miner, Stocker and Lobbyist are
+finished agents with nowhere to work, and they say so instead of pretending.
+
+Since nothing pays a keeper fee, the agents run in **campaign mode**: they work
+at a loss on purpose. What they produce is not a fee, it is coverage and proof
+— every delivery recorded, per broker. That is what a Stonk Agent sells.
+
+## The job modules
 
 **RINGER** presses Clock In the second the pot fills, and takes a cut. It is
 the only agent in the fleet where green tests do not mean money: it enters a
