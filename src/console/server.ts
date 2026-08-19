@@ -55,6 +55,13 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 
 const eth = (wei: bigint): number => Number(formatEther(wei))
 
+/** media reala de gaz pe livrare; daca nu exista istoric, o estimare declarata */
+function estimateGas(ledger: Ctx['ledger'], gasPriceWei: bigint): bigint {
+  const totals = ledger.totals(0)
+  if (totals.deliveries === 0 || totals.gasWei === 0n) return gasPriceWei * 300_000n
+  return totals.gasWei / BigInt(totals.deliveries)
+}
+
 export function createConsole(ctx: Ctx) {
   const { cfg, ledger } = ctx
   const token = cfg.console.token
@@ -108,12 +115,21 @@ export function createConsole(ctx: Ctx) {
 
       let block: string | null = null
       let balanceWei = 0n
+      let latencyMs: number | null = null
+      let gasPriceWei = 0n
       try {
+        const t0 = Date.now()
         block = String(await ctx.client.getBlockNumber())
+        latencyMs = Date.now() - t0
+        gasPriceWei = await ctx.client.getGasPrice()
         if (ctx.account) balanceWei = await ctx.client.getBalance({ address: ctx.account.address })
       } catch {
         /* lantul poate fi jos; consola trebuie sa mearga oricum */
       }
+
+      /* cat ar costa sa golim toata restanta la gazul de acum: media reala din
+         livrarile facute, iar daca nu exista istoric, o estimare declarata */
+      const avgGasWei = estimateGas(ledger, gasPriceWei)
 
       const shape = (t: ReturnType<typeof ledger.totals>) => ({
         deliveries: t.deliveries,
@@ -124,8 +140,41 @@ export function createConsole(ctx: Ctx) {
         netEth: eth(t.netWei)
       })
 
+      const wallTotals = wall
+      const backlogCostWei = avgGasWei * BigInt(wallTotals.count)
+
       return json(res, 200, {
         paused: existsSync(killFile),
+        running: ctx.control.running,
+        canRun: ctx.control.attached,
+        nextRunAt: ctx.control.nextRunAt,
+        lastRunAt: ledger.lastRunAt(),
+        intervalSec: cfg.runner.intervalSec,
+        latencyMs,
+        gasPriceWei,
+        backlogCostEth: eth(backlogCostWei),
+        perDeliveryEth: eth(avgGasWei),
+        series: ledger.dailySeries(7).map((d) => ({
+          day: d.day,
+          deliveries: d.deliveries,
+          valueEth: eth(d.valueWei),
+          earnedEth: eth(d.tipsWei),
+          gasEth: eth(d.gasWei),
+          netEth: eth(d.tipsWei - d.gasWei)
+        })),
+        topOwners: ledger.topOwners(4).map((o) => ({ owner: o.owner, wallets: o.wallets, valueEth: eth(o.valueWei) })),
+        lastOutcome: ctx.control.lastOutcome
+          ? {
+              dry: ctx.control.lastOutcome.dry,
+              at: ctx.control.lastOutcome.at,
+              delivered: ctx.control.lastOutcome.delivered,
+              candidates: ctx.control.lastOutcome.candidates,
+              valueEth: eth(ctx.control.lastOutcome.valueWei),
+              gasEth: eth(ctx.control.lastOutcome.gasWei),
+              tipsEth: eth(ctx.control.lastOutcome.tipsWei),
+              stoppedBy: ctx.control.lastOutcome.stoppedBy
+            }
+          : null,
         dryRun: cfg.execution.dryRun,
         mode: cfg.policy.mode,
         symbol: cfg.network.nativeSymbol,
@@ -160,6 +209,20 @@ export function createConsole(ctx: Ctx) {
           valueEth: eth(d.valueWei)
         }))
       })
+    }
+
+    /* a treia actiune care scrie, si singura care nu atinge fisierul de oprire:
+       cere buclei o rulare. Nu semneaza nimic ea insasi, doar ridica un steag
+       pe care bucla il vede. Cu ?dry=1 cere explicit o rulare uscata. */
+    if (req.method === 'POST' && url.pathname === '/api/run') {
+      const dry = url.searchParams.get('dry') === '1'
+      if (!ctx.control.attached) {
+        return json(res, 409, { error: 'nu ruleaza nicio bucla; porneste cu `courier start`' })
+      }
+      if (ctx.control.running) return json(res, 409, { error: 'deja ruleaza' })
+      const ok = ctx.control.request(dry)
+      log.warn({ dry }, 'rulare ceruta din consola')
+      return json(res, ok ? 200 : 409, { ok, dry })
     }
 
     if (req.method === 'POST' && (url.pathname === '/api/pause' || url.pathname === '/api/resume')) {

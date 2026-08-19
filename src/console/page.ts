@@ -1,13 +1,12 @@
 /**
- * Consola de operator, pe design-ul site-ului.
+ * Consola de operator, ca dashboard.
  *
- * Foloseste exact aceeasi tema ca ~/stonk-agents si ca peretele public:
- * aceleasi fonturi, aceiasi tokeni, aceleasi componente si aceleasi straturi
- * de fundal.
+ * Regula de compozitie: un singur numar erou, restul in jurul lui. Cand toate
+ * cifrele au aceeasi marime, ochiul nu stie unde sa se uite si panoul devine
+ * un tabel cu ambitii. Aici ordinea e: fac bani acum, e sanatos, cat mai am
+ * de facut.
  *
- * Pagina e statica si isi ia datele din /api/state, deci nu exista niciun loc
- * in care sa se lipeasca text din afara in HTML. Singurele doua actiuni care
- * scriu sunt butoanele de oprit si pornit.
+ * Foloseste aceeasi tema ca site-ul si ca peretele public.
  */
 import { THEME, LAYERS_HTML, BRAND_MARK } from '../ui/theme.js'
 
@@ -21,40 +20,109 @@ export function consolePage(): string {
 <title>Courier · Console</title>
 <style>
 ${THEME}
-/* ---------- doar ce e specific consolei ---------- */
-.page{padding:0 0 80px}
-/* antetul ramane lipit sus: butonul de oprit nu are voie sa dispara la
-   derulare. Daca esti jos, in tabelul de livrari, si trebuie sa opresti, nu
-   vrei sa cauti mai intai butonul. */
-header{position:sticky;top:0;z-index:40;
-  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-  padding:18px 0 18px;border-bottom:1px solid var(--line);margin-bottom:26px;
-  background:rgba(0,0,0,.78);backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px)}
+/* ---------- antet lipit ---------- */
+header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:16px 0;margin-bottom:24px;border-bottom:1px solid var(--line);
+  background:rgba(0,0,0,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .spacer{margin-left:auto}
-h2{margin:36px 0 14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--faint);font-family:var(--mono);font-weight:500}
-.msg{margin-top:14px;min-height:18px;font-family:var(--mono);font-size:11px;
-  letter-spacing:.1em;color:var(--faint)}
-.msg.ok{color:var(--green)}
-.msg.err{color:var(--red)}
-.bars{display:grid;gap:12px;padding:20px 18px}
+header .btn{height:40px;padding:0 18px;font-size:14px}
+.page{padding:0 0 90px}
+
+/* ---------- randul erou ---------- */
+.hero{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;margin-bottom:18px}
+.hero-card{position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.net{padding:26px 26px 0;position:relative;z-index:1}
+.net .eyebrow{margin-bottom:10px}
+.net b{display:block;font-family:var(--mono);font-weight:700;letter-spacing:-.04em;
+  font-size:clamp(46px,6.4vw,80px);line-height:1;color:var(--green);
+  text-shadow:0 0 40px rgba(0,200,5,.35);transition:color .3s}
+.net b.red{color:var(--red);text-shadow:0 0 40px rgba(255,80,0,.3)}
+.net .under{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px 20px;color:var(--dim);
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.net .under i{font-style:normal;color:var(--text);font-weight:600}
+.spark{display:block;width:100%;height:120px;margin-top:6px}
+
+/* ---------- fluxul viu ---------- */
+.feed{display:flex;flex-direction:column;min-height:260px}
+.feed-top{display:flex;align-items:center;gap:10px;padding:20px 22px 12px;
+  border-bottom:1px solid var(--line-2)}
+.feed-rows{padding:8px 10px 12px;overflow:hidden;flex:1}
+.frow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:baseline;
+  padding:9px 12px;border-radius:12px;font-family:var(--mono);font-size:12px}
+.frow:nth-child(odd){background:rgba(255,255,255,.02)}
+.frow b{color:var(--text);font-weight:600}
+.frow span{color:var(--faint);font-size:11px}
+.frow em{font-style:normal;color:var(--green);font-weight:700;text-align:right}
+.frow.new{animation:pop .6s var(--ease)}
+@keyframes pop{
+  0%{opacity:0;transform:translateY(-8px);background:rgba(0,200,5,.22)}
+  100%{opacity:1;transform:none}
+}
+.feed-empty{padding:36px 22px;color:var(--faint);font-family:var(--mono);font-size:11px;
+  letter-spacing:.1em;text-align:center}
+
+/* ---------- banda de sanatate ---------- */
+.health{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:26px}
+.hp{display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--line);
+  border-radius:999px;background:rgba(255,255,255,.02);font-family:var(--mono);font-size:11px;
+  letter-spacing:.08em;color:var(--dim);white-space:nowrap}
+.hp b{color:var(--text);font-weight:600}
+.hp.warn{border-color:rgba(255,184,0,.5);color:#ffb800}
+.hp.bad{border-color:var(--red);color:var(--red)}
+
+/* ---------- restanta ---------- */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{border:1px solid var(--line);border-radius:20px;padding:24px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.card h3{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);font-weight:500;margin-bottom:16px}
+.big-line{font-size:19px;line-height:1.4}
+.big-line b{font-family:var(--mono);color:var(--green);font-weight:700}
+.owners{margin-top:18px;display:grid;gap:10px}
+.owner{display:grid;grid-template-columns:1fr auto;gap:12px;font-family:var(--mono);font-size:12px;
+  color:var(--dim);padding-top:10px;border-top:1px solid var(--line-2)}
+.owner b{color:var(--green);font-weight:600}
+
+.bars{display:grid;gap:12px}
 .bar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;font-size:14px}
 .bar i{display:block;height:4px;background:var(--green);border-radius:2px;opacity:.55;margin-top:7px}
 .bar span{font-family:var(--mono);font-size:12px;color:var(--faint)}
-footer{margin-top:44px;color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.12em}
 
+h2{margin:34px 0 14px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);font-family:var(--mono);font-weight:500}
+.msg{margin:0 0 16px;min-height:16px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.1em;color:var(--faint)}
+.msg.ok{color:var(--green)}
+.msg.err{color:var(--red)}
+footer{margin-top:40px;color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.12em}
+/* tabelul lat isi deruleaza propriul container; pagina nu iese niciodata din ecran */
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tscroll table{min-width:620px}
+
+@media (max-width:900px){
+  .hero,.two{grid-template-columns:1fr}
+}
 @media (max-width:620px){
   .grid{grid-template-columns:1fr 1fr}
-  /* cand raman impare, ultima ocupa randul intreg: o jumatate goala arata a
-     ceva neterminat, nu a spatiu */
   .cell:last-child:nth-child(odd){grid-column:1 / -1}
   .cell{padding:16px 14px}
-  .cell b{font-size:22px}
   .spacer{display:none}
-  /* butonul de oprit trece pe rand propriu, pe toata latimea: e cel mai
-     important lucru de pe ecran si trebuie nimerit cu degetul */
-  header .btn{width:100%;order:9;height:50px}
+  /* Antetul NU mai e lipit pe telefon: cu trei butoane in el manca un sfert
+     din ecran, permanent. In schimb oprirea devine buton plutitor, jos, in
+     zona degetului mare, si e mereu la indemana fara sa ocupe nimic sus. */
+  /* backdrop-filter creeaza bloc de contineare pentru copiii pozitionati fix,
+     deci butonul plutitor ar ramane agatat de antet in loc sa stea jos pe
+     ecran. Pe telefon antetul nu mai e lipit, deci nici blurul nu are rost. */
+  header{position:static;gap:8px;padding:14px 0;
+    background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
+  header .btn{flex:1 1 auto;height:42px}
+  header .btn.stop{position:fixed;left:14px;right:14px;bottom:14px;z-index:60;
+    height:52px;flex:none;box-shadow:0 12px 34px rgba(0,0,0,.7);
+    background:rgba(0,0,0,.86);backdrop-filter:blur(12px)}
+  header .btn.stop.btn-danger:hover{background:var(--red)}
+  .page{padding-bottom:96px}
+  .net{padding:20px 18px 0}
   th,td{padding-left:10px;padding-right:10px}
   td.m,td.g{font-size:12px;white-space:nowrap}
 }
@@ -63,44 +131,64 @@ footer{margin-top:44px;color:var(--faint);font-family:var(--mono);font-size:10px
 <body>
 ${LAYERS_HTML}
 <div class="wrap page">
+
   <header>
     <span class="brand">${BRAND_MARK} COURIER</span>
     <span class="chip"><i class="dot" id="dot"></i><span id="state">CONNECTING</span></span>
-    <span class="chip faint" id="mode">--</span>
     <span class="spacer"></span>
-    <button class="btn" id="toggle" disabled>--</button>
+    <button class="btn" id="dry" disabled>Proba uscata</button>
+    <button class="btn" id="now" disabled>Ruleaza acum</button>
+    <button class="btn stop" id="toggle" disabled>--</button>
   </header>
 
   <p class="msg" id="msg"></p>
 
-  <h2>Ultimele 24 de ore</h2>
-  <div class="grid" id="day"></div>
+  <section class="hero">
+    <div class="hero-card">
+      <div class="net">
+        <p class="eyebrow" id="net-label">Net astazi</p>
+        <b id="net">0.0000</b>
+        <div class="under">
+          <span>incasat <i id="u-earned">0</i></span>
+          <span>gaz <i id="u-gas">0</i></span>
+          <span>livrari <i id="u-count">0</i></span>
+          <span>valoare <i id="u-value">0</i></span>
+        </div>
+      </div>
+      <canvas class="spark" id="spark"></canvas>
+    </div>
 
-  <h2>De la inceput</h2>
-  <div class="grid" id="all"></div>
+    <div class="hero-card feed">
+      <div class="feed-top"><i class="dot"></i><span class="mono faint">Livrari, in direct</span></div>
+      <div class="feed-rows" id="feed"></div>
+      <div class="feed-empty" id="feed-empty" hidden>NICIO LIVRARE INCA</div>
+    </div>
+  </section>
 
-  <h2>Lantul si operatorul</h2>
-  <div class="grid" id="chain"></div>
+  <div class="health" id="health"></div>
+
+  <div class="two">
+    <div class="card">
+      <h3>Restanta</h3>
+      <p class="big-line" id="backlog">--</p>
+      <div class="owners" id="owners"></div>
+    </div>
+    <div class="card">
+      <h3>De ce nu s-a livrat</h3>
+      <div class="bars" id="skips"></div>
+      <p class="mono faint" id="skips-empty" hidden>NIMIC SARIT</p>
+    </div>
+  </div>
 
   <h2>Rulari</h2>
   <div class="panel">
+    <div class="tscroll">
     <table>
       <thead><tr><th>Rulare</th><th>Mod</th><th>Scanat</th><th>Livrat</th><th>Gaz</th><th>Bacsis</th></tr></thead>
       <tbody id="runs"></tbody>
     </table>
+    </div>
     <div class="empty" id="runs-empty" hidden>NICIO RULARE INCA</div>
-  </div>
-
-  <h2>De ce nu s-a livrat</h2>
-  <div class="panel"><div class="bars" id="skips"></div><div class="empty" id="skips-empty" hidden>NIMIC SARIT</div></div>
-
-  <h2>Ultimele livrari</h2>
-  <div class="panel">
-    <table>
-      <thead><tr><th>Broker</th><th>Portofel</th><th>Cand</th><th>Valoare</th></tr></thead>
-      <tbody id="deliveries"></tbody>
-    </table>
-    <div class="empty" id="deliveries-empty" hidden>NICIO LIVRARE INCA</div>
   </div>
 
   <footer id="foot">COURIER CONSOLE</footer>
@@ -117,84 +205,210 @@ const ago = t => {
   if (s < 86400) return Math.floor(s/3600) + 'h';
   return Math.floor(s/86400) + 'd';
 };
-let paused = null;
-let explorer = '';
-let armed = false;
-let armTimer = null;
+const mmss = s => Math.floor(s/60) + ':' + String(Math.max(0, s % 60)).padStart(2, '0');
 
-function tiles(node, items) {
-  node.replaceChildren();
-  for (const it of items) {
-    const c = document.createElement('div'); c.className = 'cell';
-    const b = document.createElement('b'); b.textContent = it.value;
-    if (it.tone) b.className = it.tone;
-    const s = document.createElement('span'); s.textContent = it.label;
-    c.append(b, s); node.appendChild(c);
+let paused = null, armed = false, armTimer = null, explorer = '', symbol = 'ETH';
+let nextRunAt = null, seenFeed = new Set(), first = true, netShown = 0;
+
+/* ---------- numarul erou, care se rostogoleste ---------- */
+function setNet(v){
+  const el = $('net');
+  el.classList.toggle('red', v < 0);
+  const from = netShown, to = v, t0 = performance.now(), dur = 700;
+  const step = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 3);
+    const val = from + (to - from) * e;
+    el.textContent = (val >= 0 ? '+' : '') + num(val, 4);
+    if (p < 1) requestAnimationFrame(step);
+    else netShown = to;
+  };
+  if (document.hidden) { el.textContent = (to >= 0 ? '+' : '') + num(to, 4); netShown = to; }
+  else requestAnimationFrame(step);
+}
+
+/* ---------- graficul celor sapte zile ---------- */
+function drawSpark(series){
+  const c = $('spark'), ctx = c.getContext('2d');
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = c.clientWidth, h = c.clientHeight;
+  if (!w || !h) return;
+  c.width = w * dpr; c.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!series.length) return;
+
+  const vals = series.map(s => s.netEth);
+  const max = Math.max(...vals, 0), min = Math.min(...vals, 0);
+  /* cand toate zilele sunt zero, span 0 ar lipi linia de marginea de jos si ar
+     arata a grafic stricat. Ii dam o inaltime falsa, ca linia sa stea la mijloc */
+  const span = (max - min) || Math.abs(max) || 1;
+  const pad = 14;
+  const x = i => pad + (i * (w - pad * 2)) / Math.max(1, series.length - 1);
+  const y = v => h - pad - ((v - min) / span) * (h - pad * 2);
+
+  /* linia lui zero, ca sa se vada semnul */
+  ctx.strokeStyle = 'rgba(255,255,255,.10)';
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(0, y(0)); ctx.lineTo(w, y(0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const path = new Path2D();
+  series.forEach((s, i) => i === 0 ? path.moveTo(x(i), y(s.netEth)) : path.lineTo(x(i), y(s.netEth)));
+
+  const fill = new Path2D();
+  fill.moveTo(x(0), y(0));
+  series.forEach((s, i) => fill.lineTo(x(i), y(s.netEth)));
+  fill.lineTo(x(series.length - 1), y(0));
+  fill.closePath();
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(0,200,5,.30)');
+  g.addColorStop(1, 'rgba(0,200,5,0)');
+  ctx.fillStyle = g; ctx.fill(fill);
+
+  ctx.strokeStyle = '#00c805'; ctx.lineWidth = 2;
+  ctx.shadowColor = 'rgba(0,200,5,.7)'; ctx.shadowBlur = 12;
+  ctx.stroke(path);
+  ctx.shadowBlur = 0;
+
+  const last = series[series.length - 1];
+  ctx.beginPath(); ctx.arc(x(series.length - 1), y(last.netEth), 3.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#00ff2b'; ctx.fill();
+}
+
+/* ---------- banda de sanatate ---------- */
+function health(s){
+  const box = $('health');
+  box.replaceChildren();
+  const pill = (label, value, tone) => {
+    const n = document.createElement('span');
+    n.className = 'hp' + (tone ? ' ' + tone : '');
+    n.append(document.createTextNode(label + ' '));
+    const b = document.createElement('b'); b.textContent = value;
+    n.appendChild(b);
+    box.appendChild(n);
+  };
+  pill('LANT', String(s.chainId) + (s.latencyMs != null ? ' · ' + s.latencyMs + 'ms' : ''),
+    s.latencyMs == null ? 'bad' : s.latencyMs > 1500 ? 'warn' : '');
+  pill('BLOC', s.block ?? '--', s.block ? '' : 'bad');
+  pill('MOD', String(s.mode).toUpperCase() + (s.dryRun ? ' · USCAT' : ''), s.dryRun ? 'warn' : '');
+  pill('OPERATOR', s.operator ? num(s.operatorBalanceEth, 4) + ' ' + s.symbol : 'fara cheie',
+    s.operatorLow ? 'bad' : '');
+  pill('ULTIMA RULARE', s.lastRunAt ? ago(s.lastRunAt) + ' in urma' : 'niciodata');
+  const nextEl = document.createElement('span');
+  nextEl.className = 'hp'; nextEl.id = 'next-pill';
+  nextEl.append(document.createTextNode('URMATOAREA '));
+  const nb = document.createElement('b'); nb.id = 'next-b';
+  nb.textContent = s.running ? 'ACUM' : (s.nextRunAt ? mmss(s.nextRunAt - Math.floor(Date.now()/1000)) : '--');
+  nextEl.appendChild(nb);
+  box.appendChild(nextEl);
+}
+
+setInterval(() => {
+  const b = document.getElementById('next-b');
+  if (b && nextRunAt) {
+    const left = nextRunAt - Math.floor(Date.now()/1000);
+    b.textContent = left > 0 ? mmss(left) : 'ACUM';
   }
+}, 1000);
+
+/* ---------- fluxul ---------- */
+function feed(rows){
+  const box = $('feed');
+  $('feed-empty').hidden = rows.length > 0;
+  const keys = rows.map(r => r.tokenId + ':' + r.at);
+  box.replaceChildren();
+  rows.slice(0, 7).forEach((r, i) => {
+    const key = keys[i];
+    const row = document.createElement('div');
+    row.className = 'frow' + (!first && !seenFeed.has(key) ? ' new' : '');
+    const b = document.createElement('b'); b.textContent = '#' + r.tokenId;
+    const s = document.createElement('span'); s.textContent = short(r.wallet) + ' · ' + ago(r.at);
+    const em = document.createElement('em'); em.textContent = '+' + num(r.valueEth, 4);
+    row.append(b, s, em);
+    box.appendChild(row);
+  });
+  seenFeed = new Set(keys);
 }
 
-function rows(tbody, emptyEl, list, build) {
-  tbody.replaceChildren();
-  for (const item of list) tbody.appendChild(build(item));
-  emptyEl.hidden = list.length > 0;
-}
-
-function td(text, cls) { const n = document.createElement('td'); if (cls) n.className = cls; n.textContent = text; return n; }
-
-async function load() {
+async function load(){
   let s;
-  try {
+  try{
     const r = await fetch('/api/state', {headers: {accept: 'application/json'}});
     if (r.status === 401) { location.href = '/login'; return; }
     s = await r.json();
-  } catch {
+  }catch{
     $('state').textContent = 'FARA LEGATURA';
     $('dot').className = 'dot off';
     return;
   }
 
-  explorer = s.explorer || '';
-  paused = s.paused;
-  $('state').textContent = s.paused ? 'OPRIT' : (s.dryRun ? 'RULARE USCATA' : 'MERGE');
+  explorer = s.explorer || ''; symbol = s.symbol; paused = s.paused; nextRunAt = s.nextRunAt;
+
+  $('state').textContent = s.running ? 'RULEAZA' : s.paused ? 'OPRIT' : (s.dryRun ? 'RULARE USCATA' : 'MERGE');
   $('dot').className = 'dot' + (s.paused ? ' off' : (s.dryRun ? ' warn' : ''));
-  $('mode').textContent = 'MOD ' + String(s.mode).toUpperCase();
+
   const t = $('toggle');
   t.disabled = false;
-  /* Cat timp butonul asteapta confirmarea, reimprospatarea NU are voie sa il
-     atinga: altfel scrie peste "Sigur? Apasa iar", omul crede ca primul clic
-     nu a intrat, si al doilea lui clic ajunge sa confirme fara sa mai fi vazut
-     intrebarea. */
   if (!armed) {
     t.textContent = s.paused ? 'Porneste' : 'Opreste acum';
-    t.className = s.paused ? 'btn btn-solid' : 'btn btn-danger';
+    t.className = 'btn stop ' + (s.paused ? 'btn-solid' : 'btn-danger');
+  }
+  $('dry').disabled = !s.canRun || s.running;
+  $('now').disabled = !s.canRun || s.running || s.paused;
+
+  setNet(s.day.netEth);
+  $('u-earned').textContent = num(s.day.earnedEth) + ' ' + s.symbol;
+  $('u-gas').textContent = num(s.day.gasEth) + ' ' + s.symbol;
+  $('u-count').textContent = s.day.deliveries;
+  $('u-value').textContent = num(s.day.deliveredEth, 3) + ' ' + s.symbol;
+  drawSpark(s.series || []);
+  health(s);
+  feed(s.deliveries || []);
+
+  const b = $('backlog');
+  b.replaceChildren();
+  if (s.wall.count > 0) {
+    b.append(document.createTextNode(s.wall.count + ' portofele tin '));
+    const v = document.createElement('b'); v.textContent = num(s.wall.valueEth, 3) + ' ' + s.symbol;
+    b.appendChild(v);
+    b.append(document.createTextNode('. Golirea lor costa aproximativ '));
+    const c = document.createElement('b'); c.textContent = num(s.backlogCostEth, 5) + ' ' + s.symbol;
+    b.appendChild(c);
+    b.append(document.createTextNode('.'));
+  } else {
+    b.textContent = 'Nimic nerevendicat. Totul e livrat.';
   }
 
-  tiles($('day'), [
-    {value: String(s.day.deliveries), label: 'livrari'},
-    {value: num(s.day.deliveredEth, 3), label: 'valoare livrata ' + s.symbol},
-    {value: num(s.day.earnedEth), label: 'bacsis incasat', tone: 'green'},
-    {value: num(s.day.gasEth), label: 'gaz ars'},
-    {value: num(s.day.netEth), label: 'net', tone: s.day.netEth < 0 ? 'red' : 'green'}
-  ]);
-  tiles($('all'), [
-    {value: String(s.all.deliveries), label: 'livrari'},
-    {value: String(s.all.wallets), label: 'portofele atinse'},
-    {value: num(s.all.deliveredEth, 3), label: 'valoare livrata'},
-    {value: num(s.all.netEth), label: 'net', tone: s.all.netEth < 0 ? 'red' : 'green'},
-    {value: String(s.wall.count), label: 'inca nerevendicate'}
-  ]);
-  tiles($('chain'), [
-    {value: String(s.chainId), label: 'lant'},
-    {value: s.block ? String(s.block) : '--', label: 'bloc'},
-    {value: s.operator ? num(s.operatorBalanceEth, 4) : 'fara cheie', label: 'sold operator ' + s.symbol,
-     tone: s.operatorLow ? 'red' : (s.operator ? '' : 'soft')},
-    {value: s.operator ? short(s.operator) : 'doar citire', label: 'operator',
-     tone: s.operator ? '' : 'soft'},
-    {value: num(s.wall.valueEth, 3), label: 'valoare nerevendicata'}
-  ]);
+  const ow = $('owners');
+  ow.replaceChildren();
+  for (const o of s.topOwners || []) {
+    const row = document.createElement('div'); row.className = 'owner';
+    const left = document.createElement('span');
+    left.textContent = short(o.owner) + ' · ' + o.wallets + (o.wallets === 1 ? ' broker' : ' brokeri');
+    const right = document.createElement('b'); right.textContent = num(o.valueEth, 3);
+    row.append(left, right); ow.appendChild(row);
+  }
 
-  rows($('runs'), $('runs-empty'), s.runs, r => {
+  const skips = $('skips');
+  skips.replaceChildren();
+  const max = Math.max(1, ...(s.skips || []).map(x => x.count));
+  for (const k of s.skips || []) {
+    const row = document.createElement('div'); row.className = 'bar';
+    const left = document.createElement('div');
+    const label = document.createElement('div'); label.textContent = k.reason;
+    const bar = document.createElement('i'); bar.style.width = Math.round((k.count / max) * 100) + '%';
+    left.append(label, bar);
+    const n = document.createElement('span'); n.textContent = k.count;
+    row.append(left, n); skips.appendChild(row);
+  }
+  $('skips-empty').hidden = (s.skips || []).length > 0;
+
+  const body = $('runs');
+  body.replaceChildren();
+  for (const r of s.runs || []) {
     const tr = document.createElement('tr');
+    const td = (txt, cls) => { const n = document.createElement('td'); if (cls) n.className = cls; n.textContent = txt; return n; };
     tr.append(
       td('#' + r.id + '  ' + ago(r.startedAt) + ' in urma', 'm'),
       td(r.dry ? r.mode + ' (uscat)' : r.mode, 'm'),
@@ -204,69 +418,53 @@ async function load() {
       td(num(r.tipsEth), 'g')
     );
     if (r.note) tr.title = r.note;
-    return tr;
-  });
-
-  const skips = $('skips');
-  skips.replaceChildren();
-  const max = Math.max(1, ...s.skips.map(x => x.count));
-  for (const k of s.skips) {
-    const row = document.createElement('div'); row.className = 'bar';
-    const left = document.createElement('div');
-    const label = document.createElement('div'); label.textContent = k.reason;
-    const bar = document.createElement('i'); bar.style.width = Math.round((k.count / max) * 100) + '%';
-    left.append(label, bar);
-    const n = document.createElement('span'); n.textContent = k.count;
-    row.append(left, n); skips.appendChild(row);
+    body.appendChild(tr);
   }
-  $('skips-empty').hidden = s.skips.length > 0;
+  $('runs-empty').hidden = (s.runs || []).length > 0;
 
-  rows($('deliveries'), $('deliveries-empty'), s.deliveries, d => {
-    const tr = document.createElement('tr');
-    const w = document.createElement('td'); w.className = 'm';
-    if (explorer) {
-      const a = document.createElement('a');
-      a.href = explorer + '/address/' + d.wallet; a.target = '_blank'; a.rel = 'noopener';
-      a.textContent = short(d.wallet); w.appendChild(a);
-    } else w.textContent = short(d.wallet);
-    tr.append(td('#' + d.tokenId, 'm'), w, td(ago(d.at) + ' in urma', 'm'), td(num(d.valueEth), 'g'));
-    return tr;
-  });
-
+  if (s.lastOutcome) {
+    const o = s.lastOutcome;
+    $('net-label').textContent = o.dry
+      ? 'Net astazi · ultima proba uscata: ' + o.delivered + ' din ' + o.candidates
+      : 'Net astazi';
+  }
   $('foot').textContent = 'COURIER CONSOLE · ACTUALIZAT ' + new Date().toLocaleTimeString('en-GB');
+  first = false;
 }
 
-$('toggle').addEventListener('click', async () => {
+async function post(path, okText){
   const msg = $('msg');
+  try{
+    const r = await fetch(path, {method: 'POST'});
+    const j = await r.json();
+    msg.className = r.ok ? 'msg ok' : 'msg err';
+    msg.textContent = r.ok ? okText : (j.error || 'NU A MERS').toUpperCase();
+  }catch{
+    msg.className = 'msg err'; msg.textContent = 'NU A MERS';
+  }
+  await load();
+}
+
+$('dry').addEventListener('click', () => post('/api/run?dry=1', 'PROBA USCATA CERUTA. NU PLEACA NICIO TRANZACTIE.'));
+$('now').addEventListener('click', () => post('/api/run', 'RULARE CERUTA.'));
+
+$('toggle').addEventListener('click', async () => {
   const btn = $('toggle');
-  /* Oprirea merge dintr-un singur clic: in incident nu vrei sa te intrebe
-     nimic. Pornirea cere doua clicuri, ca sa nu repornesti din greseala ceva
-     ce a fost oprit dintr-un motiv. Confirmarea sta in buton, nu intr-o
-     fereastra de sistem: aia blocheaza pagina si nu se poate stiliza. */
+  /* oprirea merge dintr-un clic: in incident nu vrei sa te intrebe nimic.
+     pornirea cere doua, ca sa nu repornesti din greseala ceva oprit dintr-un
+     motiv. Confirmarea sta in buton, nu intr-o fereastra de sistem. */
   if (paused && !armed) {
     armed = true;
     btn.textContent = 'Sigur? Apasa iar';
     clearTimeout(armTimer);
-    /* zece secunde, nu patru: cat sa citesti si sa te razgandesti. Prea scurt
-       si omul apasa, ezita, apasa iar, iar al doilea clic doar rearmeaza. Pare
-       buton stricat. */
     armTimer = setTimeout(() => { armed = false; btn.textContent = 'Porneste'; }, 10000);
     return;
   }
-  clearTimeout(armTimer);
-  armed = false;
-  btn.disabled = true;
-  try {
-    const r = await fetch(paused ? '/api/resume' : '/api/pause', {method: 'POST'});
-    const j = await r.json();
-    msg.className = r.ok ? 'msg ok' : 'msg err';
-    msg.textContent = r.ok ? (j.paused ? 'OPRIT. NU MAI PLEACA NICIO TRANZACTIE.' : 'PORNIT.') : (j.error || 'NU A MERS');
-  } catch {
-    msg.className = 'msg err'; msg.textContent = 'NU A MERS';
-  }
-  await load();
+  clearTimeout(armTimer); armed = false; btn.disabled = true;
+  await post(paused ? '/api/resume' : '/api/pause', paused ? 'PORNIT.' : 'OPRIT. NU MAI PLEACA NICIO TRANZACTIE.');
 });
 
+addEventListener('resize', () => { const c = $('spark'); if (c) load(); });
 load();
 setInterval(load, 5000);
 </script>

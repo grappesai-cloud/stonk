@@ -164,3 +164,63 @@ describe('cele doua actiuni care scriu', () => {
     expect(r.status).toBe(404)
   })
 })
+
+describe('rularea ceruta din consola', () => {
+  const auth = { authorization: `Bearer ${TOKEN}` }
+
+  it('fara bucla pornita, cererea e refuzata si spune ce sa faci', async () => {
+    const r = await fetch(`${base}/api/run`, { method: 'POST', headers: auth })
+    expect(r.status).toBe(409)
+    const j = (await r.json()) as { error: string }
+    expect(j.error).toMatch(/courier start/)
+  })
+
+  it('cu bucla pornita, cererea intra si ajunge la ea', async () => {
+    ctx.control.attached = true
+    const r = await fetch(`${base}/api/run?dry=1`, { method: 'POST', headers: auth })
+    expect(r.status).toBe(200)
+    const taken = ctx.control.take()
+    expect(taken).toEqual({ dry: true })
+    ctx.control.attached = false
+  })
+
+  it('nu cere o rulare cand deja ruleaza una', async () => {
+    ctx.control.attached = true
+    ctx.control.running = true
+    const r = await fetch(`${base}/api/run`, { method: 'POST', headers: auth })
+    expect(r.status).toBe(409)
+    ctx.control.running = false
+    ctx.control.attached = false
+  })
+
+  it('nu se poate cere fara jeton', async () => {
+    ctx.control.attached = true
+    const r = await fetch(`${base}/api/run`, { method: 'POST' })
+    expect(r.status).toBe(401)
+    expect(ctx.control.take()).toBe(null)
+    ctx.control.attached = false
+  })
+
+  it('starea spune daca butonul are cui sa vorbeasca', async () => {
+    const s1 = (await (await fetch(`${base}/api/state`, { headers: auth })).json()) as { canRun: boolean }
+    expect(s1.canRun).toBe(false)
+    ctx.control.attached = true
+    const s2 = (await (await fetch(`${base}/api/state`, { headers: auth })).json()) as { canRun: boolean }
+    expect(s2.canRun).toBe(true)
+    ctx.control.attached = false
+  })
+})
+
+describe('somnul buclei', () => {
+  it('se rupe cand cineva apasa butonul, fara sa astepte intervalul', async () => {
+    const { Controller } = await import('../../src/control.js')
+    const c = new Controller()
+    c.attached = true
+    const t0 = Date.now()
+    const sleeping = c.sleep(60_000)
+    setTimeout(() => c.request(false), 40)
+    await sleeping
+    expect(Date.now() - t0).toBeLessThan(3_000)
+    expect(c.take()).toEqual({ dry: false })
+  })
+})

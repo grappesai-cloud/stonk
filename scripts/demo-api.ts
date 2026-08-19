@@ -10,6 +10,7 @@ import { Telegram } from '../src/alerts/telegram.js'
 import { publicClientOf } from '../src/chain/client.js'
 import { createApi } from '../src/api/server.js'
 import { createConsole } from '../src/console/server.js'
+import { Controller } from '../src/control.js'
 
 const cfg = loadConfig('./config/robinhood.example.json')
 cfg.storage.file = ':memory:'
@@ -77,7 +78,9 @@ cfg.console.token = 'demo'
 cfg.console.port = 8789
 cfg.alerts.telegram.gasLowWei = parseEther('0.01')
 
-const ctx = { cfg, client: publicClientOf(cfg), account: null, wallet: null, ledger, tg: new Telegram(cfg, ledger) }
+const control = new Controller()
+/* in demo nu exista bucla, deci butoanele de rulare raman inactive, cum trebuie */
+const ctx = { cfg, client: publicClientOf(cfg), account: null, wallet: null, ledger, tg: new Telegram(cfg, ledger), control }
 createApi(ctx).listen(cfg.api.port, '127.0.0.1', () => {
   process.stdout.write(`peretele pe http://127.0.0.1:${cfg.api.port}/\n`)
 })

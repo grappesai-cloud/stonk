@@ -413,6 +413,65 @@ export class Ledger {
     return rows.map((r) => ({ reason: r.reason, count: r.c }))
   }
 
+  /** serie zilnica pentru grafic: ce s-a livrat, castigat si ars pe zi */
+  dailySeries(days = 7): Array<{ day: number; deliveries: number; valueWei: bigint; tipsWei: bigint; gasWei: bigint }> {
+    const since = Math.floor(Date.now() / 1000) - days * 86400
+    const rows = this.db
+      .prepare(
+        `SELECT created_at, value_wei, tip_wei, gas_wei FROM deliveries
+         WHERE created_at >= ? AND status IN ('sent','confirmed')`
+      )
+      .all(since) as Array<{ created_at: number; value_wei: string; tip_wei: string; gas_wei: string }>
+
+    const buckets = new Map<number, { deliveries: number; valueWei: bigint; tipsWei: bigint; gasWei: bigint }>()
+    const dayOf = (t: number) => Math.floor(t / 86400)
+    const today = dayOf(Math.floor(Date.now() / 1000))
+    for (let i = days - 1; i >= 0; i--) {
+      buckets.set(today - i, { deliveries: 0, valueWei: 0n, tipsWei: 0n, gasWei: 0n })
+    }
+    for (const r of rows) {
+      const key = dayOf(r.created_at)
+      const b = buckets.get(key)
+      if (!b) continue
+      b.deliveries++
+      b.valueWei += BigInt(r.value_wei)
+      b.tipsWei += BigInt(r.tip_wei)
+      b.gasWei += BigInt(r.gas_wei)
+    }
+    return [...buckets.entries()].map(([day, v]) => ({ day, ...v }))
+  }
+
+  /** cine are cei mai multi bani uitati: material de marketing, nu de operare */
+  topOwners(limit = 5): Array<{ owner: string; wallets: number; valueWei: bigint }> {
+    const rows = this.db
+      .prepare(
+        `SELECT owner, COUNT(*) AS c, value_wei FROM claims
+         WHERE delivered_at IS NULL AND value_wei != '0' AND owner IS NOT NULL
+         GROUP BY owner`
+      )
+      .all() as Array<{ owner: string; c: number }>
+    const totals = new Map<string, { wallets: number; valueWei: bigint }>()
+    const all = this.db
+      .prepare(`SELECT owner, value_wei FROM claims WHERE delivered_at IS NULL AND value_wei != '0' AND owner IS NOT NULL`)
+      .all() as Array<{ owner: string; value_wei: string }>
+    for (const r of all) {
+      const cur = totals.get(r.owner) ?? { wallets: 0, valueWei: 0n }
+      cur.wallets++
+      cur.valueWei += BigInt(r.value_wei)
+      totals.set(r.owner, cur)
+    }
+    void rows
+    return [...totals.entries()]
+      .map(([owner, v]) => ({ owner, ...v }))
+      .sort((a, b) => (a.valueWei > b.valueWei ? -1 : a.valueWei < b.valueWei ? 1 : 0))
+      .slice(0, limit)
+  }
+
+  lastRunAt(): number | null {
+    const r = this.db.prepare('SELECT MAX(started_at) AS t FROM runs').get() as { t: number | null }
+    return r?.t ?? null
+  }
+
   // -------------------------------------------------------------- watchers
   addWatcher(chatId: string, address: string, label: string | null): void {
     this.db

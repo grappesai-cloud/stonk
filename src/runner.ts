@@ -161,11 +161,23 @@ export async function runOnce(ctx: Ctx): Promise<RunOutcome> {
 /** bucla, cu jitter ca sa nu batem RPC-ul in acelasi moment cu toata lumea */
 export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Promise<void> {
   const { intervalSec, jitterSec } = ctx.cfg.runner
+  const control = ctx.control
   let consecutiveFailures = 0
+  control.attached = true
+  const savedDry = ctx.cfg.execution.dryRun
 
   while (true) {
+    /* o cerere din consola poate cere explicit rulare uscata, fara sa schimbe
+       configurarea de fond */
+    const asked = control.take()
+    const dryThisRun = asked ? asked.dry : savedDry
+    ctx.cfg.execution.dryRun = dryThisRun
+    control.running = true
+    control.nextRunAt = null
+
     try {
       const o = await runOnce(ctx)
+      control.finished(o, dryThisRun)
       onRun?.(o)
       consecutiveFailures = 0
       log.info(
@@ -182,11 +194,20 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
       consecutiveFailures++
       log.error({ err: (e as Error).message, consecutiveFailures }, 'rulare picata')
       if (consecutiveFailures >= ctx.cfg.execution.maxConsecutiveFailures) {
+        control.running = false
+        control.attached = false
         log.fatal('prea multe rulari picate la rand, ma opresc')
         throw e
       }
+    } finally {
+      control.running = false
+      ctx.cfg.execution.dryRun = savedDry
     }
+
     const jitter = Math.floor(Math.random() * (jitterSec + 1))
-    await new Promise((r) => setTimeout(r, (intervalSec + jitter) * 1000))
+    const waitMs = (intervalSec + jitter) * 1000
+    control.nextRunAt = Math.floor((Date.now() + waitMs) / 1000)
+    /* somnul se rupe daca cineva apasa butonul din consola */
+    await control.sleep(waitMs)
   }
 }

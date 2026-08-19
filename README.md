@@ -221,16 +221,27 @@ Cand se schimba tema pe site, se schimba acolo.
 `courier console`, sau pornita odata cu `start`. Acelasi limbaj vizual ca
 site-ul: negru, un singur verde, cifre monospace.
 
-Arata ce face botul acum, profitul si pierderea pe 24 de ore si de la inceput,
-lantul si soldul operatorului, ultimele rulari, ultimele livrari, si
-**de ce nu s-a livrat**, grupat pe motive. Ultima e cea mai folosita in
-productie: intrebarea nu e niciodata "ce a livrat", e "de ce nu".
+Compozitia raspunde la trei intrebari, in ordinea asta:
 
-![consola, partea de sus](docs/consola-sus.jpg)
-![consola, partea de jos](docs/consola-jos.jpg)
+1. **Fac bani acum?** Un singur numar erou, netul zilei, verde sau rosu, cu
+   graficul ultimelor sapte zile sub el. Cand toate cifrele au aceeasi marime,
+   ochiul nu stie unde sa se uite si panoul devine un tabel cu ambitii.
+2. **E sanatos?** O banda de pastile: lantul si latenta lui, blocul, modul,
+   soldul operatorului, ultima rulare, numaratoarea pana la urmatoarea.
+3. **Cat mai am de facut?** Restanta, scrisa ca propozitie, cu costul estimat
+   al golirii ei la gazul de acum, plus cine are cei mai multi bani uitati.
 
-Pe telefon butonul de oprit trece pe rand propriu, pe toata latimea, fiindca e
-cel mai important lucru de pe ecran si trebuie nimerit cu degetul:
+Langa numarul erou sta **fluxul de livrari in direct**, cu randuri noi care
+intra cu o sclipire verde. Mai jos, **de ce nu s-a livrat**, grupat pe motive:
+in productie intrebarea nu e niciodata "ce a livrat", e "de ce nu".
+
+Trei butoane sus: **proba uscata** (calculeaza tot si nu trimite nimic),
+**ruleaza acum** (rupe somnul buclei si porneste imediat) si **opreste**.
+
+![consola](docs/consola-sus.jpg)
+
+Pe telefon antetul nu mai e lipit, iar oprirea devine **buton plutitor jos**, in
+zona degetului mare, mereu la indemana fara sa manance din ecran:
 
 ![consola pe telefon](docs/consola-mobil.jpg)
 
@@ -242,10 +253,11 @@ noaptea vrei sa opresti de pe telefon, nu sa cauti laptopul si cheia de SSH.
 - consola sta pe **alt port** decat API-ul public, legat implicit pe
   `127.0.0.1`, cu jeton din mediu (`CONSOLE_TOKEN`)
 - **API-ul public ramane strict citire.** Tot ce scrie sta aici
-- si aici scriu doar doua lucruri, si amandoua inseamna acelasi fisier:
-  **opreste** si **porneste**. Nu atinge chei, nu semneaza, nu schimba politici,
-  nu muta bani. Nu exista nicio alta ruta care scrie, si exista un test care
-  incearca sa gaseasca una
+- scriu doar trei lucruri: **opreste**, **porneste** si **cere o rulare**.
+  Primele doua inseamna acelasi fisier de oprire, a treia doar ridica un steag
+  pe care bucla il vede. Consola nu atinge chei, nu semneaza nimic, nu schimba
+  politici si nu muta bani. Nu exista nicio alta ruta care scrie, si exista un
+  test care incearca sa gaseasca una
 - oprirea merge dintr-un singur clic: in incident nu vrei sa te intrebe nimic.
   Pornirea cere doua, ca sa nu repornesti din greseala ceva oprit dintr-un motiv
 
