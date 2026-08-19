@@ -579,6 +579,42 @@ tine. Merge cu healthchecks.io, Uptime Kuma, BetterStack, orice ciocanitor.
 Optional `alerts.heartbeat.failUrl` pentru ca monitorul sa afle de o rulare
 cazuta acum, nu peste o fereastra intreaga.
 
+## Unde ruleaza acum
+
+**Pe server din 19.08**, nu pe laptop: Netcup, `root@<server>` (doar prin
+Tailscale), in `/root/stonk-courier`, `docker compose`, restart `unless-stopped`,
+Docker pornit la boot.
+
+Sta in **asteptare**, si asta e starea corecta: nu are inca adresele
+contractelor, deci nu scaneaza si nu semneaza nimic. Jurnalul spune exact ce
+lipseste. Cand adresele intra in `config/default.json`, porneste singur la
+ciclul urmator, fara redeploy.
+
+Registrul si copiile lui stau pe gazda ca fisiere normale (`data/`, montat in
+container), nu intr-un volum Docker: la o mutare le iei cu `scp`, nu cu
+arheologie prin volume.
+
+Ambele porturi sunt legate **doar pe loopback** pe gazda: nimic nu e expus in
+internet. La consola se ajunge prin tunel:
+
+```bash
+ssh -L 8789:127.0.0.1:8789 root@<server>
+# apoi http://127.0.0.1:8789 in browser
+# jetonul: ssh root@<server> 'grep CONSOLE_TOKEN /root/stonk-courier/.env'
+```
+
+Cheia operatorului **nu exista inca**, dinadins: se genereaza pe server cand
+trecem la livrare. Pana atunci nu are ce pierde.
+
+Cod nou pe server:
+
+```bash
+rsync -az --delete --exclude node_modules --exclude dist --exclude data \
+  --exclude .env --exclude contracts/out --exclude contracts/cache \
+  ./ root@<server>:/root/stonk-courier/
+ssh root@<server> 'cd /root/stonk-courier && docker compose up -d --build'
+```
+
 ## Desfasurare
 
 ```bash
