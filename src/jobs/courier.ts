@@ -57,7 +57,18 @@ export const CourierSchema = z.object({
   batchSize: z.number().int().positive().max(200).default(40),
 
   /** cate citiri intr-un multicall */
-  readChunk: z.number().int().positive().default(250),
+  readChunk: z.number().int().positive().default(500),
+
+  /**
+   * Citirea care spune daca un jeton mai are ceva de impartit.
+   *
+   * Fara ea, agentul intreaba pentru fiecare broker in parte pe fiecare jeton,
+   * si cu mii de brokeri ajunge sa bata RPC-ul de zeci de mii de ori pe
+   * rulare. Cu ea, un jeton fara rest se sare din UNA citire.
+   */
+  roundState: zCall.nullable().default(null),
+  /** campul cu ce a mai ramas de impartit */
+  remainingField: z.string().default('remaining'),
 
   event: z
     .object({
@@ -109,9 +120,30 @@ export const courier: Job<CourierJob> = {
     const abi = abiOf(job.claimable.signature, 'job.claimable')
     const fn = functionNameOf(abi)
 
+    /* Intai jetoanele care chiar au ceva de impartit. O citire pe jeton in loc
+       de mii, si pe langa economie e si corect: un jeton fara rest nu are ce
+       livra, oricat de multi brokeri ar avea. */
+    const live: Address[] = []
+    for (const token of job.tokens) {
+      if (!job.roundState) {
+        live.push(token)
+        continue
+      }
+      try {
+        const { pick } = await readCall(client, cfg.target.address, job.roundState, { gauge: token }, 'job.roundState')
+        if (asBig(pick(job.remainingField)) > 0n) live.push(token)
+      } catch {
+        /* daca nu se poate citi starea, nu presupunem ca e goala */
+        live.push(token)
+      }
+    }
+    if (live.length === 0) return []
+
     /* cat i se cuvine fiecarui broker, pe fiecare jeton */
     const owed = new Map<string, bigint>()
-    for (const token of job.tokens) {
+    let reads = 0
+    let failed = 0
+    for (const token of live) {
       const calls: Call[] = ids.map((id) => ({
         address: job.claimable.address ?? cfg.target.address,
         abi,
@@ -120,12 +152,27 @@ export const courier: Job<CourierJob> = {
       }))
       const res = await multiRead<unknown>(client, calls, { chunk: job.readChunk })
       res.forEach((r, i) => {
-        if (r.status !== 'success') return
+        reads++
+        if (r.status !== 'success') {
+          failed++
+          return
+        }
         const amount = asBig(r.result)
         if (amount === 0n) return
         const key = ids[i]!.toString()
         owed.set(key, (owed.get(key) ?? 0n) + amount)
       })
+    }
+    /**
+     * Citirile picate NU au voie sa arate ca un perete gol.
+     *
+     * Asta s-a intamplat pe server la prima rulare adevarata: RPC-ul a inceput
+     * sa refuze, toate citirile au picat, iar agentul a raportat linistit
+     * "nimic de facut". Un scan cazut si un perete gol arata identic in log si
+     * inseamna lucruri opuse, deci un scan cazut trebuie sa CADA.
+     */
+    if (failed > reads / 10) {
+      throw new Error(`${failed} of ${reads} claimable reads failed: the wall cannot be trusted this run, not reporting it as empty`)
     }
     if (owed.size === 0) return []
 

@@ -69,13 +69,23 @@
       "address": null
     },
     "batchSize": 40,
-    "readChunk": 250,
+    "readChunk": 500,
     "event": {
       "signature": "event ClockedIn(address token, uint64 round, uint256 tokenId, address wallet, uint256 amount)",
       "callerField": null,
       "idField": "tokenId",
       "amountField": "amount"
-    }
+    },
+    "roundState": {
+      "_": "o citire pe jeton, ca sa nu intrebam de mii de ori degeaba",
+      "signature": "function rounds(address token) view returns (uint64 round, uint64 startedAt, uint256 pot, uint256 remaining, uint256 totalWeight)",
+      "args": [
+        "$gauge"
+      ],
+      "field": null,
+      "address": null
+    },
+    "remainingField": "remaining"
   },
   "policy": {
     "mode": "campaign",
@@ -84,7 +94,7 @@
     "minStakeWei": "0",
     "requireMeasuredReward": false,
     "cooldownSec": 900,
-    "maxJobsPerRun": 20,
+    "maxJobsPerRun": 40,
     "batchSize": 1,
     "gasCapPerCall": "8000000",
     "maxGasPriceWei": null,
@@ -103,7 +113,7 @@
   },
   "runner": {
     "mode": "interval",
-    "intervalSec": 300,
+    "intervalSec": 600,
     "jitterSec": 30,
     "pollMs": 2000,
     "staleAfterSec": 1200,
