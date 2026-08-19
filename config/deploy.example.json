@@ -6,6 +6,7 @@
 
   "_payToken": "adresa lui $STONKBROKER",
   "payToken": "0x0000000000000000000000000000000000000000",
+  "_priceWei": "SUBSTITUENT. Pretul nu e decis si nu se decide aici: iese din venitul masurat in etapa 2. Vezi LAUNCH.md.",
   "priceWei": "100000000000000000000",
   "burnBps": 5000,
 
