@@ -202,6 +202,15 @@ export function createConsole(ctx: Ctx) {
           note: r.note
         })),
         skips: ledger.skipReasons(now - 7 * 86400),
+        events: ledger.recentEvents(14).map((e) => ({
+          at: e.at,
+          kind: e.kind,
+          tokenId: e.tokenId,
+          wallet: e.wallet,
+          valueEth: eth(e.valueWei),
+          tipEth: eth(e.tipWei),
+          reason: e.reason
+        })),
         deliveries: ledger.recentDeliveries(10).map((d) => ({
           tokenId: d.tokenId,
           wallet: d.wallet,

@@ -27,6 +27,7 @@ const rnd = (seed: number) => {
   }
 }
 const r = rnd(42)
+const r2 = rnd(7)
 const addr = (i: number) => ('0x' + (i * 7919).toString(16).padStart(40, 'c')).slice(0, 42)
 
 // nerevendicate
@@ -72,6 +73,15 @@ for (const [reason, n] of [['sub pragul de valoare', 31], ['pauza intre livrari'
     })
   }
 }
+
+/* Evenimentele primesc ceasuri diferite, imprastiate pe ultima ora, altfel
+   logul arata ca o singura secunda in care s-a intamplat tot. */
+const nowSec = Math.floor(Date.now() / 1000)
+const rows = ledger.raw().prepare('SELECT id FROM deliveries ORDER BY id').all() as Array<{ id: number }>
+const stamp = ledger.raw().prepare('UPDATE deliveries SET created_at=? WHERE id=?')
+/* imprastiate aleator pe ultima ora, ca livrarile si sariturile sa se
+   intrepatrunda, cum se intampla intr-o rulare adevarata */
+rows.forEach((r) => stamp.run(nowSec - Math.floor(r2() * 3600), r.id))
 
 cfg.console.enabled = true
 cfg.console.token = 'demo'

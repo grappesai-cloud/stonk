@@ -1,16 +1,15 @@
 /**
- * Peretele uitatilor, pe design-ul site-ului.
+ * Peretele uitatilor, piele de terminal.
  *
- * Foloseste aceeasi tema ca ~/stonk-agents: aceleasi fonturi, aceiasi tokeni,
- * aceleasi butoane si aceleasi straturi de fundal. Daca site-ul si pagina asta
- * ar arata diferit, omul ar simti ca sunt doua produse, si peretele nu ar mai
- * parea al proiectului.
+ * Aceeasi forma ca in consola: panouri cu titlul pe muchie, totul monospace,
+ * bare din blocuri. Diferenta e publicul: aici nu se comanda nimic, doar se
+ * vede cati bani zac nerevendicati chiar acum.
  *
- * Pagina e statica si isi ia datele singura din /wall, deci nu exista niciun
+ * Pagina e statica si isi ia datele din /wall si /stats, deci nu exista niciun
  * loc in care sa se lipeasca text din afara in HTML.
  */
 import type { Config } from '../config.js'
-import { THEME, LAYERS_HTML, BRAND_MARK } from '../ui/theme.js'
+import { TERM, TERM_LAYERS, BLOCKS_JS } from '../ui/terminal.js'
 
 export function wallPage(cfg: Config): string {
   const sym = esc(cfg.network.nativeSymbol)
@@ -20,98 +19,105 @@ export function wallPage(cfg: Config): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Unclaimed · Stonk Agents</title>
+<title>UNCLAIMED // STONK AGENTS</title>
 <meta name="description" content="Live list of stock drops sitting unclaimed in broker wallets.">
 <meta name="theme-color" content="#000000">
 <style>
-${THEME}
-/* ---------- bara de sus, ca pe site ---------- */
-.nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:50;
-  display:flex;align-items:center;gap:16px;padding-inline:var(--pad);
-  border-bottom:1px solid transparent;transition:background .3s,border-color .3s,backdrop-filter .3s}
-.nav.stuck{background:rgba(0,0,0,.72);backdrop-filter:blur(14px);border-bottom-color:var(--line)}
-.nav .chip{margin-left:auto}
+${TERM}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0 14px;
+  border-bottom:1px solid var(--line)}
+.logo{font-size:13px;font-weight:700;letter-spacing:.24em}
+.logo b{color:var(--green)}
+.st{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;
+  letter-spacing:.16em;color:var(--dim)}
 
-/* ---------- hero ---------- */
-.hero{padding:calc(var(--nav-h) + 72px) 0 44px;display:grid;gap:22px;justify-items:start}
-/* hero-ul aliniaza continutul la stanga, deci copiii nu se intind singuri.
-   Grila trebuie sa ocupe toata latimea, altfel se strange pe o coloana. */
-.figures{margin-top:14px;width:100%;justify-self:stretch}
-.tbl-head{display:flex;align-items:baseline;gap:14px;margin:52px 0 14px}
-.tbl-head h2{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);
-  font-family:var(--mono);font-weight:500}
-.tbl-head span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.22)}
+.hero{padding:54px 0 10px;max-width:900px}
+.hero h1{margin:0;font-size:clamp(26px,4.6vw,52px);line-height:1.12;font-weight:700;
+  letter-spacing:.02em;text-transform:uppercase}
+.hero h1 em{font-style:normal;color:var(--green);text-shadow:0 0 28px rgba(0,200,5,.35)}
+.hero p{margin:18px 0 0;color:var(--dim);font-size:13px;line-height:1.7;max-width:62ch}
+.pre{color:var(--green);font-size:11px;letter-spacing:.24em;margin:0 0 18px}
 
-/* ---------- caseta de siguranta ---------- */
-.note{margin-top:36px;padding:22px 24px;border:1px solid var(--line);border-radius:18px;
-  color:var(--dim);font-size:15px;background:linear-gradient(180deg,var(--panel-2),var(--panel))}
-.note b{color:var(--text)}
-.foot{margin-top:28px;padding-bottom:80px;font-family:var(--mono);font-size:10px;
-  letter-spacing:.12em;color:var(--faint);text-transform:uppercase}
-
-@media (max-width:620px){
-  /* patru cifre raman doua pe rand si pe telefon */
-  .grid{grid-template-columns:1fr 1fr}
-  .cell{padding:16px 14px}
-  .cell b{font-size:23px}
-  .hero{padding-top:calc(var(--nav-h) + 40px)}
-  th,td{padding-left:10px;padding-right:10px}
-  td{font-size:13px}
-  /* adresa e un identificator, nu o propozitie: nu se rupe */
-  td.m{white-space:nowrap;font-size:12px}
-}
+.sum{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-top:26px}
+.big{font-size:clamp(30px,4.4vw,52px);font-weight:700;color:var(--green);line-height:1;
+  letter-spacing:-.01em;text-shadow:0 0 26px rgba(0,200,5,.3)}
+.mid{font-size:clamp(22px,3vw,34px);font-weight:700;line-height:1;color:var(--text)}
+.note{margin-top:22px;border:1px solid var(--line);background:var(--panel);padding:16px 18px;
+  font-size:12px;line-height:1.7;color:var(--dim)}
+.note b{color:var(--green)}
+footer{margin-top:24px;font-size:10px;letter-spacing:.16em;color:var(--faint)}
+@media (max-width:820px){ .sum{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
-${LAYERS_HTML}
+${TERM_LAYERS}
 <div class="page">
 
-  <header class="nav" id="nav">
-    <span class="brand">${BRAND_MARK} STONK AGENTS</span>
-    <span class="chip"><i class="dot" id="dot"></i><span id="status">READING THE CHAIN</span></span>
+  <header>
+    <span class="logo">STONK AGENTS<b>//</b>COURIER</span>
+    <span class="st"><i class="led" id="led"></i><span id="status">READING THE CHAIN</span><i class="cur"></i></span>
   </header>
 
-  <main class="wrap">
-    <section class="hero">
-      <p class="eyebrow">COURIER · DELIVERY AGENT</p>
-      <h1 class="h-display">Money nobody<br><span class="hl">came back for.</span></h1>
-      <p class="lede">Stock drops that were sent but never claimed, sitting inside broker wallets right now. Courier finds them and delivers them.</p>
+  <section class="hero">
+    <p class="pre">COURIER // DELIVERY AGENT</p>
+    <h1>Money nobody<br><em>came back for.</em></h1>
+    <p>Stock drops that were sent but never claimed, sitting inside broker wallets right now.
+       Courier finds them and delivers them. This page reads the chain every 15 seconds.</p>
+  </section>
 
-      <div class="grid figures">
-        <div class="cell"><b id="f-value">0</b><span>${sym} unclaimed</span></div>
-        <div class="cell"><b id="f-count">0</b><span>wallets waiting</span></div>
-        <div class="cell"><b id="f-oldest">0</b><span>days, the oldest</span></div>
-        <div class="cell"><b class="green" id="f-done">0</b><span>already delivered</span></div>
+  <section class="sum">
+    <div class="box">
+      <span class="t">unclaimed right now</span>
+      <div class="box-b">
+        <div class="big"><span id="f-value">0.000</span> <span class="k" style="font-size:14px;letter-spacing:.1em">${sym}</span></div>
+        <div style="margin-top:12px" id="f-bar"></div>
+        <p class="k" style="margin:10px 0 0" id="f-share">--</p>
       </div>
-    </section>
+    </div>
+    <div class="box">
+      <span class="t">wallets waiting</span>
+      <div class="box-b">
+        <div class="mid" id="f-count">0</div>
+        <p class="k" style="margin:12px 0 0">oldest <span class="v" id="f-oldest">--</span></p>
+      </div>
+    </div>
+    <div class="box">
+      <span class="t">already delivered</span>
+      <div class="box-b">
+        <div class="mid g" id="f-done">0</div>
+        <p class="k" style="margin:12px 0 0">by the courier fleet</p>
+      </div>
+    </div>
+  </section>
 
-    <div class="tbl-head"><h2>Waiting right now</h2><span id="count-note"></span></div>
-    <div class="panel">
+  <div class="box">
+    <span class="t">waiting <i id="count-note"></i></span>
+    <div class="tscroll">
       <table>
-        <thead><tr><th>Broker</th><th>Wallet</th><th>Waiting</th><th>Value</th></tr></thead>
+        <thead><tr><th>broker</th><th>wallet</th><th>waiting</th><th>value ${sym}</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
-      <div class="empty" id="empty" hidden>NOTHING UNCLAIMED RIGHT NOW</div>
     </div>
+    <div class="empty" id="empty" hidden>NOTHING UNCLAIMED RIGHT NOW</div>
+  </div>
 
-    <div class="note">
-      <b>We never ask you to connect a wallet.</b> This page only reads what the chain already shows everyone.
-      Nothing here can move your funds, and any site or bot that asks you to connect or sign is not us.
-    </div>
+  <div class="note">
+    <b>We never ask you to connect a wallet.</b> This page only reads what the chain already shows
+    everyone. Nothing here can move your funds, and any site or bot that asks you to connect or sign
+    is not us.
+  </div>
 
-    <p class="foot" id="foot">COURIER · STONK AGENTS</p>
-  </main>
+  <footer id="foot">COURIER // STONK AGENTS</footer>
 </div>
 
 <script>
+${BLOCKS_JS}
 const EXPLORER = ${JSON.stringify(explorer)};
 const $ = id => document.getElementById(id);
 const short = a => a.slice(0,6) + '\\u2026' + a.slice(-4);
 const num = (n, d) => Number(n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
 /* "0 days" pe o pagina publica arata a bug, nu a informatie */
 const waited = d => d === 0 ? 'today' : d === 1 ? '1 day' : d + ' days';
-
-addEventListener('scroll', () => $('nav').classList.toggle('stuck', scrollY > 12), {passive:true});
 
 async function tick(){
   try{
@@ -121,43 +127,38 @@ async function tick(){
     ]);
     $('f-value').textContent = num(wall.valueEth, 3);
     $('f-count').textContent = wall.count.toLocaleString('en-US');
-    $('f-oldest').textContent = wall.oldestDays > 0 ? wall.oldestDays.toLocaleString('en-US') : '\\u2014';
+    $('f-oldest').textContent = wall.oldestDays > 0 ? waited(wall.oldestDays) : 'today';
     $('f-done').textContent = stats.stats.jobs.toLocaleString('en-US');
-    $('count-note').textContent = wall.count > 25 ? 'TOP 25 OF ' + wall.count : '';
+    $('count-note').textContent = wall.count > 25 ? '\\u00b7 top 25 of ' + wall.count : '';
+
+    const total = wall.count + stats.stats.jobs;
+    const bar = $('f-bar'); bar.replaceChildren();
+    bar.appendChild(blocks(total > 0 ? wall.count / total : 0, 28));
+    $('f-share').textContent = total > 0
+      ? Math.round((wall.count / total) * 100) + '% of all drops are still sitting'
+      : '';
 
     const body = $('rows');
     body.replaceChildren();
     for(const r of wall.rows){
       const tr = document.createElement('tr');
-      const id = document.createElement('td');
-      id.className = 'm';
-      id.textContent = '#' + r.tokenId;
-      const w = document.createElement('td');
-      w.className = 'm';
+      const td = (txt, cls) => { const n = document.createElement('td'); if (cls) n.className = cls; n.textContent = txt; return n; };
+      const w = document.createElement('td'); w.className = 'dim';
       if(EXPLORER){
         const a = document.createElement('a');
-        a.href = EXPLORER + '/address/' + r.wallet;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        a.textContent = short(r.wallet);
-        w.appendChild(a);
+        a.href = EXPLORER + '/address/' + r.wallet; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = short(r.wallet); w.appendChild(a);
       } else { w.textContent = short(r.wallet); }
-      const age = document.createElement('td');
-      age.className = 'm';
-      age.textContent = waited(r.ageDays);
-      const v = document.createElement('td');
-      v.className = 'g';
-      v.textContent = num(r.valueEth, 4);
-      tr.append(id, w, age, v);
+      tr.append(td('#' + r.tokenId, 'dim'), w, td(waited(r.ageDays), 'dim'), td(num(r.valueEth, 4), 'g'));
       body.appendChild(tr);
     }
     $('empty').hidden = wall.rows.length > 0;
     $('status').textContent = 'LIVE';
-    $('dot').className = 'dot';
-    $('foot').textContent = 'COURIER · STONK AGENTS · UPDATED ' + new Date().toLocaleTimeString('en-GB');
+    $('led').className = 'led';
+    $('foot').textContent = 'COURIER // STONK AGENTS \\u00b7 UPDATED ' + new Date().toLocaleTimeString('en-GB');
   }catch(e){
     $('status').textContent = 'CHAIN UNREACHABLE';
-    $('dot').className = 'dot off';
+    $('led').className = 'led off';
   }
 }
 tick();

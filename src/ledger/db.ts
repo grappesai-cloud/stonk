@@ -134,6 +134,11 @@ export class Ledger {
     this.db.close()
   }
 
+  /** acces direct, pentru unelte si seminte de proba. Nu se foloseste in bot. */
+  raw(): DatabaseSync {
+    return this.db
+  }
+
   // ---------------------------------------------------------------- rulari
   startRun(mode: string, dry: boolean): number {
     const st = this.db.prepare('INSERT INTO runs (started_at, mode, dry) VALUES (?, ?, ?)')
@@ -359,6 +364,42 @@ export class Ledger {
       txHash: r.tx_hash === null ? null : String(r.tx_hash),
       at: Number(r.created_at),
       status: String(r.status)
+    }))
+  }
+
+  /**
+   * Fluxul de evenimente pentru log: si ce s-a livrat, si ce s-a sarit, in
+   * aceeasi ordine cronologica. Un log care arata doar reusitele minte prin
+   * omisiune: cand botul nu livreaza nimic, tocmai liniile de sarire sunt
+   * singurele care iti spun de ce.
+   */
+  recentEvents(limit = 40): Array<{
+    at: number
+    kind: 'deliver' | 'skip' | 'fail' | 'dry'
+    tokenId: string
+    wallet: string
+    valueWei: bigint
+    tipWei: bigint
+    reason: string | null
+    txHash: string | null
+  }> {
+    const rows = this.db
+      .prepare(
+        `SELECT created_at, status, token_id, wallet, value_wei, tip_wei, reason, tx_hash
+         FROM deliveries ORDER BY created_at DESC, id DESC LIMIT ?`
+      )
+      .all(limit) as Array<Record<string, string | number | null>>
+    const kindOf = (s: string): 'deliver' | 'skip' | 'fail' | 'dry' =>
+      s === 'sent' || s === 'confirmed' ? 'deliver' : s === 'failed' || s === 'reverted' ? 'fail' : s === 'dry' ? 'dry' : 'skip'
+    return rows.map((r) => ({
+      at: Number(r.created_at),
+      kind: kindOf(String(r.status)),
+      tokenId: String(r.token_id),
+      wallet: String(r.wallet),
+      valueWei: BigInt(String(r.value_wei ?? '0')),
+      tipWei: BigInt(String(r.tip_wei ?? '0')),
+      reason: r.reason === null ? null : String(r.reason),
+      txHash: r.tx_hash === null ? null : String(r.tx_hash)
     }))
   }
 

@@ -171,12 +171,12 @@ niciodata conectare de portofel. Regula asta e si apararea impotriva clonelor:
 daca e publica si absoluta, orice imitatie care cere conectare se demasca
 singura.
 
-![peretele, partea de sus](docs/perete-sus.jpg)
-![peretele, partea de jos](docs/perete-jos.jpg)
+![peretele](docs/perete-sus.jpg)
 
-Pe telefon, cele patru cifre raman doua pe rand si adresa nu se rupe in doua:
+Pe telefon amandoua se aseaza singure, iar in consola oprirea devine **buton
+plutitor jos**, in zona degetului mare:
 
-![peretele pe telefon](docs/perete-mobil.jpg)
+![amandoua pe telefon](docs/mobil.jpg)
 
 Ca sa o vezi fara contracte reale:
 
@@ -204,19 +204,24 @@ din hero devin reale.
 Nicio ruta nu scrie, deci nu exista suprafata de atac de aparat. Limita de
 cereri pe adresa IP e pornita implicit.
 
-## Aceeasi tema ca site-ul
+## Pielea: terminal de trading
 
-Peretele si consola folosesc **exact tema site-ului** din `~/stonk-agents`:
-aceleasi fonturi (Archivo si JetBrains Mono, servite din `/fonts`), aceiasi
-tokeni de culoare, aceleasi butoane si pastile, aceleasi straturi de fundal
-(grila, aura verde, granulatie).
+Peretele si consola folosesc o piele proprie, de terminal: **totul monospace,
+colturi drepte, linii de un pixel, panouri cu titlul asezat pe muchia de sus**,
+bare desenate din blocuri, log cu ceas.
 
-Nu e o asemanare aproximativa: `src/ui/theme.ts` e un singur fisier din care
-mananca amandoua paginile. Daca site-ul si uneltele ar arata diferit, omul ar
-simti ca sunt doua produse, si peretele public nu ar mai parea al proiectului.
-Cand se schimba tema pe site, se schimba acolo.
+Nu e nostalgie, e densitate. Intr-o unealta de operare, cu cat incap mai multe
+randuri pe ecran fara sa oboseasca ochiul, cu atat afli mai repede ce se
+intampla. Un panou aerisit cu placi mari arata bine in captura si te face sa
+derulezi in productie.
 
-## Consola de operator
+Culorile raman ale proiectului, ca sa fie limpede ca e acelasi produs: negru,
+verde `#00c805`, chihlimbar pentru avertismente, rosu pentru probleme. Site-ul
+de prezentare ramane pe pielea lui curata; uneltele arata a unelte.
+
+Totul in `src/ui/terminal.ts`, un singur loc de schimbat.
+
+## Consola de operator## Consola de operator
 
 `courier console`, sau pornita odata cu `start`. Acelasi limbaj vizual ca
 site-ul: negru, un singur verde, cifre monospace.
@@ -239,11 +244,6 @@ Trei butoane sus: **proba uscata** (calculeaza tot si nu trimite nimic),
 **ruleaza acum** (rupe somnul buclei si porneste imediat) si **opreste**.
 
 ![consola](docs/consola-sus.jpg)
-
-Pe telefon antetul nu mai e lipit, iar oprirea devine **buton plutitor jos**, in
-zona degetului mare, mereu la indemana fara sa manance din ecran:
-
-![consola pe telefon](docs/consola-mobil.jpg)
 
 Si are un buton mare de oprit. Ala e motivul pentru care exista: la doua
 noaptea vrei sa opresti de pe telefon, nu sa cauti laptopul si cheia de SSH.
