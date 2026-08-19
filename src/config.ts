@@ -194,6 +194,20 @@ export const ConfigSchema = z.object({
     rateLimitPerMinute: z.number().int().min(0).default(120)
   }).default({}),
 
+  /**
+   * Consola de operator. Sta pe alt port decat API-ul public si are exact doua
+   * actiuni care scriu: opreste si porneste. Nu atinge chei, nu semneaza nimic,
+   * nu schimba politici. Asa API-ul public ramane strict citire, si daca ajunge
+   * cineva la el nu are ce face cu el.
+   */
+  console: z.object({
+    enabled: z.boolean().default(false),
+    host: z.string().default('127.0.0.1'),
+    port: z.number().int().positive().default(8788),
+    /** jeton obligatoriu; se citeste din mediu, ca orice secret */
+    token: z.string().nullable().default(null)
+  }).default({}),
+
   storage: z.object({
     file: z.string().default('./data/courier.db')
   }).default({})

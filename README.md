@@ -87,6 +87,7 @@ Implicit nu se trimite nimic. `--live` se scrie de mana de fiecare data.
 | `run` | o rulare completa (uscata daca nu pui `--live`) |
 | `start` | bucla continua, plus API si botul de Telegram |
 | `serve` | doar API-ul de citire |
+| `console` | doar consola de operator |
 | `report` | cat a livrat, cat a castigat, cat a ars pe gaz, pe 24h, 7 zile si total |
 | `tba <id>` | adresa portofelului 6551 al unui broker, calculata local si verificata cu registrul |
 
@@ -195,6 +196,31 @@ din hero devin reale.
 
 Nicio ruta nu scrie, deci nu exista suprafata de atac de aparat. Limita de
 cereri pe adresa IP e pornita implicit.
+
+## Consola de operator
+
+`courier console`, sau pornita odata cu `start`. Acelasi limbaj vizual ca
+site-ul: negru, un singur verde, cifre monospace.
+
+Arata ce face botul acum, profitul si pierderea pe 24 de ore si de la inceput,
+lantul si soldul operatorului, ultimele rulari, ultimele livrari, si
+**de ce nu s-a livrat**, grupat pe motive. Ultima e cea mai folosita in
+productie: intrebarea nu e niciodata "ce a livrat", e "de ce nu".
+
+Si are un buton mare de oprit. Ala e motivul pentru care exista: la doua
+noaptea vrei sa opresti de pe telefon, nu sa cauti laptopul si cheia de SSH.
+
+**Granitele, si de ce sunt asa:**
+
+- consola sta pe **alt port** decat API-ul public, legat implicit pe
+  `127.0.0.1`, cu jeton din mediu (`CONSOLE_TOKEN`)
+- **API-ul public ramane strict citire.** Tot ce scrie sta aici
+- si aici scriu doar doua lucruri, si amandoua inseamna acelasi fisier:
+  **opreste** si **porneste**. Nu atinge chei, nu semneaza, nu schimba politici,
+  nu muta bani. Nu exista nicio alta ruta care scrie, si exista un test care
+  incearca sa gaseasca una
+- oprirea merge dintr-un singur clic: in incident nu vrei sa te intrebe nimic.
+  Pornirea cere doua, ca sa nu repornesti din greseala ceva oprit dintr-un motiv
 
 ## Registrul e produsul
 
@@ -319,7 +345,7 @@ npm run test:e2e  # cap-coada, porneste anvil si desfasoara contracte reale
 npm run test:all
 ```
 
-77 de teste. Cap-coada nu foloseste obiecte false: porneste un lant local, desfasoara
+97 de teste. Cap-coada nu foloseste obiecte false: porneste un lant local, desfasoara
 registrul 6551, colectia, distribuitorul si contractul de lot, si demonstreaza
 in ordine ca adresa calculata local e aceeasi cu cea de pe lant, ca scanarea
 gaseste exact ce a fost pus, ca rularea uscata nu cheltuie nimic, ca livrarea

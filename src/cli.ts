@@ -11,6 +11,7 @@ import { discover } from './init.js'
 import { tbaAddress } from './erc6551/address.js'
 import { runForever, runOnce } from './runner.js'
 import { startApi } from './api/server.js'
+import { startConsole } from './console/server.js'
 import { discoverTokenIds, ownersOf } from './discover/brokers.js'
 import { scanClaims } from './scan/claims.js'
 import { screenClaims } from './policy/rules.js'
@@ -165,12 +166,14 @@ program
   .action(async () => {
     const ctx = ctxOf()
     const server = startApi(ctx)
+    const consoleServer = startConsole(ctx)
     const tgTimer = ctx.tg.enabled ? setInterval(() => void ctx.tg.poll(), 3000) : null
 
     const shutdown = () => {
       log.info('opresc')
       if (tgTimer) clearInterval(tgTimer)
       server?.close()
+      consoleServer?.close()
       ctx.ledger.close()
       process.exit(0)
     }
@@ -178,6 +181,15 @@ program
     process.on('SIGTERM', shutdown)
 
     await runForever(ctx, (o) => printOutcome(ctx, o))
+  })
+
+program
+  .command('console')
+  .description('doar consola de operator (jeton din console.token)')
+  .action(async () => {
+    const ctx = ctxOf()
+    ctx.cfg.console.enabled = true
+    if (!startConsole(ctx)) process.exit(1)
   })
 
 program

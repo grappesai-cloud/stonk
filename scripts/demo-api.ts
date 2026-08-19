@@ -9,6 +9,7 @@ import { Ledger } from '../src/ledger/db.js'
 import { Telegram } from '../src/alerts/telegram.js'
 import { publicClientOf } from '../src/chain/client.js'
 import { createApi } from '../src/api/server.js'
+import { createConsole } from '../src/console/server.js'
 
 const cfg = loadConfig('./config/robinhood.example.json')
 cfg.storage.file = ':memory:'
@@ -49,7 +50,37 @@ for (let i = 100; i < 118; i++) {
   })
 }
 
+// cateva rulari si motive de sarire, ca sa aiba consola ce arata
+ledger.finishRun(run, {
+  scanned: 5000, candidates: 62, delivered: 18, failed: 44,
+  gasWei: parseEther('0.000038'), tipsWei: parseEther('0.0072'), valueWei: parseEther('4.31'), note: null
+})
+for (let i = 0; i < 4; i++) {
+  const r2 = ledger.startRun(i % 2 ? 'campaign' : 'profit', i === 3)
+  ledger.finishRun(r2, {
+    scanned: 5000, candidates: 40 - i * 7, delivered: 12 - i * 3, failed: 8 + i,
+    gasWei: parseEther('0.00002'), tipsWei: parseEther('0.004'), valueWei: parseEther('2.2'), note: null
+  })
+}
+for (const [reason, n] of [['sub pragul de valoare', 31], ['pauza intre livrari', 12], ['nu mai era nimic de livrat', 7], ['bacsis sub gaz', 3]] as const) {
+  for (let i = 0; i < n; i++) {
+    ledger.recordDelivery({
+      runId: run, tokenId: String(900 + i), wallet: addr(900 + i), owner: null,
+      valueWei: 0n, nativeWei: 0n, tipWei: 0n, gasWei: 0n, txHash: null, blockNumber: null,
+      status: 'skipped', reason
+    })
+  }
+}
+
+cfg.console.enabled = true
+cfg.console.token = 'demo'
+cfg.console.port = 8789
+cfg.alerts.telegram.gasLowWei = parseEther('0.01')
+
 const ctx = { cfg, client: publicClientOf(cfg), account: null, wallet: null, ledger, tg: new Telegram(cfg, ledger) }
 createApi(ctx).listen(cfg.api.port, '127.0.0.1', () => {
-  process.stdout.write(`demo pe http://127.0.0.1:${cfg.api.port}/\n`)
+  process.stdout.write(`peretele pe http://127.0.0.1:${cfg.api.port}/\n`)
+})
+createConsole(ctx).listen(cfg.console.port, '127.0.0.1', () => {
+  process.stdout.write(`consola pe http://127.0.0.1:${cfg.console.port}/?token=demo\n`)
 })

@@ -362,6 +362,57 @@ export class Ledger {
     }))
   }
 
+  recentRuns(limit = 12): Array<{
+    id: number
+    startedAt: number
+    finishedAt: number | null
+    mode: string
+    dry: boolean
+    scanned: number
+    candidates: number
+    delivered: number
+    failed: number
+    gasWei: bigint
+    tipsWei: bigint
+    valueWei: bigint
+    note: string | null
+  }> {
+    const rows = this.db
+      .prepare(
+        `SELECT id, started_at, finished_at, mode, dry, scanned, candidates, delivered, failed,
+                gas_wei, tips_wei, value_wei, note
+         FROM runs ORDER BY id DESC LIMIT ?`
+      )
+      .all(limit) as Array<Record<string, string | number | null>>
+    return rows.map((r) => ({
+      id: Number(r.id),
+      startedAt: Number(r.started_at),
+      finishedAt: r.finished_at === null ? null : Number(r.finished_at),
+      mode: String(r.mode),
+      dry: Number(r.dry) === 1,
+      scanned: Number(r.scanned),
+      candidates: Number(r.candidates),
+      delivered: Number(r.delivered),
+      failed: Number(r.failed),
+      gasWei: BigInt(String(r.gas_wei ?? '0')),
+      tipsWei: BigInt(String(r.tips_wei ?? '0')),
+      valueWei: BigInt(String(r.value_wei ?? '0')),
+      note: r.note === null ? null : String(r.note)
+    }))
+  }
+
+  /** de ce NU s-a livrat, grupat. Intrebarea cea mai deasa in productie. */
+  skipReasons(sinceTs = 0, limit = 8): Array<{ reason: string; count: number }> {
+    const rows = this.db
+      .prepare(
+        `SELECT COALESCE(reason,'fara motiv') AS reason, COUNT(*) AS c
+         FROM deliveries WHERE created_at >= ? AND status IN ('skipped','failed')
+         GROUP BY reason ORDER BY c DESC LIMIT ?`
+      )
+      .all(sinceTs, limit) as Array<{ reason: string; c: number }>
+    return rows.map((r) => ({ reason: r.reason, count: r.c }))
+  }
+
   // -------------------------------------------------------------- watchers
   addWatcher(chatId: string, address: string, label: string | null): void {
     this.db
