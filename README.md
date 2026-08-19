@@ -207,6 +207,9 @@ lantul si soldul operatorului, ultimele rulari, ultimele livrari, si
 **de ce nu s-a livrat**, grupat pe motive. Ultima e cea mai folosita in
 productie: intrebarea nu e niciodata "ce a livrat", e "de ce nu".
 
+![consola, partea de sus](docs/consola-sus.jpg)
+![consola, partea de jos](docs/consola-jos.jpg)
+
 Si are un buton mare de oprit. Ala e motivul pentru care exista: la doua
 noaptea vrei sa opresti de pe telefon, nu sa cauti laptopul si cheia de SSH.
 

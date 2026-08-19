@@ -129,7 +129,9 @@ export function createConsole(ctx: Ctx) {
         block,
         operator: ctx.account?.address ?? null,
         operatorBalanceEth: eth(balanceWei),
-        operatorLow: cfg.alerts.telegram.gasLowWei > 0n && balanceWei < cfg.alerts.telegram.gasLowWei,
+        /* rosu inseamna "e o problema", nu "nu e configurat". Fara cheie de
+           operator nu exista sold scazut, exista doar lipsa cheii. */
+        operatorLow: !!ctx.account && cfg.alerts.telegram.gasLowWei > 0n && balanceWei < cfg.alerts.telegram.gasLowWei,
         day: shape(day),
         all: shape(all),
         wall: { count: wall.count, valueEth: eth(wall.valueWei), oldestDays: wall.oldestDays },

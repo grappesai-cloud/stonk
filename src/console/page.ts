@@ -60,7 +60,9 @@ export function consolePage(): string {
   .grid{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
     border-radius:16px;overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
   .cell{background:var(--panel);padding:22px 20px}
-  .cell b{display:block;font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:-.02em}
+  .cell b{display:block;font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:-.02em;
+    overflow-wrap:anywhere}
+  .cell b.soft{font-size:18px;color:var(--faint)}
   .cell b.green{color:var(--green)}
   .cell b.red{color:var(--red)}
   .cell span{display:block;margin-top:8px;color:var(--faint);font-family:var(--mono);
@@ -219,9 +221,10 @@ async function load() {
   tiles($('chain'), [
     {value: String(s.chainId), label: 'lant'},
     {value: s.block ? String(s.block) : '--', label: 'bloc'},
-    {value: s.operator ? num(s.operatorBalanceEth, 4) : '--', label: 'sold operator ' + s.symbol,
-     tone: s.operatorLow ? 'red' : ''},
-    {value: short(s.operator), label: 'operator'},
+    {value: s.operator ? num(s.operatorBalanceEth, 4) : 'fara cheie', label: 'sold operator ' + s.symbol,
+     tone: s.operatorLow ? 'red' : (s.operator ? '' : 'soft')},
+    {value: s.operator ? short(s.operator) : 'doar citire', label: 'operator',
+     tone: s.operator ? '' : 'soft'},
     {value: num(s.wall.valueEth, 3), label: 'valoare nerevendicata'}
   ]);
 
