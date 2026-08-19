@@ -25,6 +25,8 @@ services:
     <<: *agent
     ports:
       - "127.0.0.1:8790:8790"
+      # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui
+      - "10.0.0.1:8790:8790"
       - "127.0.0.1:8791:8791"
     command: ["start", "-c", "./config/ringer.json"]
     healthcheck:
@@ -77,6 +79,10 @@ services:
     <<: *agent
     ports:
       - "127.0.0.1:8798:8798"
+      # Si pe puntea docker, ca pagina publica (alt container, pe aceeasi
+      # masina) sa poata citi cifrele reale prin nginx-ul ei. NU pe IP-ul
+      # public: agentul ramane invizibil din internet.
+      - "10.0.0.1:8798:8798"
       - "127.0.0.1:8799:8799"
     command: ["start", "-c", "./config/courier.json"]
     healthcheck:
@@ -90,6 +96,8 @@ services:
     <<: *agent
     ports:
       - "127.0.0.1:8800:8800"
+      # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui
+      - "10.0.0.1:8800:8800"
       - "127.0.0.1:8801:8801"
     command: ["start", "-c", "./config/crank.json"]
     healthcheck:

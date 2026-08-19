@@ -143,10 +143,11 @@
     "rateLimitPerMinute": 120
   },
   "console": {
-    "enabled": false,
+    "enabled": true,
     "host": "127.0.0.1",
     "port": 8799,
-    "token": "env:CONSOLE_TOKEN"
+    "token": "env:CONSOLE_TOKEN",
+    "_": "Pe loopback. Se ajunge prin tunel SSH: ssh -L 8799:127.0.0.1:8799 root@<server>, apoi http://127.0.0.1:8799/?token=<CONSOLE_TOKEN>"
   },
   "storage": {
     "file": "./data/courier.db",

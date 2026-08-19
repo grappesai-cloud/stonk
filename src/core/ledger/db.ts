@@ -206,6 +206,14 @@ export class Ledger {
       )
   }
 
+  /** ultima rulare TERMINATA; una in curs are inca zerouri peste tot */
+  lastFinishedRun(): { seen: number; candidates: number; done: number; at: number } | null {
+    const r = this.db
+      .prepare('SELECT seen, candidates, done, started_at FROM runs WHERE finished_at IS NOT NULL ORDER BY id DESC LIMIT 1')
+      .get() as { seen: number; candidates: number; done: number; started_at: number } | undefined
+    return r ? { seen: r.seen, candidates: r.candidates, done: r.done, at: r.started_at } : null
+  }
+
   lastFinishedAt(): number | null {
     const r = this.db.prepare('SELECT MAX(finished_at) AS t FROM runs').get() as { t: number | null } | undefined
     return r?.t ?? null
@@ -315,6 +323,26 @@ export class Ledger {
       .prepare('UPDATE opportunities SET label=?, stake_wei=?, reward_wei=?, last_seen=?, done_at=NULL WHERE key=?')
       .run(label, stakeWei.toString(), rewardWei.toString(), t, key)
     return { isNew: prev.done_at !== null, previousWei, deltaWei: stakeWei - previousWei }
+  }
+
+  /**
+   * Inchide tot ce NU s-a mai vazut la rularea asta.
+   *
+   * Fara asta, indexul creste la nesfarsit: cheia unui lot contine cati brokeri
+   * are, deci la fiecare rulare cu alta compozitie apar chei noi si cele vechi
+   * raman deschise pe veci. Cifra "cate asteapta" urca singura si pagina
+   * publica ajunge sa arate un numar care nu inseamna nimic.
+   */
+  closeUnseen(seenKeys: string[]): number {
+    const rows = this.db.prepare('SELECT key FROM opportunities WHERE done_at IS NULL').all() as Array<{ key: string }>
+    const seen = new Set(seenKeys)
+    let closed = 0
+    for (const r of rows) {
+      if (seen.has(r.key)) continue
+      this.clearOpportunity(r.key)
+      closed++
+    }
+    return closed
   }
 
   clearOpportunity(key: string): void {

@@ -65,6 +65,9 @@ export async function runOnce(ctx: Ctx, opts: RunOptions = {}): Promise<RunOutco
     const d = ledger.seeOpportunity(it.key, it.label, it.stakeWei, it.rewardWei)
     if (d.isNew) found++
   }
+  /* ce nu s-a mai vazut acum nu mai e deschis: indexul spune prezentul, nu
+     istoria a tot ce a fost vreodata */
+  ledger.closeUnseen(items.map((i) => i.key))
 
   const race = opts.race ?? null
   if (race?.active && items.length > 0) {

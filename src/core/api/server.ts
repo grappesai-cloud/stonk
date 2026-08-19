@@ -114,6 +114,15 @@ async function handle(
   }
 
   if (path === '/stats') return json(res, 200, stats(ctx))
+  /**
+   * Cifrele pentru pagina publica, in forma pe care o citeste ea.
+   *
+   * Exista separat de `/stats` dinadins: pagina nu trebuie sa stie cum arata
+   * registrul nostru, iar noi nu trebuie sa ne temem ca o schimbare interna
+   * strica site-ul. Si tot ce iese pe aici e masurat: daca nu s-a livrat nimic,
+   * scrie zero, nu o cifra frumoasa.
+   */
+  if (path === '/site') return json(res, 200, sitePayload(ctx))
   if (path === '/races') return json(res, 200, races(ctx))
   if (path === '/open') {
     return json(res, 200, {
@@ -198,6 +207,60 @@ export function stats(ctx: Ctx) {
       note: r.note
     })),
     skips: ledger.skipReasons(Math.floor(Date.now() / 1000) - 86400)
+  }
+}
+
+/** cati brokeri a atins un lot: cheia e `drop:<primul>:<cati>` */
+function brokersOf(key: string): number {
+  const parts = key.split(':')
+  const n = Number(parts[2])
+  return Number.isFinite(n) ? n : 0
+}
+
+export function sitePayload(ctx: Ctx) {
+  const { ledger, cfg } = ctx
+  const all = ledger.totals()
+  const open = ledger.openTotals()
+  const openList = ledger.openList(500)
+  const events = ledger.recentEvents(60)
+  const done = events.filter((e) => e.kind === 'work')
+
+  const brokersReached = done.reduce((s, e) => s + brokersOf(e.key), 0)
+  const brokersWaiting = openList.reduce((s, o) => s + brokersOf(o.key), 0)
+
+  /* fluxul: ce s-a facut chiar acum, in cuvintele agentului */
+  const feed = events.slice(0, 8).map((e) => {
+    const who = cfg.agent.name
+    const what = e.label || e.key
+    if (e.kind === 'work') return `${who} · ${what} · DONE`
+    if (e.kind === 'dry') return `${who} · ${what} · READY`
+    if (e.kind === 'fail') return `${who} · ${what} · FAILED`
+    return `${who} · ${what} · ${(e.reason ?? 'skipped').split(':')[0]!.toUpperCase()}`
+  })
+
+  const last = ledger.lastFinishedRun()
+  const meta =
+    ctx.control.standby !== null
+      ? ctx.control.standby.toUpperCase()
+      : brokersWaiting > 0
+        ? `${open.count} BATCHES WAITING · ${brokersWaiting} BROKERS UNPAID`
+        : 'NOTHING UNCLAIMED RIGHT NOW'
+
+  return {
+    stats: {
+      jobs: all.done,
+      agents: brokersReached,
+      unclaimedCount: open.count,
+      brokersWaiting
+    },
+    feed,
+    meta,
+    /* ca sa se vada din afara ca nu e o poza: cand a fost ultima masuratoare */
+    measuredAt: ledger.lastFinishedAt(),
+    /* din ultima rulare TERMINATA: una in curs are zerouri si ar arata ca o
+       flota care nu vede nimic */
+    lastRun: last,
+    live: !ctx.cfg.watchtower && !ctx.cfg.execution.dryRun
   }
 }
 

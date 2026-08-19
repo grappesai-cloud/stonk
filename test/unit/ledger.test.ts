@@ -137,3 +137,26 @@ describe('registrul', () => {
     expect(led.totals().rewardWei).toBe(huge)
   })
 })
+
+describe('indexul arata prezentul', () => {
+  it('inchide ce nu s-a mai vazut la rularea asta', () => {
+    led.seeOpportunity('a', 'A', 10n, 0n)
+    led.seeOpportunity('b', 'B', 20n, 0n)
+    led.seeOpportunity('c', 'C', 30n, 0n)
+    expect(led.openTotals().count).toBe(3)
+    /* a doua rulare vede doar doua dintre ele */
+    const closed = led.closeUnseen(['a', 'c'])
+    expect(closed).toBe(1)
+    expect(led.openTotals().count).toBe(2)
+    expect(led.openList(10).map((o) => o.key).sort()).toEqual(['a', 'c'])
+  })
+
+  it('o rulare in curs nu se ia drept masuratoare', () => {
+    const running = led.startRun('courier', 'campaign', true)
+    expect(led.lastFinishedRun()).toBeNull()
+    led.finishRun(running, { seen: 7, candidates: 5, done: 0, failed: 0, gasWei: 0n, rewardWei: 0n, costWei: 0n })
+    led.startRun('courier', 'campaign', true)
+    /* cea noua e in curs, deci raspunsul ramane cea terminata */
+    expect(led.lastFinishedRun()?.seen).toBe(7)
+  })
+})

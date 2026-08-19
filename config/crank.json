@@ -129,10 +129,11 @@
     "rateLimitPerMinute": 120
   },
   "console": {
-    "enabled": false,
+    "enabled": true,
     "host": "127.0.0.1",
     "port": 8801,
-    "token": "env:CONSOLE_TOKEN"
+    "token": "env:CONSOLE_TOKEN",
+    "_": "Pe loopback. Se ajunge prin tunel SSH: ssh -L 8801:127.0.0.1:8801 root@<server>, apoi http://127.0.0.1:8801/?token=<CONSOLE_TOKEN>"
   },
   "storage": {
     "file": "./data/crank.db",
