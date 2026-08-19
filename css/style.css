@@ -341,3 +341,14 @@ main{position:relative;z-index:1}
     transition-duration:.01ms !important;scroll-behavior:auto !important}
   [data-reveal]{opacity:1;transform:none}
 }
+
+/* ---------------------------------------------------- starea unei clase --
+   Verde plin = agentul lucreaza pe lant. Contur stins = meseria nu exista
+   inca acolo. Diferenta se vede dintr-o privire, fara sa citesti nimic. */
+.card-state{
+  margin-left:auto;font:600 10px/1 var(--mono);letter-spacing:.14em;
+  padding:5px 8px;border-radius:999px;align-self:flex-start;
+}
+.card-state-live{background:var(--green);color:#000}
+.card-state-soon{border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.45)}
+.card-top{align-items:flex-start}

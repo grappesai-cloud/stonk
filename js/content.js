@@ -38,8 +38,8 @@ window.SITE = {
     contract: {
       label: 'CONTRACT',
       address: '',                           /* gol = "NOT DEPLOYED YET" */
-      chain: 'BASE',
-      explorer: 'https://basescan.org/address/',
+      chain: 'ROBINHOOD CHAIN',
+      explorer: 'https://robinhoodchain.blockscout.com/address/',
       soon: 'NOT DEPLOYED YET',
       copy: 'COPY',
       copied: 'COPIED'
@@ -101,7 +101,10 @@ window.SITE = {
     /* Adresa lui `/stats` de la Courier (vezi ~/stonk-courier). Gol = raman
        cifrele statice de mai sus. Cand botul ruleaza, cifrele din pagina devin
        masurate, iar eticheta SIM din hero se schimba singura in LIVE. */
-    endpoint: '',
+    /* Serverul propriu, prin nginx-ul paginii: acelasi domeniu, deci fara
+       CORS si fara sa expunem agentul in internet. Cifrele vin din registrul
+       agentului care chiar ruleaza. */
+    endpoint: '/api/stats',
     refreshMs: 30000,
     ethPrice: true,      /* pretul ETH, real, public, fara backend */
     ethUrl: 'https://api.coinbase.com/v2/prices/ETH-USD/spot',
@@ -114,16 +117,16 @@ window.SITE = {
     title: 'One agent, one job, one paycheck.',
     hint: 'SCROLL',
     items: [
-      { code: '01', glyph: 'bell',  name: 'The Ringer',   role: 'CLOCK IN EXECUTOR',
-        job: 'Fires Clock In the second the pot fills.', earns: 'Clock In tip' },
-      { code: '02', glyph: 'pick',  name: 'The Miner',    role: 'VRNG FULFILLER',
+      { code: '01', glyph: 'bell',  name: 'The Ringer', status: 'LIVE',   role: 'CLOCK IN EXECUTOR',
+        job: 'Fires Clock In the second the pot fills.', earns: 'Coverage, proven per round' },
+      { code: '02', glyph: 'pick',  name: 'The Miner', status: 'SOON',    role: 'VRNG FULFILLER',
         job: 'Settles Broker Box rounds waiting on randomness.', earns: 'Fulfill bounty' },
-      { code: '03', glyph: 'box',   name: 'The Stocker',  role: 'INVENTORY RESTOCKER',
+      { code: '03', glyph: 'box',   name: 'The Stocker', status: 'SOON',  role: 'INVENTORY RESTOCKER',
         job: 'Refills machines before they run dry.', earns: 'Restock commission' },
-      { code: '04', glyph: 'vote',  name: 'The Lobbyist', role: 'VEUP VOTE OPTIMIZER',
+      { code: '04', glyph: 'vote',  name: 'The Lobbyist', status: 'SOON', role: 'VEUP VOTE OPTIMIZER',
         job: 'Votes your gauges before the epoch closes.', earns: 'Voter fees' },
-      { code: '05', glyph: 'truck', name: 'The Courier',  role: 'DELIVERY AND SWEEP',
-        job: 'Pushes unclaimed drops into broker wallets.', earns: 'Delivery fee' }
+      { code: '05', glyph: 'truck', name: 'The Courier', status: 'LIVE',  role: 'DELIVERY AND SWEEP',
+        job: 'Pushes unclaimed drops into broker wallets.', earns: 'Coverage, proven per broker' }
     ]
   },
 

@@ -374,6 +374,13 @@
     const card = el('article', 'card')
     const top = el('div', 'card-top')
     top.appendChild(el('span', 'card-code', c.code))
+    /* Starea reala a fiecarei clase. Trei dintre meserii nu exista inca pe
+       lant, iar o pagina care le arata pe toate la fel promite ceva ce nu
+       poate livra. Un badge onest arata mai bine decat o promisiune. */
+    if (c.status) {
+      const st = el('span', 'card-state card-state-' + c.status.toLowerCase(), c.status)
+      top.appendChild(st)
+    }
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('viewBox', '0 0 24 24')
     svg.setAttribute('class', 'card-glyph')
