@@ -1,11 +1,16 @@
 /**
- * Consola de operator. Acelasi limbaj vizual ca site-ul: negru, un singur
- * verde, tipografie mare, cifre monospace.
+ * Consola de operator, pe design-ul site-ului.
+ *
+ * Foloseste exact aceeasi tema ca ~/stonk-agents si ca peretele public:
+ * aceleasi fonturi, aceiasi tokeni, aceleasi componente si aceleasi straturi
+ * de fundal.
  *
  * Pagina e statica si isi ia datele din /api/state, deci nu exista niciun loc
  * in care sa se lipeasca text din afara in HTML. Singurele doua actiuni care
  * scriu sunt butoanele de oprit si pornit.
  */
+import { THEME, LAYERS_HTML, BRAND_MARK } from '../ui/theme.js'
+
 export function consolePage(): string {
   return `<!doctype html>
 <html lang="en">
@@ -15,113 +20,55 @@ export function consolePage(): string {
 <meta name="robots" content="noindex, nofollow">
 <title>Courier · Console</title>
 <style>
-  :root{
-    --bg:#000; --panel:#0a0a0a; --panel-2:#101010;
-    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.055);
-    --text:#fff; --dim:rgba(255,255,255,.58); --faint:rgba(255,255,255,.34);
-    --green:#00c805; --green-hot:#00ff2b; --green-soft:rgba(0,200,5,.12);
-    --red:#ff5000;
-    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,system-ui,sans-serif;
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.55 var(--sans);
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:1120px;margin:0 auto;padding:28px 24px 80px}
-  .mono{font-family:var(--mono);font-weight:500;letter-spacing:.1em;text-transform:uppercase;font-size:11px}
-  .faint{color:var(--faint)}
+${THEME}
+/* ---------- doar ce e specific consolei ---------- */
+.page{padding:0 0 80px}
+/* antetul ramane lipit sus: butonul de oprit nu are voie sa dispara la
+   derulare. Daca esti jos, in tabelul de livrari, si trebuie sa opresti, nu
+   vrei sa cauti mai intai butonul. */
+header{position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:18px 0 18px;border-bottom:1px solid var(--line);margin-bottom:26px;
+  background:rgba(0,0,0,.78);backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px)}
+.spacer{margin-left:auto}
+h2{margin:36px 0 14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);font-family:var(--mono);font-weight:500}
+.msg{margin-top:14px;min-height:18px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.1em;color:var(--faint)}
+.msg.ok{color:var(--green)}
+.msg.err{color:var(--red)}
+.bars{display:grid;gap:12px;padding:20px 18px}
+.bar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;font-size:14px}
+.bar i{display:block;height:4px;background:var(--green);border-radius:2px;opacity:.55;margin-top:7px}
+.bar span{font-family:var(--mono);font-size:12px;color:var(--faint)}
+footer{margin-top:44px;color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.12em}
 
-  header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
-    padding-bottom:22px;border-bottom:1px solid var(--line);margin-bottom:28px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.02em;font-size:16px;white-space:nowrap}
-  .brand svg{width:20px;height:20px;fill:none;stroke:var(--green);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-  .chip{display:inline-flex;align-items:center;gap:9px;padding:7px 14px 7px 11px;
-    border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);
-    animation:pulse 2.4s ease-in-out infinite}
-  .dot.off{background:var(--red);box-shadow:0 0 10px var(--red);animation:none}
-  .dot.warn{background:#ffb800;box-shadow:0 0 10px #ffb800}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .spacer{margin-left:auto}
-
-  button{font:inherit;color:inherit;cursor:pointer;border-radius:999px;border:1px solid var(--line);
-    background:transparent;height:44px;padding:0 22px;font-weight:600;font-size:15px;
-    transition:background .2s,border-color .2s,color .2s,transform .2s}
-  button:hover{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.04)}
-  button:active{transform:scale(.98)}
-  button.stop{border-color:var(--red);color:var(--red)}
-  button.stop:hover{background:var(--red);color:#000}
-  button.go{background:var(--green);border-color:var(--green);color:#000}
-  button.go:hover{background:var(--green-hot);border-color:var(--green-hot)}
-  button:disabled{opacity:.45;cursor:default}
-
-  h2{margin:36px 0 14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--faint);font-family:var(--mono);font-weight:500}
-  .grid{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
-    border-radius:16px;overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
-  .cell{background:var(--panel);padding:22px 20px}
-  .cell b{display:block;font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:-.02em;
-    overflow-wrap:anywhere}
-  .cell b.soft{font-size:18px;color:var(--faint)}
-  .cell b.green{color:var(--green)}
-  .cell b.red{color:var(--red)}
-  .cell span{display:block;margin-top:8px;color:var(--faint);font-family:var(--mono);
-    font-size:10px;letter-spacing:.12em;text-transform:uppercase}
-
-  .panel{border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden}
-  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-  th{text-align:left;padding:14px 16px;border-bottom:1px solid var(--line);
-    font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--faint);text-transform:uppercase;font-weight:500}
-  td{padding:13px 16px;border-bottom:1px solid var(--line-2);font-size:14px}
-  tr:last-child td{border-bottom:none}
-  td.m{font-family:var(--mono);color:var(--dim);font-size:13px}
-  td.g{font-family:var(--mono);color:var(--green);font-size:13px}
-  td.r{color:var(--red)}
-  th:last-child,td:last-child{text-align:right}
-  tbody tr:hover{background:rgba(0,200,5,.04)}
-  a{color:inherit;border-bottom:1px solid rgba(255,255,255,.2);text-decoration:none}
-  a:hover{border-color:var(--green)}
-  .empty{padding:30px 16px;text-align:center;color:var(--faint);font-family:var(--mono);font-size:12px}
-  .bars{display:grid;gap:10px;padding:18px 16px}
-  .bar{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;font-size:13px}
-  .bar i{display:block;height:4px;background:var(--green);border-radius:2px;opacity:.5;margin-top:6px}
-  .bar span{font-family:var(--mono);font-size:12px;color:var(--faint)}
-  .msg{margin-top:14px;min-height:18px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--faint)}
-  .msg.ok{color:var(--green)}
-  .msg.err{color:var(--red)}
-  footer{margin-top:44px;color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.12em}
-  @media (max-width:620px){
-    .spacer{margin-left:0;width:100%}
-    header{gap:12px}
-    /* si aici placile raman doua pe rand pe telefon */
-    .grid{grid-template-columns:1fr 1fr}
-    /* cand raman impare, ultima ocupa randul intreg: o jumatate goala arata
-       a ceva neterminat, nu a spatiu */
-    .cell:last-child:nth-child(odd){grid-column:1 / -1}
-    /* butonul de oprit trece pe rand propriu, pe toata latimea: e cel mai
-       important lucru de pe ecran si trebuie nimerit cu degetul */
-    header{gap:10px}
-    .spacer{display:none}
-    header button{width:100%;order:9;height:50px}
-    .cell{padding:16px 14px}
-    .cell b{font-size:22px}
-    .wrap{padding:20px 14px 60px}
-    th,td{padding-left:10px;padding-right:10px}
-    td.m,td.g{font-size:12px;white-space:nowrap}
-  }
+@media (max-width:620px){
+  .grid{grid-template-columns:1fr 1fr}
+  /* cand raman impare, ultima ocupa randul intreg: o jumatate goala arata a
+     ceva neterminat, nu a spatiu */
+  .cell:last-child:nth-child(odd){grid-column:1 / -1}
+  .cell{padding:16px 14px}
+  .cell b{font-size:22px}
+  .spacer{display:none}
+  /* butonul de oprit trece pe rand propriu, pe toata latimea: e cel mai
+     important lucru de pe ecran si trebuie nimerit cu degetul */
+  header .btn{width:100%;order:9;height:50px}
+  th,td{padding-left:10px;padding-right:10px}
+  td.m,td.g{font-size:12px;white-space:nowrap}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
+${LAYERS_HTML}
+<div class="wrap page">
   <header>
-    <span class="brand">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17.5 8 11l4 3.5L22 4"/><path d="M16 4h6v6"/></svg>
-      COURIER
-    </span>
-    <span class="chip"><i class="dot" id="dot"></i><span class="mono" id="state">CONNECTING</span></span>
-    <span class="chip mono faint" id="mode">--</span>
+    <span class="brand">${BRAND_MARK} COURIER</span>
+    <span class="chip"><i class="dot" id="dot"></i><span id="state">CONNECTING</span></span>
+    <span class="chip faint" id="mode">--</span>
     <span class="spacer"></span>
-    <button id="toggle" disabled>--</button>
+    <button class="btn" id="toggle" disabled>--</button>
   </header>
 
   <p class="msg" id="msg"></p>
@@ -219,7 +166,7 @@ async function load() {
      intrebarea. */
   if (!armed) {
     t.textContent = s.paused ? 'Porneste' : 'Opreste acum';
-    t.className = s.paused ? 'go' : 'stop';
+    t.className = s.paused ? 'btn btn-solid' : 'btn btn-danger';
   }
 
   tiles($('day'), [
@@ -332,24 +279,25 @@ export function loginPage(): string {
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow"><title>Courier · Console</title>
 <style>
- body{margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#fff;
-   font:400 16px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
- form{display:grid;gap:14px;width:min(360px,90vw);padding:30px;border:1px solid rgba(255,255,255,.1);
-   border-radius:18px;background:#0a0a0a}
- h1{margin:0;font-size:20px;letter-spacing:-.02em}
- p{margin:0;color:rgba(255,255,255,.55);font-size:14px}
- input{height:46px;padding:0 14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;
-   background:rgba(0,0,0,.6);color:#fff;outline:none;font:inherit}
- input:focus{border-color:#00c805}
- button{height:46px;border:none;border-radius:999px;background:#00c805;color:#000;font-weight:600;
-   font-size:15px;cursor:pointer}
+${THEME}
+body{min-height:100vh;display:grid;place-items:center}
+form{position:relative;z-index:1;display:grid;gap:16px;width:min(380px,90vw);padding:32px;
+  border:1px solid var(--line);border-radius:20px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.brand{margin-bottom:4px}
+p{margin:0;color:var(--dim);font-size:14px}
+input{height:46px;padding:0 14px;border:1px solid var(--line);border-radius:12px;
+  background:rgba(0,0,0,.5);outline:none;transition:border-color .2s,background .2s}
+input:focus{border-color:var(--green);background:rgba(0,200,5,.04)}
+input::placeholder{color:rgba(255,255,255,.26)}
 </style></head>
 <body>
+${LAYERS_HTML}
 <form method="GET" action="/">
-  <h1>Courier console</h1>
+  <span class="brand">${BRAND_MARK} COURIER</span>
   <p>Jetonul de operator. Nu e un cont si nu deschide niciun portofel.</p>
   <input name="token" type="password" placeholder="token" autocomplete="off" autofocus>
-  <button type="submit">Intra</button>
+  <button class="btn btn-solid" type="submit">Intra</button>
 </form>
 </body></html>`
 }

@@ -204,6 +204,18 @@ din hero devin reale.
 Nicio ruta nu scrie, deci nu exista suprafata de atac de aparat. Limita de
 cereri pe adresa IP e pornita implicit.
 
+## Aceeasi tema ca site-ul
+
+Peretele si consola folosesc **exact tema site-ului** din `~/stonk-agents`:
+aceleasi fonturi (Archivo si JetBrains Mono, servite din `/fonts`), aceiasi
+tokeni de culoare, aceleasi butoane si pastile, aceleasi straturi de fundal
+(grila, aura verde, granulatie).
+
+Nu e o asemanare aproximativa: `src/ui/theme.ts` e un singur fisier din care
+mananca amandoua paginile. Daca site-ul si uneltele ar arata diferit, omul ar
+simti ca sunt doua produse, si peretele public nu ar mai parea al proiectului.
+Cand se schimba tema pe site, se schimba acolo.
+
 ## Consola de operator
 
 `courier console`, sau pornita odata cu `start`. Acelasi limbaj vizual ca

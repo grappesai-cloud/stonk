@@ -13,6 +13,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { formatEther } from 'viem'
 import type { Ctx } from '../context.js'
 import { consolePage, loginPage } from './page.js'
+import { serveFont } from '../ui/assets.js'
 import { log } from '../log.js'
 
 const COOKIE = 'courier_console'
@@ -42,7 +43,7 @@ function html(res: ServerResponse, status: number, body: string): void {
     'referrer-policy': 'no-referrer',
     'x-robots-tag': 'noindex, nofollow',
     'content-security-policy':
-      "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"
+      "default-src 'none'; connect-src 'self'; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"
   })
   res.end(body)
 }
@@ -69,6 +70,10 @@ export function createConsole(ctx: Ctx) {
 
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://localhost')
+
+    /* fonturile se servesc si fara jeton: sunt doar fisiere de font, iar
+       ecranul de intrare are nevoie de ele ca sa arate a produsul nostru */
+    if (serveFont(url.pathname, res)) return
 
     if (!token) {
       return html(res, 503, loginPage().replace('Jetonul de operator.', 'Nu e configurat niciun jeton (console.token).'))

@@ -69,7 +69,12 @@ describe('intrarea', () => {
   it('fara jeton primesti ecranul de intrare, nu consola', async () => {
     const r = await fetch(`${base}/`)
     expect(r.status).toBe(401)
-    expect(await r.text()).toContain('Courier console')
+    const body = await r.text()
+    /* verificam ce e pagina, nu cum arata: campul de jeton exista, iar tabelele
+       consolei nu. Altfel testul cade la fiecare schimbare de text. */
+    expect(body).toContain('name="token"')
+    expect(body).not.toContain('id="runs"')
+    expect(body).not.toContain('id="deliveries"')
   })
 
   it('API-ul refuza fara jeton', async () => {

@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { formatEther } from 'viem'
 import type { Ctx } from '../context.js'
 import { wallPage } from './page.js'
+import { serveFont } from '../ui/assets.js'
 import { log } from '../log.js'
 
 function json(res: ServerResponse, status: number, body: unknown, cors: string): void {
@@ -84,6 +85,7 @@ export function createApi(ctx: Ctx) {
     }
 
     const url = new URL(req.url ?? '/', 'http://localhost')
+    if (serveFont(url.pathname, res)) return
     const limit = Math.min(Number(url.searchParams.get('limit') ?? 50) || 50, 500)
 
     try {
@@ -101,7 +103,7 @@ export function createApi(ctx: Ctx) {
             'x-content-type-options': 'nosniff',
             'referrer-policy': 'no-referrer',
             'content-security-policy':
-              "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+              "default-src 'none'; connect-src 'self'; font-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
           })
           res.end(wallPage(cfg))
           return
