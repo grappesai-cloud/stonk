@@ -51,3 +51,27 @@ describe('de unde vine cifra castigului', () => {
     expect(asBig('nu e numar')).toBe(0n)
   })
 })
+
+describe('citiri in lot', () => {
+  it('cand TOT lotul pica, se reia pe bucati: un lot prea mare nu inseamna date lipsa', async () => {
+    const { multiRead } = await import('../../src/core/chain/reader.js')
+    let multicalls = 0
+    let singles = 0
+    const client = {
+      chain: { contracts: { multicall3: { address: ADDR } } },
+      multicall: async ({ contracts }: { contracts: unknown[] }) => {
+        multicalls++
+        return contracts.map(() => ({ status: 'failure', error: new Error('out of gas') }))
+      },
+      readContract: async () => {
+        singles++
+        return 7n
+      }
+    } as unknown as PublicClient
+    const calls = Array.from({ length: 5 }, () => ({ address: ADDR, abi: [] as never, functionName: 'x' }))
+    const res = await multiRead<bigint>(client, calls, { chunk: 5 })
+    expect(multicalls).toBe(1)
+    expect(singles).toBe(5)
+    expect(res.every((r) => r.status === 'success')).toBe(true)
+  })
+})

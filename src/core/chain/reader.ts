@@ -49,6 +49,20 @@ export async function multiRead<T = unknown>(
         const res = (await client.multicall({ contracts: slice as never, allowFailure: true })) as unknown as Array<
           { status: 'success'; result: unknown } | { status: 'failure'; error: unknown }
         >
+        /**
+         * Cand TOT lotul a picat, nu au picat o mie de citiri: a picat una
+         * singura, cea care le duce pe toate. Se intampla cand lotul e prea
+         * mare pentru nodul din fata (gaz de apel, timp de raspuns), si atunci
+         * raspunsul e "toate au esuat", nu o exceptie.
+         *
+         * Plasa de siguranta exista de la inceput, dar se intindea doar cand
+         * multicall-ul ARUNCA. Aici nu arunca, deci nu se intindea, iar
+         * agentul credea ca nu are nimic de facut.
+         */
+        if (slice.length > 1 && res.every((r) => r.status === 'failure')) {
+          out.push(...(await readOneByOne<T>(client, slice, concurrency)))
+          continue
+        }
         for (const r of res) {
           out.push(
             r.status === 'success'

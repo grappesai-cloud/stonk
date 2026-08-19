@@ -44,6 +44,7 @@ export interface Anvil {
   port: number
   url: string
   stop: () => void
+  proxy?: { url: string; stop: () => void }
 }
 
 export interface AnvilOptions {
@@ -54,10 +55,51 @@ export interface AnvilOptions {
   order?: 'fees' | 'fifo'
 }
 
+/**
+ * Un pod local intre anvil si RPC-ul public.
+ *
+ * RPC-ul lantului sta in spatele Cloudflare, care da 403 exact clientului lui
+ * anvil, in timp ce acelasi apel din node trece. Nu e ceva ce se rezolva cu un
+ * antet: se recunoaste amprenta clientului. Asa ca anvil vorbeste cu podul asta
+ * peste HTTP simplu, iar podul duce mai departe cu fetch-ul din node.
+ *
+ * Merita tinut minte si dincolo de teste: orice unealta care forkeaza lantul
+ * asta va lovi acelasi zid.
+ */
+export async function startRpcProxy(target: string, port = 8899): Promise<{ url: string; stop: () => void }> {
+  const { createServer } = await import('node:http')
+  const server = createServer((req, res) => {
+    const chunks: Buffer[] = []
+    req.on('data', (c: Buffer) => chunks.push(c))
+    req.on('end', async () => {
+      try {
+        const upstream = await fetch(target, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: Buffer.concat(chunks).toString('utf8'),
+          signal: AbortSignal.timeout(30_000)
+        })
+        const body = await upstream.text()
+        res.writeHead(upstream.status, { 'content-type': 'application/json' })
+        res.end(body)
+      } catch (e) {
+        res.writeHead(502, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: (e as Error).message } }))
+      }
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve))
+  return { url: `http://127.0.0.1:${port}`, stop: () => server.close() }
+}
+
 export async function startAnvil(port = 8545, opts: AnvilOptions = {}): Promise<Anvil> {
   const bin = process.env.ANVIL_BIN ?? `${process.env.HOME}/.foundry/bin/anvil`
   const args = ['--port', String(port)]
-  if (opts.forkUrl) args.push('--fork-url', opts.forkUrl)
+  let proxy: { url: string; stop: () => void } | undefined
+  if (opts.forkUrl) {
+    proxy = await startRpcProxy(opts.forkUrl, port + 100)
+    args.push('--fork-url', proxy.url)
+  }
   if (opts.noMining) args.push('--no-mining')
   if (opts.order) args.push('--order', opts.order)
 
@@ -74,15 +116,28 @@ export async function startAnvil(port = 8545, opts: AnvilOptions = {}): Promise<
   const waitMs = opts.forkUrl ? 180_000 : 30_000
   const deadline = Date.now() + waitMs
   while (Date.now() < deadline) {
-    if (proc.exitCode !== null) throw new Error(`anvil exited on its own (code ${proc.exitCode}):\n${out.slice(-800)}`)
+    if (proc.exitCode !== null) {
+      proxy?.stop()
+      throw new Error(`anvil exited on its own (code ${proc.exitCode}):\n${out.slice(-800)}`)
+    }
     try {
       await client.getBlockNumber()
-      return { proc, port, url, stop: () => proc.kill('SIGKILL') }
+      return {
+        proc,
+        port,
+        url,
+        proxy,
+        stop: () => {
+          proc.kill('SIGKILL')
+          proxy?.stop()
+        }
+      }
     } catch {
       await sleep(250)
     }
   }
   proc.kill('SIGKILL')
+  proxy?.stop()
   throw new Error(`anvil did not start in ${waitMs / 1000}s. Last output:\n${out.slice(-800)}`)
 }
 
