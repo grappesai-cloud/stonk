@@ -90,7 +90,25 @@ export function consolePage(): string {
   .msg.ok{color:var(--green)}
   .msg.err{color:var(--red)}
   footer{margin-top:44px;color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.12em}
-  @media (max-width:620px){ .spacer{margin-left:0;width:100%} header{gap:12px} }
+  @media (max-width:620px){
+    .spacer{margin-left:0;width:100%}
+    header{gap:12px}
+    /* si aici placile raman doua pe rand pe telefon */
+    .grid{grid-template-columns:1fr 1fr}
+    /* cand raman impare, ultima ocupa randul intreg: o jumatate goala arata
+       a ceva neterminat, nu a spatiu */
+    .cell:last-child:nth-child(odd){grid-column:1 / -1}
+    /* butonul de oprit trece pe rand propriu, pe toata latimea: e cel mai
+       important lucru de pe ecran si trebuie nimerit cu degetul */
+    header{gap:10px}
+    .spacer{display:none}
+    header button{width:100%;order:9;height:50px}
+    .cell{padding:16px 14px}
+    .cell b{font-size:22px}
+    .wrap{padding:20px 14px 60px}
+    th,td{padding-left:10px;padding-right:10px}
+    td.m,td.g{font-size:12px;white-space:nowrap}
+  }
 </style>
 </head>
 <body>

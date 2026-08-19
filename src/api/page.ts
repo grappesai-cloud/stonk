@@ -59,6 +59,18 @@ export function wallPage(cfg: Config): string {
   .note b{color:var(--text)}
   .foot{margin-top:24px;font:500 11px/1.6 var(--mono);letter-spacing:.1em;color:var(--faint)}
   .empty{padding:48px 0;color:var(--faint);text-align:center;font-family:var(--mono);font-size:13px}
+  @media (max-width:620px){
+    /* patru cifre raman doua pe rand si pe telefon, nu una sub alta:
+       altfel pagina se lungeste si se pierde ritmul */
+    .figures{grid-template-columns:1fr 1fr}
+    .fig{padding:16px 14px}
+    .fig b{font-size:24px}
+    .wrap{padding:32px 16px 64px}
+    th,td{padding-left:8px;padding-right:8px}
+    td{font-size:13px}
+    /* adresa nu se rupe pe doua randuri; e un identificator, nu o propozitie */
+    td.mono{white-space:nowrap}
+  }
   @media (prefers-reduced-motion:reduce){.dot{animation:none}}
 </style>
 </head>
@@ -93,6 +105,8 @@ export function wallPage(cfg: Config): string {
 const EXPLORER = ${JSON.stringify(explorer)};
 const short = a => a.slice(0,6) + '\\u2026' + a.slice(-4);
 const num = (n, d) => n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+/* "0 days" pe o pagina publica arata a bug, nu a informatie */
+const waited = d => d === 0 ? 'today' : d === 1 ? '1 day' : d + ' days';
 
 async function tick(){
   try{
@@ -102,7 +116,7 @@ async function tick(){
     ]);
     document.getElementById('f-value').textContent = num(wall.valueEth, 3);
     document.getElementById('f-count').textContent = wall.count.toLocaleString('en-US');
-    document.getElementById('f-oldest').textContent = wall.oldestDays.toLocaleString('en-US');
+    document.getElementById('f-oldest').textContent = wall.oldestDays > 0 ? wall.oldestDays.toLocaleString('en-US') : '\u2014';
     document.getElementById('f-done').textContent = stats.stats.jobs.toLocaleString('en-US');
 
     const body = document.getElementById('rows');
@@ -123,7 +137,7 @@ async function tick(){
       } else { w.textContent = short(r.wallet); }
       const age = document.createElement('td');
       age.className = 'mono';
-      age.textContent = r.ageDays + ' days';
+      age.textContent = waited(r.ageDays);
       const v = document.createElement('td');
       v.className = 'val';
       v.textContent = num(r.valueEth, 4);

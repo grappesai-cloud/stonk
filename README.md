@@ -171,6 +171,13 @@ niciodata conectare de portofel. Regula asta e si apararea impotriva clonelor:
 daca e publica si absoluta, orice imitatie care cere conectare se demasca
 singura.
 
+![peretele, partea de sus](docs/perete-sus.jpg)
+![peretele, partea de jos](docs/perete-jos.jpg)
+
+Pe telefon, cele patru cifre raman doua pe rand si adresa nu se rupe in doua:
+
+![peretele pe telefon](docs/perete-mobil.jpg)
+
 Ca sa o vezi fara contracte reale:
 
 ```bash
@@ -209,6 +216,11 @@ productie: intrebarea nu e niciodata "ce a livrat", e "de ce nu".
 
 ![consola, partea de sus](docs/consola-sus.jpg)
 ![consola, partea de jos](docs/consola-jos.jpg)
+
+Pe telefon butonul de oprit trece pe rand propriu, pe toata latimea, fiindca e
+cel mai important lucru de pe ecran si trebuie nimerit cu degetul:
+
+![consola pe telefon](docs/consola-mobil.jpg)
 
 Si are un buton mare de oprit. Ala e motivul pentru care exista: la doua
 noaptea vrei sa opresti de pe telefon, nu sa cauti laptopul si cheia de SSH.
