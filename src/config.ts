@@ -194,7 +194,11 @@ export const ConfigSchema = z.object({
 
   runner: z.object({
     intervalSec: z.number().int().positive().default(300),
-    jitterSec: z.number().int().min(0).default(20)
+    jitterSec: z.number().int().min(0).default(20),
+    /** peste cat timp fara o rulare terminata /health raspunde 503; null = calculat din interval */
+    staleAfterSec: z.number().int().positive().nullable().default(null),
+    /** cainele de paza: null = calculat din interval, 0 = oprit dinadins */
+    watchdogSec: z.number().int().min(0).nullable().default(null)
   }).default({}),
 
   alerts: z.object({
@@ -213,6 +217,13 @@ export const ConfigSchema = z.object({
       gasLowWei: zBig.default(0n),
       /** in modul de veghe: anunta doar descoperirile peste pragul asta */
       foundMinValueWei: zBig.default(0n)
+    }).default({}),
+    /* Pulsul catre un ciocanitor din afara. Un proces mort nu poate raporta ca
+       a murit, deci raportarea se face invers: cine nu mai primeste, tipa. */
+    heartbeat: z.object({
+      url: z.string().nullable().default(null),
+      failUrl: z.string().nullable().default(null),
+      timeoutMs: z.number().int().positive().default(5000)
     }).default({}),
     watchers: z.object({
       enabled: z.boolean().default(true),
@@ -247,7 +258,15 @@ export const ConfigSchema = z.object({
   }).default({}),
 
   storage: z.object({
-    file: z.string().default('./data/courier.db')
+    file: z.string().default('./data/courier.db'),
+    /* Registrul e produsul. Copia se face din procesul care scrie, cu VACUUM
+       INTO, si se verifica imediat dupa ce a fost scrisa. */
+    backup: z.object({
+      enabled: z.boolean().default(true),
+      dir: z.string().default('./data/backups'),
+      everyHours: z.number().positive().default(6),
+      keep: z.number().int().positive().default(28)
+    }).default({})
   }).default({})
 })
 

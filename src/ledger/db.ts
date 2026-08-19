@@ -566,6 +566,17 @@ export class Ledger {
     return r?.t ?? null
   }
 
+  /**
+   * Ultima rulare care chiar s-a terminat. Alta intrebare decat lastRunAt:
+   * una pornita acum zece minute si nemaiterminata inseamna ca botul e
+   * intepenit, iar diferenta asta e tot ce sta intre "merge" si "pare ca
+   * merge".
+   */
+  lastFinishedRunAt(): number | null {
+    const r = this.db.prepare('SELECT MAX(finished_at) AS t FROM runs').get() as { t: number | null }
+    return r?.t ?? null
+  }
+
   // ---------------------------------------------------------------- agenti
   /**
    * Socoteala unui singur agent. Asta e cifra pe care o vinde toata colectia:

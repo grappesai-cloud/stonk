@@ -75,7 +75,7 @@
     "maxConsecutiveFailures": 5
   },
 
-  "runner": { "intervalSec": 300, "jitterSec": 20 },
+  "runner": { "intervalSec": 300, "jitterSec": 20, "staleAfterSec": null, "watchdogSec": null },
 
   "alerts": {
     "telegram": {
@@ -94,5 +94,8 @@
 
   "_console": "Consola de operator. Alt port decat API-ul public, legat pe localhost, cu jeton din mediu. Scrie doar fisierul de oprire.",
   "console": { "enabled": true, "host": "127.0.0.1", "port": 8789, "token": "env:CONSOLE_TOKEN" },
-  "storage": { "file": "./data/courier.db" }
+  "storage": {
+    "file": "./data/courier.db",
+    "backup": { "enabled": true, "dir": "./data/backups", "everyHours": 6, "keep": 28 }
+  }
 }

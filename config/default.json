@@ -75,7 +75,8 @@
     "maxConsecutiveFailures": 5
   },
 
-  "runner": { "intervalSec": 300, "jitterSec": 20 },
+  "_runner": "staleAfterSec: peste cat timp /health raspunde 503. watchdogSec: peste cat timp procesul iese singur ca sa fie repornit; null = calculat din interval, 0 = oprit.",
+  "runner": { "intervalSec": 300, "jitterSec": 20, "staleAfterSec": null, "watchdogSec": null },
 
   "alerts": {
     "telegram": {
@@ -87,6 +88,8 @@
       "digestHour": 9,
       "gasLowWei": "5000000000000000"
     },
+    "_heartbeat": "Ciocanitorul din afara: healthchecks.io, Uptime Kuma, BetterStack. Un proces mort nu poate anunta ca a murit, deci anunta cine nu mai primeste ciocanit.",
+    "heartbeat": { "url": "env:HEARTBEAT_URL", "failUrl": null, "timeoutMs": 5000 },
     "watchers": { "enabled": true, "maxChatsPerAddress": 50, "maxAddressesPerChat": 25 }
   },
 
@@ -94,5 +97,9 @@
 
   "_console": "Consola de operator. Alt port decat API-ul public, legat pe localhost, cu jeton din mediu. Scrie doar fisierul de oprire.",
   "console": { "enabled": true, "host": "127.0.0.1", "port": 8789, "token": "env:CONSOLE_TOKEN" },
-  "storage": { "file": "./data/courier.db" }
+  "_storage": "Registrul e produsul. Copia se face cu VACUUM INTO din procesul care scrie si se verifica imediat.",
+  "storage": {
+    "file": "./data/courier.db",
+    "backup": { "enabled": true, "dir": "./data/backups", "everyHours": 6, "keep": 28 }
+  }
 }

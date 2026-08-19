@@ -270,7 +270,14 @@ function strip(s){
   item('MODE', s.watchtower ? 'WATCH' : String(s.mode).toUpperCase() + (s.dryRun ? ' \\u00b7 USCAT' : ''),
     s.watchtower ? '' : (s.dryRun ? 'warn' : ''));
   item('OPERATOR', s.operator ? num(s.operatorBalanceEth, 4) + ' ' + s.symbol : 'no key', s.operatorLow ? 'bad' : '');
-  item('LAST', s.lastRunAt ? ago(s.lastRunAt) : '--');
+  item('LAST', s.lastRunAt ? ago(s.lastRunAt) : '--', s.health && s.health.stale ? 'bad' : '');
+  /* o copie a registrului veche de doua ori cat ritmul ei nu mai e o copie,
+     e o promisiune; se vede aici, nu intr-un log pe care nu il citeste nimeni */
+  if (s.backup && s.backup.enabled) {
+    const nowSec = Math.floor(Date.now()/1000);
+    const stale = !s.backup.at || (nowSec - s.backup.at) > s.backup.everyHours * 7200;
+    item('BACKUP', s.backup.at ? ago(s.backup.at) : 'never', stale ? 'warn' : '');
+  }
   const nb = item('NEXT', s.running ? 'NOW' : (s.nextRunAt ? mmss(s.nextRunAt - Math.floor(Date.now()/1000)) : '--'));
   nb.id = 'next-b';
 }

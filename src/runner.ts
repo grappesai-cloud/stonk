@@ -14,6 +14,9 @@ import { probeGating, simulateEach } from './simulate/simulate.js'
 import { execute } from './execute/executor.js'
 import type { FoundNews } from './alerts/telegram.js'
 import { reconcile } from './reconcile.js'
+import { backupDue, backupOnce } from './ledger/backup.js'
+import { beat, beatFailure } from './alerts/heartbeat.js'
+import { isWedged, watchdogSec } from './health.js'
 import { log } from './log.js'
 
 export interface RunOutcome {
@@ -216,6 +219,24 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
   control.attached = true
   const savedDry = ctx.cfg.execution.dryRun
 
+  /* Cainele de paza. Nu apara de caderi, alea le prinde politica de restart a
+     containerului. Apara de cazul urat: procesul traieste, portul raspunde,
+     dar nicio rulare nu se mai termina. Atunci iese singur, cu cod 1, si il
+     ridica inapoi acelasi restart. */
+  const watchdog = watchdogSec(ctx.cfg)
+  let lastCompletedMs = Date.now()
+  const guard = watchdog
+    ? setInterval(() => {
+        if (!isWedged(lastCompletedMs, Date.now(), watchdog)) return
+        log.fatal(
+          { sinceSec: Math.floor((Date.now() - lastCompletedMs) / 1000), watchdogSec: watchdog },
+          'no run finished in too long, exiting so the supervisor restarts me'
+        )
+        process.exit(1)
+      }, 30_000)
+    : null
+  guard?.unref?.()
+
   while (true) {
     /* o cerere din consola poate cere explicit rulare uscata, fara sa schimbe
        configurarea de fond */
@@ -230,6 +251,9 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
       control.finished(o, dryThisRun)
       onRun?.(o)
       consecutiveFailures = 0
+      lastCompletedMs = Date.now()
+      await beat(ctx.cfg.alerts.heartbeat)
+      maybeBackup(ctx)
       log.info(
         {
           delivered: o.delivered,
@@ -243,9 +267,11 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
     } catch (e) {
       consecutiveFailures++
       log.error({ err: (e as Error).message, consecutiveFailures }, 'run failed')
+      await beatFailure(ctx.cfg.alerts.heartbeat)
       if (consecutiveFailures >= ctx.cfg.execution.maxConsecutiveFailures) {
         control.running = false
         control.attached = false
+        if (guard) clearInterval(guard)
         log.fatal('too many consecutive failed runs, stopping')
         throw e
       }
@@ -259,5 +285,25 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
     control.nextRunAt = Math.floor((Date.now() + waitMs) / 1000)
     /* somnul se rupe daca cineva apasa butonul din consola */
     await control.sleep(waitMs)
+  }
+}
+
+/**
+ * Copia registrului, daca a trecut destul de la ultima. Ruleaza in procesul
+ * care scrie, imediat dupa o rulare terminata, adica in momentul cel mai
+ * linistit din tot ciclul.
+ *
+ * Nu are voie sa opreasca bucla: o copie care nu s-a putut face e o problema
+ * de raportat, nu un motiv sa nu mai livrezi.
+ */
+function maybeBackup(ctx: Ctx): void {
+  const b = ctx.cfg.storage.backup
+  if (!b.enabled) return
+  if (!backupDue(ctx.ledger, b.everyHours)) return
+  try {
+    const r = backupOnce(ctx.ledger, b.dir, b.keep)
+    log.info({ file: r.file, bytes: r.bytes, rows: r.rows, pruned: r.pruned.length, ms: r.ms }, 'ledger backed up')
+  } catch (e) {
+    log.error({ err: (e as Error).message }, 'backup failed')
   }
 }

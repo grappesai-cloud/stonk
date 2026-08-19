@@ -4,9 +4,14 @@ Written 2026-08-19. This is the honest state, not the pitch.
 
 ## Where we are
 
-**The bot is finished and tested.** 118 tests, including a fork of Robinhood
+**The bot is finished and tested.** 144 tests, including a fork of Robinhood
 Chain mainnet running against the real ERC-6551 registry deployed there, and an
 owner-gating probe run against a live third-party contract we do not control.
+
+**The container is proven.** The image builds, boots, scans, delivers a real
+batch, writes verified backups to the volume, answers 503 when it goes stale,
+and restarts itself when the watchdog bites. Verified against a running
+container, not assumed from the Dockerfile.
 
 **It has never touched production.** No transaction has ever been signed on a
 real chain. Every delivery so far happened on a local chain or a fork.
@@ -35,7 +40,9 @@ so there is no risk, no gas, and no permission needed from anyone.
 - [ ] `courier doctor` until every line is OK (the gating line may say NO; fine here)
 - [ ] `courier scan` and record the first real number: how much is sitting unclaimed
 - [ ] register the Telegram channel and bot handle **before announcing anything**
+- [ ] create the dead-man check (healthchecks.io or similar), put it in `HEARTBEAT_URL`
 - [ ] point a subdomain at the box, deploy with `docker compose up -d`
+- [ ] confirm `courier backup --list` shows copies after the first day
 - [ ] set `publicUrl` so alerts link to the per-wallet pages
 - [ ] `courier start --watchtower`
 

@@ -3,6 +3,7 @@
  * Linia de comanda. Regula: implicit nu se trimite nimic. `--live` e singurul
  * lucru care porneste semnarea, si se scrie de mana de fiecare data.
  */
+import { statSync } from 'node:fs'
 import { formatEther } from 'viem'
 import { Command } from 'commander'
 import { buildContext, type Ctx } from './context.js'
@@ -10,6 +11,7 @@ import { doctor, verifyTbaMath } from './doctor.js'
 import { discover } from './init.js'
 import { tbaAddress } from './erc6551/address.js'
 import { runForever, runOnce } from './runner.js'
+import { backupOnce, listBackups } from './ledger/backup.js'
 import { startApi } from './api/server.js'
 import { startConsole } from './console/server.js'
 import { discoverTokenIds, ownersOf } from './discover/brokers.js'
@@ -221,6 +223,47 @@ program
       )
     }
     ctx.ledger.close()
+  })
+
+program
+  .command('backup')
+  .description('write a verified copy of the ledger, now')
+  .option('--dir <path>', 'where to write it')
+  .option('--keep <n>', 'how many copies to keep')
+  .option('--list', 'only list the copies already on disk', false)
+  .action(async (o: { dir?: string; keep?: string; list: boolean }) => {
+    const ctx = ctxOf()
+    const dir = o.dir ?? ctx.cfg.storage.backup.dir
+    const keep = o.keep ? Number(o.keep) : ctx.cfg.storage.backup.keep
+
+    if (o.list) {
+      const files = listBackups(dir)
+      if (!files.length) process.stdout.write(`\nno copies in ${dir}\n`)
+      for (const f of files) {
+        const st = statSync(f)
+        process.stdout.write(`${new Date(st.mtimeMs).toISOString()}  ${String(st.size).padStart(9)} B  ${f}\n`)
+      }
+      ctx.ledger.close()
+      return
+    }
+
+    try {
+      const r = backupOnce(ctx.ledger, dir, keep)
+      const rows = Object.entries(r.rows).map(([k, v]) => `${k} ${v}`).join(', ')
+      process.stdout.write(
+        `\n${r.file}\n` +
+          `  ${r.bytes} bytes, written and verified in ${r.ms} ms\n` +
+          `  integrity check: ${r.integrity}\n` +
+          `  rows: ${rows}\n` +
+          (r.pruned.length ? `  pruned ${r.pruned.length} old ${r.pruned.length === 1 ? 'copy' : 'copies'}, keeping ${keep}\n` : '')
+      )
+      ctx.ledger.close()
+    } catch (e) {
+      process.stdout.write(`\nBACKUP FAILED: ${(e as Error).message}\n`)
+      process.stdout.write('The copy was deleted. A file you cannot trust is worse than no file.\n')
+      ctx.ledger.close()
+      process.exit(1)
+    }
   })
 
 program

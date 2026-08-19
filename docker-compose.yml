@@ -5,9 +5,29 @@ services:
     env_file: .env
     environment:
       LOG_FORMAT: json
+      # In container, legarea pe 127.0.0.1 ar ascunde serverul si de proxy-ul
+      # care publica portul. Granita nu se pierde: pe gazda, portul de mai jos
+      # e publicat tot pe loopback.
+      API_HOST: 0.0.0.0
+      CONSOLE_HOST: 0.0.0.0
     volumes:
+      # registrul si copiile lui traiesc pe gazda, nu in container
       - ./data:/app/data
       - ./config:/app/config:ro
     ports:
       - "127.0.0.1:8787:8787"
+      # consola de operator: tot pe loopback, se ajunge la ea prin tunel SSH
+      - "127.0.0.1:8789:8789"
     command: ["start", "-c", "./config/default.json"]
+
+  # Copia registrului se face si singura, din bot, la fiecare cateva ore. Asta
+  # e pentru cand vrei una acum, inainte de o migrare sau de un redeploy:
+  #   docker compose run --rm backup
+  backup:
+    build: .
+    profiles: ["tools"]
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    command: ["backup", "-c", "./config/default.json"]

@@ -14,6 +14,7 @@ import { formatEther } from 'viem'
 import type { Ctx } from '../context.js'
 import { consolePage, loginPage } from './page.js'
 import { serveFont } from '../ui/assets.js'
+import { healthOf } from '../health.js'
 import { log } from '../log.js'
 
 const COOKIE = 'courier_console'
@@ -155,6 +156,14 @@ export function createConsole(ctx: Ctx) {
         canRun: ctx.control.attached,
         nextRunAt: ctx.control.nextRunAt,
         lastRunAt: ledger.lastRunAt(),
+        /* viu sau doar pornit: cate secunde de la ultima rulare TERMINATA */
+        health: healthOf(ledger.lastFinishedRunAt(), cfg),
+        /* ultima copie a registrului, ca operatorul sa vada ca exista una */
+        backup: {
+          enabled: cfg.storage.backup.enabled,
+          at: Number(ledger.kvGet('backup.last') ?? 0) || null,
+          everyHours: cfg.storage.backup.everyHours
+        },
         intervalSec: cfg.runner.intervalSec,
         latencyMs,
         gasPriceWei,
@@ -281,8 +290,11 @@ export function startConsole(ctx: Ctx): ReturnType<typeof createServer> | null {
     return null
   }
   const server = createConsole(ctx)
-  server.listen(ctx.cfg.console.port, ctx.cfg.console.host, () => {
-    log.info({ host: ctx.cfg.console.host, port: ctx.cfg.console.port }, 'operator console listening')
+  /* la fel ca la API: in container legarea pe loopback ascunde consola si de
+     tine, nu doar de straini */
+  const host = process.env.CONSOLE_HOST || ctx.cfg.console.host
+  server.listen(ctx.cfg.console.port, host, () => {
+    log.info({ host, port: ctx.cfg.console.port }, 'operator console listening')
   })
   return server
 }

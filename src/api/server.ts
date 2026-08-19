@@ -29,6 +29,7 @@ const AGENT_ABI = [
   }
 ] as const
 import { serveFont } from '../ui/assets.js'
+import { healthOf } from '../health.js'
 import { log } from '../log.js'
 
 function htmlPage(res: ServerResponse, body: string): void {
@@ -202,9 +203,37 @@ export function createApi(ctx: Ctx) {
       }
 
       switch (url.pathname) {
+        /* Sondajul containerului si al oricarui monitor din afara. Raspunde 503
+           cand nu s-a mai terminat nicio rulare de prea mult timp: un proces
+           care raspunde vesel 200 in timp ce nu mai scaneaza nimic e cel mai
+           scump fel de a fi picat. */
         case '/health': {
-          const block = await ctx.client.getBlockNumber()
-          return json(res, 200, { ok: true, chainId: cfg.network.chainId, block, mode: cfg.policy.mode, dry: cfg.execution.dryRun }, cors)
+          let block: string | null = null
+          let chainOk = true
+          try {
+            block = String(await ctx.client.getBlockNumber())
+          } catch {
+            chainOk = false
+          }
+          const h = healthOf(ledger.lastFinishedRunAt(), cfg)
+          const ok = chainOk && !h.stale
+          return json(
+            res,
+            ok ? 200 : 503,
+            {
+              ok,
+              chainId: cfg.network.chainId,
+              chainOk,
+              block,
+              mode: cfg.watchtower ? 'watchtower' : cfg.policy.mode,
+              dry: cfg.execution.dryRun,
+              lastRunAt: h.lastRunAt,
+              ageSec: h.ageSec,
+              staleAfterSec: h.staleAfterSec,
+              stale: h.stale
+            },
+            cors
+          )
         }
 
         /* peretele uitatilor, ca pagina */
@@ -347,8 +376,13 @@ export function createApi(ctx: Ctx) {
 export function startApi(ctx: Ctx): ReturnType<typeof createServer> | null {
   if (!ctx.cfg.api.enabled) return null
   const server = createApi(ctx)
-  server.listen(ctx.cfg.api.port, ctx.cfg.api.host, () => {
-    log.info({ host: ctx.cfg.api.host, port: ctx.cfg.api.port }, 'api listening')
+  /* In container, 127.0.0.1 inseamna "nimeni nu ma vede", nici macar proxy-ul
+     care publica portul. De aia mediul bate configurarea aici: docker-compose
+     pune API_HOST=0.0.0.0, iar granita ramane tot pe gazda, unde portul e
+     publicat doar pe loopback. */
+  const host = process.env.API_HOST || ctx.cfg.api.host
+  server.listen(ctx.cfg.api.port, host, () => {
+    log.info({ host, port: ctx.cfg.api.port }, 'api listening')
   })
   return server
 }

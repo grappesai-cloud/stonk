@@ -521,6 +521,64 @@ livrare dar inregistra tot grupul ca trimis. Registrul ar fi aratat zece livrari
 acolo unde s-a facut una. Acum, fara contract de lot, o tranzactie duce exact o
 livrare, garantat si probat.
 
+## Copia registrului
+
+Registrul e produsul: fara el nu mai poti dovedi ca un agent a livrat vreodata
+ceva, adica exact cifra din care se decide supply-ul si pretul. Deci se copiaza.
+
+Copia se face **din procesul care scrie**, cu `VACUUM INTO`, nu cu `cp`. Baza e
+in mod WAL, iar un `cp` peste o baza vie da un fisier care pare in regula si e
+rupt: randurile scrise ultima data pot sa nu fie inca in fisierul principal.
+
+Si se verifica. Imediat dupa ce a fost scrisa, copia se deschide din nou, i se
+cere `integrity_check`, i se numara randurile si se compara cu sursa pe
+tabelele care doar cresc. **Daca ceva nu e in regula, fisierul se sterge pe
+loc**: o copie in care ai incredere degeaba e mai rea decat lipsa ei.
+
+```bash
+courier backup           # una acum, verificata, cu rotatie
+courier backup --list    # ce copii sunt pe disc
+```
+
+Automat: la fiecare `storage.backup.everyHours`, imediat dupa o rulare
+terminata, adica in momentul cel mai linistit din ciclu. Se pastreaza ultimele
+`keep` copii. Consola arata cand s-a facut ultima, si o ingalbeneste daca a
+trecut de doua ori ritmul ei.
+
+Refacerea e o copiere de fisier peste `storage.file`, cu botul oprit. Nu are
+comanda proprie dinadins: e o operatie pe care o faci constient, nu una pe care
+o nimeresti.
+
+## Cat de viu e
+
+Sunt doua feluri de mort si se rezolva diferit.
+
+**Procesul a cazut.** Il ridica inapoi politica de restart a containerului.
+Nimic de facut in cod.
+
+**Procesul traieste dar nu mai termina nicio rulare.** Asta e cazul scump,
+pentru ca portul raspunde vesel si toata lumea crede ca merge. Doua lucruri il
+prind:
+
+- `/health` raspunde **503** cand nu s-a mai terminat nicio rulare de mai mult
+  de `runner.staleAfterSec` (implicit: de trei ori intervalul, plus doua
+  minute). Asta vede healthcheck-ul din Dockerfile si orice monitor din afara.
+- **cainele de paza**: dupa `runner.watchdogSec` fara nicio rulare terminata,
+  procesul iese singur cu cod 1 si il repune acelasi restart. Implicit se
+  calculeaza din interval, `0` il opreste.
+
+Atentie la ce NU face healthcheck-ul: un container marcat `unhealthy` de Docker
+**nu e repornit** de `restart: unless-stopped`. De aia exista cainele de paza.
+Healthcheck-ul spune, cainele face.
+
+Si al treilea caz, cel pe care nu il poate raporta nimeni din interior: **masina
+s-a stins**. Un proces mort nu poate sa anunte ca a murit, deci raportarea se
+face invers. Pui `HEARTBEAT_URL` in `.env`, botul ciocaneste acolo dupa fiecare
+rulare reusita, iar cand ciocanitul nu mai vine, serviciul din afara te suna pe
+tine. Merge cu healthchecks.io, Uptime Kuma, BetterStack, orice ciocanitor.
+Optional `alerts.heartbeat.failUrl` pentru ca monitorul sa afle de o rulare
+cazuta acum, nu peste o fereastra intreaga.
+
 ## Desfasurare
 
 ```bash
@@ -532,9 +590,14 @@ Pe Coolify: aplicatie cu build pack Dockerfile, portul 8787, un volum montat pe
 pornire ramane cea din imagine. Healthcheck-ul e deja in Dockerfile si loveste
 `/health`.
 
+**In container, `api.host` din configurare nu e de ajuns.** Legarea pe
+`127.0.0.1` inauntrul containerului inseamna ca nu te vede nici proxy-ul care
+publica portul, deci `docker-compose.yml` pune `API_HOST=0.0.0.0` si
+`CONSOLE_HOST=0.0.0.0`, iar mediul bate configurarea. Granita nu se pierde: pe
+gazda, porturile sunt publicate tot pe loopback (`127.0.0.1:8787:8787`), iar la
+consola se ajunge prin tunel SSH.
+
 Datele stau pe volum: registrul e produsul, nu se pierde la redeploy.
-Portul e legat pe `127.0.0.1`, se pune un reverse proxy in fata daca trebuie
-expus.
 
 Cheia operatorului sta in `.env`, pe server. **Wallet nou, facut pe server, cu
 gaz cat pentru cateva zile, fara legatura cu nimic altceva.** Daca e compromisa,

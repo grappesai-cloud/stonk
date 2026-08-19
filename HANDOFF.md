@@ -99,10 +99,11 @@ sending a transaction.
 
 ## 6. What is already built and tested
 
-132 tests, 13 files. Not a demo, not an MVP.
+144 tests, 14 files. Not a demo, not an MVP.
 
-- **87 unit tests**: policy, ERC-6551 math, ledger accounting, config parsing,
-  Telegram, console auth, ABI discovery, CLI args, contract math.
+- **99 unit tests**: policy, ERC-6551 math, ledger accounting, config parsing,
+  Telegram, console auth, ABI discovery, CLI args, contract math, backup
+  verification, liveness windows.
 - **45 end-to-end tests** on a real chain (anvil), including:
   - a **fork of Robinhood Chain mainnet** running against the real ERC-6551
     registry deployed there,
@@ -128,6 +129,8 @@ All three would have shipped silently without the e2e suite.
     courier start --watchtower    loop forever, never sign anything
     courier wall                  the wall of the forgotten, in the terminal
     courier report                delivered, earned, burned on gas
+    courier backup                a verified copy of the ledger, now
+    courier backup --list         what copies are already on disk
     courier tba <tokenId>         the 6551 wallet of a broker, computed locally
 
 `init` proposes, it never guesses. A function called `claim` can mean three
@@ -174,7 +177,51 @@ the feed, and the gas balance. The stop button is a two-step confirm inside the
 button itself, because a browser dialog would block automation and because
 stopping a bot should take one deliberate second.
 
-## 11. The NFT contract
+## 11. Running it: backup, liveness, restart
+
+The image builds and was run end to end: it booted, scanned a chain, delivered
+a real batch, wrote verified backups to the mounted volume, and restarted
+itself after a crash. Proven, not assumed.
+
+**Backup.** The ledger is the product, so it gets copied every few hours from
+inside the process that writes it, using SQLite's own `VACUUM INTO` rather than
+a file copy. That distinction matters: the database runs in WAL mode, and a
+plain `cp` of a live database gives you a file that looks fine and is broken,
+missing exactly the rows written most recently.
+
+Every copy is verified the moment it is written: reopened, `integrity_check`,
+row counts compared against the source on the append-only tables. **If it does
+not check out, the file is deleted immediately.** A backup you trust for
+nothing is worse than no backup. `courier backup` does one on demand,
+`courier backup --list` shows what is on disk, and old copies rotate out.
+
+**Liveness.** Two different kinds of dead:
+
+- *The process crashed.* The container restart policy puts it back. Nothing
+  clever needed.
+- *The process is alive but no longer finishing runs.* This is the expensive
+  one, because the port answers and everybody assumes it works. Two things
+  catch it: `/health` returns **503** once no run has finished for longer than
+  the configured window, and a watchdog exits the process with code 1 after a
+  longer window so the same restart policy picks it up.
+
+Worth knowing: a container Docker marks `unhealthy` is **not** restarted by
+`restart: unless-stopped`. The healthcheck reports, the watchdog acts. Both are
+in, and both were verified against a running container.
+
+**The third case nobody inside can report: the machine is off.** A dead process
+cannot announce that it died, so the reporting runs the other way. Set
+`HEARTBEAT_URL` and the bot knocks on it after every successful run. When the
+knocking stops, an outside service pages you. Works with healthchecks.io,
+Uptime Kuma, BetterStack, any dead-man switch.
+
+**One container gotcha, found by actually building the image:** binding to
+`127.0.0.1` inside a container hides the server from the proxy publishing the
+port, so the compose file sets `API_HOST=0.0.0.0` and the environment overrides
+the config. The boundary does not move: on the host, the ports are still
+published to loopback only.
+
+## 12. The NFT contract
 
 `StonkAgent.sol`. Written, tested with 14 on-chain tests, deploy script ready,
 **not deployed**. Three decisions are encoded in it:
@@ -207,7 +254,7 @@ The deploy script is dry run by default. It refuses to run if the RPC chain ID
 does not match the config, or if any address it assumes exists has no code on
 it. It leaves the mint closed.
 
-## 12. What we measured, not guessed
+## 13. What we measured, not guessed
 
 Batching deliveries cuts the cost per delivery by about 79 percent, and the
 curve flattens past a batch of 25, which is why the default batch size is what
@@ -221,7 +268,7 @@ protocol pays per delivery, or how many deliveries a month are possible. Stage
 1 answers the first. Stage 2 answers the rest. Only then do supply and price
 stop being vibes.
 
-## 13. What is blocking
+## 14. What is blocking
 
 Two addresses. That is the entire blocker list.
 
@@ -235,7 +282,7 @@ implementation and Multicall3 are all deployed.
 
 Give the bot those two addresses and watchtower can be live the same week.
 
-## 14. Deliberately not built
+## 15. Deliberately not built
 
 - **The marketplace**, until drain-on-transfer is solved atomically. See 11.
 - **Stocker**, the agent that would hand protocol bankroll authority to a
@@ -245,7 +292,7 @@ Give the bot those two addresses and watchtower can be live the same week.
 - **Opening the mint.** Supply and price should come from a month of measured
   revenue, not from a round number that looks good in a tweet.
 
-## 15. Rules that do not get broken
+## 16. Rules that do not get broken
 
 - the operator key is created **on the server**, funded with a few days of gas,
   and never exists on a laptop
@@ -256,12 +303,13 @@ Give the bot those two addresses and watchtower can be live the same week.
 - mint price is justified by the tool that already works, never by the roadmap
 - `--live` is typed by hand every single time
 
-## 16. Ship order
+## 17. Ship order
 
 **Stage 1, watchtower.** Two addresses, `doctor` until it is green, `scan` for
 the first real number, Telegram channel registered before anything is
-announced, subdomain pointed at the box, `docker compose up -d`, then
-`courier start --watchtower`. No key, no risk.
+announced, a dead-man check created and its URL in `HEARTBEAT_URL`, subdomain
+pointed at the box, `docker compose up -d`, then `courier start --watchtower`.
+No key, no risk.
 
 **Stage 2, courier.** Only after `doctor` says a stranger can call `deliver()`.
 Fresh key on the server, simulate, dry run, read the ledger, deploy the batch
