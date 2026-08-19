@@ -9,6 +9,9 @@
     "owner": null
   },
 
+  "_fleet": "Agentii in numele carora se lucreaza si portofelele lor 6551. Goala = un singur agent. Cu membri, bacsisul se imparte PE LANT intre ei, in aceeasi tranzactie cu livrarile. Se genereaza cu `courier fleet`, nu se scrie de mana.",
+  "fleet": [],
+
   "network": {
     "name": "base",
     "chainId": 8453,

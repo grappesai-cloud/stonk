@@ -22,6 +22,7 @@ import type { Ledger } from '../ledger/db.js'
 import type { Claim } from '../scan/claims.js'
 import { BATCH_ABI, deliverCalldata, simulateBatch, type BatchSim } from '../simulate/simulate.js'
 import { decideProfit, gasPriceAcceptable, withinDailyBudget, type Skipped } from '../policy/rules.js'
+import { agentIdsOf, rotate, sharesOf, type Split } from '../fleet.js'
 import { log } from '../log.js'
 
 const BATCH_EVENT_ABI = [
@@ -102,6 +103,12 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
      lucrat; fara el nu se poate dovedi niciodata ce a castigat o bucata anume */
   const agentId = cfg.agent.id
 
+  /* Rotatia flotei continua de unde a ramas ultima rulare. Daca ar porni de
+     fiecare data de la zero, primii agenti din lista ar lua toata munca si
+     "fiecare bucata castiga la fel" ar fi o minciuna verificabila. */
+  const fleet = cfg.fleet
+  let cursor = Number(ledger.kvGet('fleet.cursor') ?? 0) || 0
+
   // 2. pretul gazului
   const gasPriceWei = await client.getGasPrice()
   const priceVerdict = gasPriceAcceptable(gasPriceWei, cfg)
@@ -128,13 +135,30 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       break
     }
 
+    /* Cine ia ce, inainte de simulare: lotul trebuie simulat exact cum va fi
+       trimis, cu aceleasi cote, altfel bacsisul masurat nu e al acestei
+       tranzactii. */
+    const picks = rotate(fleet.length, group.length, cursor)
+    const shares: Split[] = sharesOf(fleet, picks)
+    const groupAgents = agentIdsOf(fleet, picks)
+    const agentByToken = new Map<string, number | null>()
+    group.forEach((c, i) => agentByToken.set(c.tokenId.toString(), fleet.length ? (groupAgents[i] ?? null) : agentId))
+    const agentFor = (c: Claim): number | null => {
+      const k = c.tokenId.toString()
+      return agentByToken.has(k) ? (agentByToken.get(k) ?? null) : agentId
+    }
+    if (fleet.length) {
+      cursor = (cursor + group.length) % fleet.length
+      ledger.kvSet('fleet.cursor', String(cursor))
+    }
+
     let sim: BatchSim
     try {
-      sim = await simulateBatch(client, cfg, account ?? from, group)
+      sim = await simulateBatch(client, cfg, account ?? from, group, shares)
     } catch (e) {
       log.error({ err: (e as Error).message }, 'batch simulation failed, skipping the batch')
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', `simulation failed: ${(e as Error).message}`, agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', `simulation failed: ${(e as Error).message}`, agentFor(c)))
         out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail: 'simulation failed' })
       }
       continue
@@ -147,7 +171,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
         'Deploy CourierBatch, switch to campaign mode, or set requireMeasuredTips to false and accept delivering blind.'
       out.stoppedBy = detail
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', detail, agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', detail, agentFor(c)))
         out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail })
       }
       log.error(detail)
@@ -157,7 +181,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     const verdict = decideProfit({ tipWei: sim.tipsWei, gasCostWei: sim.gasCostWei, cfg })
     if (!verdict.go && sim.tipsMeasured) {
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', verdict.detail, agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', verdict.detail, agentFor(c)))
         out.skipped.push({ tokenId: c.tokenId, reason: 'unprofitable', detail: verdict.detail })
       }
       continue
@@ -168,7 +192,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     if (!budget.go) {
       out.stoppedBy = `daily budget spent: ${budget.detail}`
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', budget.detail, agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', budget.detail, agentFor(c)))
         out.skipped.push({ tokenId: c.tokenId, reason: 'daily-budget', detail: budget.detail })
       }
       break
@@ -177,7 +201,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     // 5. modul uscat: totul s-a calculat, nu se semneaza nimic
     if (cfg.execution.dryRun) {
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'dry', 'dry run', agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'dry', 'dry run', agentFor(c)))
       }
       out.tipsWei += sim.tipsWei
       out.gasWei += sim.gasCostWei
@@ -195,18 +219,18 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     if (balance < sim.gasCostWei) {
       out.stoppedBy = `balance too low: ${balance} under the estimated gas ${sim.gasCostWei}`
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'skipped', 'balance too low', agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'skipped', 'balance too low', agentFor(c)))
       }
       break
     }
 
     // 7. trimitere
     try {
-      const hash = await send(wallet, account, cfg, sim, client)
+      const hash = await send(wallet, account, cfg, sim, client, shares)
       out.txHashes.push(hash)
       for (const c of group) {
         ledger.recordDelivery({
-          ...row(runId, c, owners, 'sent', null, agentId),
+          ...row(runId, c, owners, 'sent', null, agentFor(c)),
           txHash: hash
         })
       }
@@ -245,7 +269,7 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
       const msg = (e as Error).message
       log.error({ err: msg }, 'sending the batch failed')
       for (const c of group) {
-        ledger.recordDelivery(row(runId, c, owners, 'failed', msg, agentId))
+        ledger.recordDelivery(row(runId, c, owners, 'failed', msg, agentFor(c)))
       }
       out.stoppedBy = `send failed: ${msg}`
       break
@@ -260,7 +284,8 @@ async function send(
   account: Account,
   cfg: Config,
   sim: BatchSim,
-  client: PublicClient
+  client: PublicClient,
+  shares: Split[] = []
 ): Promise<Hex> {
   const beneficiary = cfg.execution.beneficiary ?? account.address
   const nonce = await client.getTransactionCount({ address: account.address, blockTag: 'pending' })
@@ -269,11 +294,19 @@ async function send(
   if (cfg.execution.maxPriorityFeePerGasWei !== null) fees.maxPriorityFeePerGas = cfg.execution.maxPriorityFeePerGasWei
 
   if (cfg.execution.batchContract) {
-    const data = encodeFunctionData({
-      abi: BATCH_ABI,
-      functionName: 'run',
-      args: [cfg.drops.address, sim.calldata, cfg.policy.gasCapPerCall, beneficiary]
-    })
+    /* Cu flota, plata pleaca in aceeasi tranzactie catre portofelul 6551 al
+       fiecarui agent. Fara flota, un singur beneficiar, ca pana acum. */
+    const data = shares.length
+      ? encodeFunctionData({
+          abi: BATCH_ABI,
+          functionName: 'runSplit',
+          args: [cfg.drops.address, sim.calldata, cfg.policy.gasCapPerCall, shares] as never
+        })
+      : encodeFunctionData({
+          abi: BATCH_ABI,
+          functionName: 'run',
+          args: [cfg.drops.address, sim.calldata, cfg.policy.gasCapPerCall, beneficiary]
+        })
     return wallet.sendTransaction({
       account,
       chain: wallet.chain,

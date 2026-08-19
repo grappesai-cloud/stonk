@@ -99,9 +99,9 @@ sending a transaction.
 
 ## 6. What is already built and tested
 
-144 tests, 14 files. Not a demo, not an MVP.
+166 tests, 16 files. Not a demo, not an MVP.
 
-- **99 unit tests**: policy, ERC-6551 math, ledger accounting, config parsing,
+- **115 unit tests**: policy, ERC-6551 math, ledger accounting, config parsing,
   Telegram, console auth, ABI discovery, CLI args, contract math, backup
   verification, liveness windows.
 - **45 end-to-end tests** on a real chain (anvil), including:
@@ -110,6 +110,8 @@ sending a transaction.
   - an owner-gating probe against a **live third-party contract we do not
     control**, to prove the detection actually detects,
   - the full delivery loop with a real batch contract,
+  - the fleet payout: every agent wallet checked on chain before and after, and
+    the books closing to the wei,
   - every brake, individually, proven to stop the thing.
 
 Three real bugs were found by these tests and are written up in the README:
@@ -129,6 +131,7 @@ All three would have shipped silently without the e2e suite.
     courier start --watchtower    loop forever, never sign anything
     courier wall                  the wall of the forgotten, in the terminal
     courier report                delivered, earned, burned on gas
+    courier fleet                 the agents and their wallets, ready to paste
     courier backup                a verified copy of the ledger, now
     courier backup --list         what copies are already on disk
     courier tba <tokenId>         the 6551 wallet of a broker, computed locally
@@ -225,6 +228,18 @@ published to loopback only.
 
 `StonkAgent.sol`. Written, tested with 14 on-chain tests, deploy script ready,
 **not deployed**. Three decisions are encoded in it:
+
+**Every agent gets paid on chain, in the same transaction as the work.** The
+fleet is a list of agents and their 6551 wallets. Deliveries are handed out by
+rotation, tips are split in proportion to how many each agent took, and
+`CourierBatch.runSplit` pays every wallet in the same transaction that does the
+work. So "your piece earned this" is not a number in our database, it is a
+transfer on chain with the agent's address on it.
+
+Rotation, not racing: if agents competed for the same deliveries, the one with
+the most gas would win and the rest would burn gas for nothing. And a single
+agent with a broken wallet cannot stall the fleet, the amount is credited to it
+and can be pushed again later.
 
 **One agent type with a role slot**, not five classes. The role is installed
 and can be swapped when a new tool works. If we had sold five classes and only

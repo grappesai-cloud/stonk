@@ -23,6 +23,7 @@ import { functionNameOf } from '../chain/reader.js'
 import { pool } from '../chain/client.js'
 import { resolveArgs, templateFrom } from '../args.js'
 import type { Claim } from '../scan/claims.js'
+import type { Split } from '../fleet.js'
 
 export const BATCH_ABI = [
   {
@@ -34,6 +35,29 @@ export const BATCH_ABI = [
       { name: 'calls', type: 'bytes[]' },
       { name: 'gasCap', type: 'uint256' },
       { name: 'beneficiary', type: 'address' }
+    ],
+    outputs: [
+      { name: 'ok', type: 'bool[]' },
+      { name: 'tips', type: 'uint256' },
+      { name: 'fee', type: 'uint256' }
+    ]
+  },
+  {
+    type: 'function',
+    name: 'runSplit',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'target', type: 'address' },
+      { name: 'calls', type: 'bytes[]' },
+      { name: 'gasCap', type: 'uint256' },
+      {
+        name: 'shares',
+        type: 'tuple[]',
+        components: [
+          { name: 'to', type: 'address' },
+          { name: 'bps', type: 'uint32' }
+        ]
+      }
     ],
     outputs: [
       { name: 'ok', type: 'bool[]' },
@@ -138,7 +162,11 @@ export async function simulateBatch(
   client: PublicClient,
   cfg: Config,
   account: Account | Address,
-  claims: Claim[]
+  claims: Claim[],
+  /* cotele flotei; cand exista, se simuleaza exact apelul care se va trimite,
+     nu unul asemanator. Un lot simulat altfel decat e trimis e o masuratoare
+     care minte. */
+  shares?: Split[]
 ): Promise<BatchSim> {
   const calldata = claims.map((c) => deliverCalldata(cfg, c))
   const gasPriceWei = await client.getGasPrice()
@@ -164,12 +192,17 @@ export async function simulateBatch(
     }
   }
 
-  const args = [cfg.drops.address, calldata, cfg.policy.gasCapPerCall, beneficiary] as const
+  const useSplit = !!shares && shares.length > 0
+  const args = useSplit
+    ? ([cfg.drops.address, calldata, cfg.policy.gasCapPerCall, shares] as const)
+    : ([cfg.drops.address, calldata, cfg.policy.gasCapPerCall, beneficiary] as const)
+  const fn = useSplit ? 'runSplit' : 'run'
+
   const { result } = await client.simulateContract({
     address: batch,
     abi: BATCH_ABI,
-    functionName: 'run',
-    args,
+    functionName: fn,
+    args: args as never,
     account: from
   })
   const [ok, tips, fee] = result as unknown as [boolean[], bigint, bigint]
@@ -179,7 +212,7 @@ export async function simulateBatch(
     gasUnits = await client.estimateGas({
       account: from,
       to: batch,
-      data: encodeFunctionData({ abi: BATCH_ABI, functionName: 'run', args })
+      data: encodeFunctionData({ abi: BATCH_ABI, functionName: fn, args: args as never })
     })
   } catch {
     gasUnits = 0n

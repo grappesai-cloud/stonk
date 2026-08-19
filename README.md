@@ -66,6 +66,53 @@ Peretele general e frumos, dar nimeni nu il da mai departe. Pagina LUI, cu banii
 LUI, da. De aia fiecare rand din perete duce la `/w/`, si de aia alerta de
 Telegram contine acelasi link.
 
+## Plata flotei, pe lant
+
+Aici e diferenta dintre "bucata ta a castigat atat" scris de noi intr-un
+registru, si acelasi lucru **scris pe lant, cu numele agentului pe el**.
+
+Briefingul cerea ca fiecare NFT sa fie un muncitor autonom, cu gazul lui.
+Ar fi insemnat o mie de chei fierbinti de tinut undeva si o mie de tranzactii
+in loc de una grupata, adica de cateva ori mai mult gaz pentru aceeasi munca.
+Solutia e alta: **un executor, munca impartita prin rotatie, plata pe lant**.
+
+```json
+"fleet": [
+  { "id": 0, "wallet": "0x..." },
+  { "id": 1, "wallet": "0x..." }
+]
+```
+
+Lista nu se scrie de mana. `courier fleet --count 50` o calculeaza din colecția
+de agenti si o verifica pe langa registrul 6551 de pe lant.
+
+Ce se intampla la fiecare lot:
+
+1. livrarile se dau **pe rand** agentilor din flota, continuand de unde a ramas
+   rularea trecuta (cursorul e in registru, deci nu se reseteaza la repornire),
+2. cotele din bacsis ies **proportional cu cate livrari a luat fiecare**,
+3. `CourierBatch.runSplit` plateste fiecare agent **in aceeasi tranzactie** cu
+   munca, direct in portofelul lui 6551.
+
+Rotatia, nu cursa: daca agentii s-ar bate pe aceleasi livrari, castiga cine are
+gaz mai mult si restul ard gaz degeaba. Asa, fiecare ia acelasi numar de
+livrari, indiferent cine a fost mintat primul.
+
+**Praful se roteste si el.** Cotele sunt in miimi de procent si nu ies mereu
+fix, iar restul in wei merge la prima cota. Prima cota nu e primul din lista, e
+**cine a inceput lotul**, adica se schimba cu rotatia. Altfel praful s-ar aduna
+sistematic la acelasi agent.
+
+**Un agent cu portofel prost nu opreste flota.** Daca plata catre el nu intra
+(portofelul refuza ETH sau cere prea mult gaz), suma i se **crediteaza** in
+contract si oricine o poate impinge inapoi cu `withdraw`. Alternativa ar fi fost
+ca un singur portofel stricat sa darame lotul intregii flote. Si `sweep` nu are
+voie sa atinga ce e datorat cuiva.
+
+Testul care conteaza e in `test/e2e/fleet.e2e.test.ts` si nu verifica registrul
+nostru, ci **soldurile de pe lant**: dupa un lot, suma platita agentilor plus
+taxa trezoreriei plus ce a ramas creditat e egala, la wei, cu bacsisul intrat.
+
 ## Atribuirea pe agent
 
 Fiecare rand din registru poarta **id-ul agentului** care a facut treaba. Fara

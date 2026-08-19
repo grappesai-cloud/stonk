@@ -98,6 +98,17 @@ export const ConfigSchema = z.object({
     owner: zAddress.nullable().default(null)
   }).default({}),
 
+  /* Flota: agentii in numele carora se lucreaza si portofelele lor 6551.
+     Goala inseamna un singur agent, cel din `agent`, cu bacsisul la
+     `execution.beneficiary`. Cu cel putin un membru, bacsisul se imparte pe
+     lant intre ei, in aceeasi tranzactie cu livrarile. */
+  fleet: z.array(
+    z.object({
+      id: z.number().int().min(0),
+      wallet: zAddress
+    })
+  ).default([]),
+
   network: z.object({
     name: z.string(),
     chainId: z.number().int().positive(),

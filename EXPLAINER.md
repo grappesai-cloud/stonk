@@ -57,9 +57,14 @@ different pots, and keeping them separate is the whole design.
 
 If the tip does not cover the cost, it does not deliver. It says so and moves on.
 
+The work is shared out between the agents in turn, and each one is paid into its
+own wallet in the same transaction that does the work. What your agent earned is
+not a number in our database. It is a transfer on chain with its address on it,
+and anyone can check it.
+
 ## Where it is right now
 
-**Built and tested.** 148 tests, including runs against a copy of the real
+**Built and tested.** 166 tests, including runs against a copy of the real
 chain, with real contracts.
 
 **Running on a server.** Not on a laptop. It restarts itself, backs up its own

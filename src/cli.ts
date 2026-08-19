@@ -226,6 +226,60 @@ program
   })
 
 program
+  .command('fleet')
+  .description('the agents and their 6551 wallets, ready to paste into the config')
+  .option('--from <id>', 'first agent id', '0')
+  .option('--count <n>', 'how many', '10')
+  .action(async (o: { from: string; count: string }) => {
+    const ctx = ctxOf()
+    const collection = ctx.cfg.agent.collection
+    if (!collection) {
+      process.stdout.write(
+        '\nagent.collection is not set, so there is no agent NFT to compute wallets from.\n' +
+          'Deploy the collection first, or write the fleet by hand.\n'
+      )
+      ctx.ledger.close()
+      return
+    }
+    const first = BigInt(o.from)
+    const count = Number(o.count)
+    const members = []
+    for (let i = 0; i < count; i++) {
+      const id = first + BigInt(i)
+      members.push({
+        id: Number(id),
+        wallet: tbaAddress({
+          registry: ctx.cfg.erc6551.registry,
+          implementation: ctx.cfg.erc6551.implementation,
+          salt: ctx.cfg.erc6551.salt,
+          chainId: ctx.cfg.network.chainId,
+          tokenContract: collection,
+          tokenId: id
+        })
+      })
+    }
+    const check = await verifyTbaMath(
+      ctx.client,
+      ctx.cfg.erc6551.registry,
+      ctx.cfg.erc6551.implementation,
+      ctx.cfg.erc6551.salt,
+      ctx.cfg.network.chainId,
+      collection
+    )
+    process.stdout.write(`\n"fleet": ${JSON.stringify(members, null, 2)}\n\n`)
+    process.stdout.write(
+      check.ok
+        ? 'These addresses were checked against the on-chain registry, not just computed.\n'
+        : `WARNING: ${check.detail}\n`
+    )
+    process.stdout.write(
+      'Tips are split between these wallets, in the same transaction as the work.\n' +
+        'An agent that is not in this list earns nothing, no matter who owns it.\n'
+    )
+    ctx.ledger.close()
+  })
+
+program
   .command('backup')
   .description('write a verified copy of the ledger, now')
   .option('--dir <path>', 'where to write it')
