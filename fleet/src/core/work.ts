@@ -12,6 +12,15 @@ import type { Abi, Address, PublicClient } from 'viem'
 import type { Config } from './config.js'
 import type { Ledger } from './ledger/db.js'
 
+/**
+ * Adresa din numele careia se citeste cand nu exista cheie: un strain oarecare.
+ *
+ * Sta aici, langa contractul meseriei, nu langa context: si meseriile trebuie
+ * sa poata recunoaste cazul "proces fara cheie", altfel ar raporta soldul unui
+ * strain ca fiind gazul agentului.
+ */
+export const STRANGER = '0x000000000000000000000000000000000000dEaD' as const
+
 export interface WorkItem {
   /** identitate stabila intre rulari: cooldown, dedup si registrul se leaga de ea */
   key: string
@@ -96,6 +105,23 @@ export interface DiscoverInput {
   from: Address
 }
 
+/**
+ * Un rand din darea de seama a agentului: ce nu se vede din registru.
+ *
+ * Registrul stie cate bucati s-au facut si cat gaz s-a ars. Pentru un agent
+ * care isi tine banii intr-un seif (Trader), aia e cea mai putin interesanta
+ * jumatate: conteaza ce are in mana ACUM si cat valoreaza. De aia meseria
+ * scrie randurile, nu miezul.
+ *
+ * `level` nu e culoare, e decizie: 'warn' si 'bad' se trimit pe telefon cand
+ * apar, nu doar in rezumatul zilnic.
+ */
+export interface ReportLine {
+  name: string
+  value: string
+  level?: 'ok' | 'warn' | 'bad'
+}
+
 /** o apasare vazuta pe lant: cine a facut treaba inaintea noastra */
 export interface Press {
   /** cheia bucatii de munca, in formatul meseriei */
@@ -142,6 +168,16 @@ export interface Job<J = unknown> {
   actsOnOwnPosition?: boolean
   /** verificari proprii meseriei, pe langa cele generice */
   checks?(input: DiscoverInput & { job: J }): Promise<JobCheck[]>
+
+  /**
+   * Ce are meseria de spus despre starea ei, in afara registrului.
+   *
+   * Diferenta fata de `checks`: diagnosticul raspunde la "e agentul asta
+   * posibil?" si se ruleaza o data, la pornire. Darea de seama raspunde la "ce
+   * face banul acum?" si se citeste in fiecare zi. Un agent care apasa butoane
+   * n-are ce scrie aici; unul care tine o pozitie are tot.
+   */
+  report?(input: DiscoverInput & { job: J }): Promise<ReportLine[]>
   /**
    * Cine a facut treaba in blocurile astea, si cu cat gaz a platit.
    *

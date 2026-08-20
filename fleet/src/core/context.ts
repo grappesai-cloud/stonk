@@ -6,6 +6,7 @@ import { Telegram } from './alerts/telegram.js'
 import { Controller } from './control.js'
 import { jobFor } from '../jobs/index.js'
 import type { Job } from './work.js'
+export { STRANGER } from './work.js'
 
 export interface Ctx {
   cfg: Config
@@ -19,9 +20,6 @@ export interface Ctx {
   /** blocul `job` din configurare, deja validat de modulul meseriei */
   jobCfg: never
 }
-
-/** adresa folosita la simulari cand nu exista cheie: un strain oarecare */
-export const STRANGER = '0x000000000000000000000000000000000000dEaD' as const
 
 export function buildContext(configPath: string): Ctx {
   const cfg = loadConfig(configPath)

@@ -32,11 +32,19 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
-import { parseAbi, type Address, type Hex, type PublicClient } from 'viem'
+import { formatEther, formatUnits, parseAbi, type Address, type Hex, type PublicClient } from 'viem'
 import { abiOf, zAddress, zBig, type Config } from '../core/config.js'
 import type { Abi } from 'viem'
 import { log } from '../core/log.js'
-import type { DiscoverInput, Job, JobCheck, Target, WorkItem } from '../core/work.js'
+import {
+  STRANGER,
+  type DiscoverInput,
+  type Job,
+  type JobCheck,
+  type ReportLine,
+  type Target,
+  type WorkItem
+} from '../core/work.js'
 
 const ZERO = '0x0000000000000000000000000000000000000000'
 
@@ -358,6 +366,81 @@ async function dominantAsset(
     }
   }
   return { current: best, balance: bestBal, price: bestPrice }
+}
+
+// ---- darea de seama: cifrele care se citesc, nu se calculeaza pe lant
+
+/** un mic registru de valori, cat ii trebuie raportului ca sa isi tina reperele */
+export interface NavStore {
+  kvGet(key: string): string | null
+  kvSet(key: string, value: string): void
+}
+
+/** $ cu doua zecimale dintr-o suma in USD cu 8 zecimale */
+export function usd(usd8: bigint): string {
+  const neg = usd8 < 0n
+  const v = neg ? -usd8 : usd8
+  const whole = v / 100_000_000n
+  const cents = ((v % 100_000_000n) * 100n) / 100_000_000n
+  return `${neg ? '-' : ''}$${whole}.${String(cents).padStart(2, '0')}`
+}
+
+/**
+ * Cat s-a miscat, in procente, de la o valoare la alta; null cand nu exista baza.
+ *
+ * Impartirea pe intregi taie in jos, si taiatul in jos MINTE consecvent in
+ * aceeasi directie: o crestere de exact 10% aparea ca 9.99%. Se rotunjeste,
+ * departe de zero, ca sa nu se piarda nici castigul, nici pierderea.
+ */
+export function movePct(from: bigint, to: bigint): number | null {
+  if (from <= 0n) return null
+  const scaled = (to - from) * 10_000n
+  const half = from / 2n
+  return Number(scaled >= 0n ? (scaled + half) / from : (scaled - half) / from) / 100
+}
+
+export function signed(pct: number | null): string {
+  if (pct === null) return 'n/a'
+  return `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`
+}
+
+/**
+ * Cate rotatii mai plateste gazul din portofel, la costul mediu de pana acum.
+ *
+ * Fara istoric nu se ghiceste: "nu stiu" e un raspuns, o medie inventata nu.
+ */
+export function tradesLeft(balanceWei: bigint, gasWei: bigint, done: number): number | null {
+  if (done <= 0 || gasWei <= 0n) return null
+  const avg = gasWei / BigInt(done)
+  if (avg <= 0n) return null
+  return Number(balanceWei / avg)
+}
+
+/**
+ * Reperele fata de care se masoara valoarea: prima valoare vazuta vreodata si
+ * prima valoare a zilei de azi.
+ *
+ * ATENTIE la ce inseamna "de la start": e valoarea de la PRIMA citire, nu
+ * capitalul depus. Cand se mai adauga bani in seif, reperul trebuie sters
+ * (kv `nav.first`), altfel alimentarea apare ca profit. Un reper care minte in
+ * favoarea noastra e mai rau decat niciun reper.
+ */
+export function navMarks(store: NavStore, navUsd8: bigint, day: string): { first: bigint; dayOpen: bigint } {
+  const firstRaw = store.kvGet('nav.first')
+  const first = firstRaw === null ? navUsd8 : BigInt(firstRaw)
+  if (firstRaw === null) store.kvSet('nav.first', navUsd8.toString())
+  const dayRaw = store.kvGet(`nav.day.${day}`)
+  const dayOpen = dayRaw === null ? navUsd8 : BigInt(dayRaw)
+  if (dayRaw === null) store.kvSet(`nav.day.${day}`, navUsd8.toString())
+  store.kvSet('nav.last', navUsd8.toString())
+  return { first, dayOpen }
+}
+
+function ago(sec: number): string {
+  if (sec < 90) return 'just now'
+  if (sec < 5400) return `${Math.round(sec / 60)}m ago`
+  if (sec < 172_800) return `${Math.round(sec / 3600)}h ago`
+  return `${Math.round(sec / 86_400)}d ago`
 }
 
 /** in ce simboluri poate ateriza strategia; portile (SPY/QQQ pe post de regim) nu apar aici */
@@ -796,5 +879,134 @@ export const trader: Job<TraderJob> = {
     }
 
     return checks
+  },
+
+  /**
+   * Ce tine seiful, cat valoreaza si cu ce ramane botul.
+   *
+   * Un bot cu bani in mana tace la fel cand merge perfect si cand e blocat.
+   * Monitorul de uptime nu poate face diferenta — el vede un port care
+   * raspunde. Randurile de aici o fac: pozitia, valoarea fata de doua repere
+   * (azi si de la start) si gazul, transformat din "cati wei" in singura unitate
+   * care conteaza, "cate rotatii mai are".
+   */
+  async report({ client, cfg, job, ledger, from }): Promise<ReportLine[]> {
+    let brain: Brain
+    try {
+      brain = await loadBrain(job.brain.dir)
+    } catch (e) {
+      return [{ name: 'brain', value: `not loaded: ${(e as Error).message}`, level: 'bad' }]
+    }
+    const cash = brain.CASH
+    const st = await nftState(client, cfg, job)
+    const sig = brain.SIGNALS[st.strategyId]
+
+    /* fara politica citita, vechimea acceptata a oracolului ramane o ora: e
+       doar pragul de la care raportul spune "pretul e vechi", nu o frana */
+    let maxStaleSec = 3600
+    try {
+      const policy = await client.readContract({
+        address: job.registry,
+        abi: registryAbi,
+        functionName: 'policyOf',
+        args: [st.strategyId]
+      })
+      if (policy.exists) maxStaleSec = policy.maxStaleSec
+    } catch (e) {
+      log.debug({ err: (e as Error).message }, 'policy unreadable while reporting')
+    }
+
+    const nowSec = (await client.getBlock()).timestamp
+    let navUsd8 = 0n
+    const held: string[] = []
+    let staleSym: string | null = null
+    for (const sym of Object.keys(job.tokens)) {
+      const tok = job.tokens[sym]!
+      if (!hasFeed(tok) && sym !== cash) continue
+      const bal = await client.readContract({
+        address: tok.address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [st.account]
+      })
+      if (bal === 0n) continue
+      let p: Price
+      try {
+        p = await priceOf(client, job, cash, sym, maxStaleSec, nowSec)
+      } catch {
+        continue
+      }
+      const value = usdValue(bal, tok.decimals, p.usd8)
+      /* sub un cent e praf ramas dintr-o rotatie, nu pozitie: intra in valoare,
+         nu in lista */
+      navUsd8 += value
+      if (value >= 1_000_000n) {
+        held.push(`${Number(formatUnits(bal, tok.decimals)).toFixed(6)} ${sym} (${usd(value)})`)
+        if (p.stale) staleSym = sym
+      }
+    }
+
+    const day = new Date().toISOString().slice(0, 10)
+    const { first, dayOpen } = navMarks(ledger, navUsd8, day)
+    const sinceStart = movePct(first, navUsd8)
+
+    const lines: ReportLine[] = [
+      { name: 'position', value: held.length ? held.join(' + ') : 'empty vault' },
+      {
+        name: 'value',
+        value: `${usd(navUsd8)} | today ${signed(movePct(dayOpen, navUsd8))} | since start ${signed(sinceStart)}`,
+        /* pierderea nu e o defectiune, dar de la un punct incolo vrei sa afli
+           in aceeasi zi, nu la finalul lunii */
+        level: sinceStart !== null && sinceStart <= -20 ? 'warn' : undefined
+      },
+      { name: 'strategy', value: sig ? `#${st.strategyId} ${sig.name}` : `#${st.strategyId} (no signal implementation)` }
+    ]
+
+    if (from.toLowerCase() === STRANGER.toLowerCase()) {
+      /* proces fara cheie (un `report` de pe laptop): soldul unui strain nu e
+         gazul agentului, si o cifra care pare a fi a noastra e mai rea decat
+         niciuna */
+      lines.push({ name: 'gas', value: 'unknown: this process has no operator key' })
+    } else {
+      const gasWei = await client.getBalance({ address: from })
+      const life = ledger.totals(0)
+      const left = tradesLeft(gasWei, life.gasWei, life.done)
+      lines.push({
+        name: 'gas',
+        value: `${formatEther(gasWei)} ${cfg.network.nativeSymbol}${left === null ? '' : ` (~${left} rotations)`}`,
+        level: left === null ? undefined : left < 5 ? 'bad' : left < 20 ? 'warn' : undefined
+      })
+    }
+
+    if (st.paused || st.globallyPaused) {
+      lines.push({
+        name: 'halted',
+        value: st.globallyPaused ? 'the registry is globally paused' : 'the owner paused this vault',
+        level: 'bad'
+      })
+    }
+    if (cfg.execution.dryRun) {
+      /* un bot in proba arata identic cu unul care lucreaza, pana te uiti in
+         portofel peste o luna */
+      lines.push({ name: 'mode', value: 'DRY RUN, nothing is being signed', level: 'warn' })
+    }
+    if (staleSym) {
+      /* in weekend piata e inchisa, deci oracolul vechi e normalitate, nu
+         alarma; in cursul saptamanii e exact invers */
+      const weekend = [0, 6].includes(new Date().getUTCDay())
+      lines.push({
+        name: 'oracle',
+        value: `${staleSym} price is older than ${maxStaleSec}s${weekend ? ' (weekend, market closed)' : ''}`,
+        level: weekend ? undefined : 'warn'
+      })
+    }
+
+    const lastWork = ledger.recentEvents(40).find((e) => e.kind === 'work')
+    lines.push({
+      name: 'last rotation',
+      value: lastWork ? `${lastWork.key} ${ago(Math.floor(Date.now() / 1000) - lastWork.at)}` : 'none yet'
+    })
+
+    return lines
   }
 }

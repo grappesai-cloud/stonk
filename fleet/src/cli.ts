@@ -21,6 +21,7 @@ import { simulateEach, probeGating } from './core/simulate.js'
 import { startServer } from './core/api/server.js'
 import { races as raceReport, stats as statsReport } from './core/api/server.js'
 import { backupOnce, listBackups } from './core/ledger/backup.js'
+import { pushDigest as notifyDigest, reportLines } from './core/alerts/digest.js'
 import { discoverAbi } from './core/init.js'
 import { standbyReason } from './core/standby.js'
 import { log } from './core/log.js'
@@ -181,7 +182,8 @@ program
 program
   .command('report')
   .description('the profit and loss of this agent')
-  .action(() => {
+  .option('--send', 'also push it to ntfy, as the daily digest would', false)
+  .action(async (opts: { send: boolean }) => {
     const ctx = ctxOf()
     const s = statsReport(ctx)
     process.stdout.write(
@@ -190,6 +192,20 @@ program
         `last 24h: ${s.live.jobsDone24h} jobs, ${s.live.earned24h} earned\n` +
         `open now: ${s.live.openCount} worth ${s.live.openStake}\n\n`
     )
+    /* ce nu se vede din registru: pozitia si valoarea ei. Doar meseriile care
+       tin ceva au ce spune aici, restul trec mai departe. */
+    if (ctx.job.report) {
+      const lines = await reportLines(ctx)
+      for (const l of lines) {
+        const color = l.level === 'bad' ? RED : l.level === 'warn' ? DIM : GREEN
+        process.stdout.write(`${color}${l.name.padEnd(14)}${OFF} ${l.value}\n`)
+      }
+      process.stdout.write('\n')
+      if (opts.send) {
+        const sent = await notifyDigest(ctx, lines)
+        process.stdout.write(sent ? 'pushed to ntfy\n' : `${RED}not pushed: ntfy is off or refused${OFF}\n`)
+      }
+    }
     if (s.skips.length) {
       process.stdout.write(`why nothing happened:\n`)
       for (const k of s.skips) process.stdout.write(`  ${String(k.count).padStart(5)} ${k.reason}\n`)

@@ -156,6 +156,34 @@ Stocker uses, pointed at a different kind of spend.
 
 ---
 
+## Silence is ambiguous
+
+An uptime monitor answers one question: does the process reply? For an agent
+that presses buttons, that is nearly the whole story. For one holding money it
+is not — a trader that is alive, healthy, answering `/health` and has not
+rotated in a week looks exactly like one doing its job.
+
+So a job may also write a **report**: not "is this agent possible?" (that is
+`doctor`, once, at start) but "what is the money doing?", read every day. The
+trader's report is its position, what it is worth against two marks — today's
+open and the first value ever seen — the gas balance translated into the only
+unit that matters (*how many more rotations*), and whether the vault is paused,
+dry-running, or pricing off a stale oracle.
+
+`fleet report` prints it. If `alerts.ntfy` is configured it also goes to a
+phone: a daily digest at `digestHour`, plus an immediate note when a line comes
+back `warn` or `bad`. Each line keeps its own six-hour quiet window, because an
+alarm that sounds every ten minutes stops being read. The day is only marked
+done once the message actually left, so a minute of bad network does not eat
+the whole day's report.
+
+One number deserves care: *since start* is measured from the first value the
+agent ever saw, not from the capital deposited. Top up the vault and that mark
+must be cleared (`nav.first` in the ledger's kv), or the deposit shows up as
+profit. A mark that lies in your favour is worse than no mark.
+
+---
+
 ## The race book
 
 Ringer keeps a table the other agents do not have: every press it sees on

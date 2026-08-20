@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { decodeAbiParameters } from 'viem'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ConfigSchema } from '../../src/core/config.js'
-import { loadBrain, trader } from '../../src/jobs/trader.js'
+import { loadBrain, movePct, navMarks, signed, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
 
 const BRAIN_DIR = fileURLToPath(new URL('./fixtures/brain', import.meta.url))
 const CACHE = join(tmpdir(), `trader-test-${process.pid}`)
@@ -58,6 +58,7 @@ interface FakeState {
   aggAllowed?: boolean
   v4Out?: bigint
   aggOut?: bigint
+  gasWei?: bigint
 }
 
 function clientFor(state: FakeState = {}) {
@@ -99,6 +100,9 @@ function clientFor(state: FakeState = {}) {
     },
     async getBlock() {
       return { timestamp: NOW }
+    },
+    async getBalance() {
+      return state.gasWei ?? 300_000_000_000_000n
     },
     async simulateContract({ functionName }: { functionName: string }) {
       if (functionName === 'executeTrade') return { result: state.v4Out ?? 4_975_000_000_000_000_000n }
@@ -348,5 +352,114 @@ describe('trader: diagnosticul', () => {
     expect(bad).toHaveLength(0)
     expect(checks.find((x) => x.name === 'universe tokens')!.ok).toBe(true)
     expect(checks.find((x) => x.name === 'price history')!.ok).toBe(true)
+  })
+})
+
+function fakeLedger(over: { done?: number; gasWei?: bigint; events?: unknown[] } = {}) {
+  const kv = new Map<string, string>()
+  return {
+    kv,
+    kvGet: (k: string) => kv.get(k) ?? null,
+    kvSet: (k: string, v: string) => {
+      kv.set(k, v)
+    },
+    totals: () => ({
+      done: over.done ?? 1,
+      rewardWei: 0n,
+      costWei: 0n,
+      gasWei: over.gasWei ?? 7_770_136_936_000n,
+      netWei: 0n
+    }),
+    recentEvents: () => over.events ?? []
+  }
+}
+
+const lineOf = (lines: Array<{ name: string; value: string; level?: string }>, name: string) =>
+  lines.find((l) => l.name === name)!
+
+describe('trader: socoteala din dare de seama', () => {
+  it('dolarii se scriu cu doua zecimale, si zero e zero, nu gol', () => {
+    expect(usd(227_000_000n)).toBe('$2.27')
+    expect(usd(0n)).toBe('$0.00')
+    expect(usd(100_000_000n)).toBe('$1.00')
+    expect(usd(-50_000_000n)).toBe('-$0.50')
+  })
+
+  it('procentele au semn, iar lipsa reperului nu devine 0%', () => {
+    expect(signed(movePct(100_000_000n, 110_000_000n))).toBe('+10.00%')
+    expect(signed(movePct(100_000_000n, 95_000_000n))).toBe('-5.00%')
+    expect(movePct(0n, 100n)).toBeNull()
+    expect(signed(null)).toBe('n/a')
+  })
+
+  it('gazul se traduce in rotatii DOAR daca exista istoric: fara el, "nu stiu"', () => {
+    expect(tradesLeft(100n, 10n, 1)).toBe(10)
+    expect(tradesLeft(100n, 0n, 0)).toBeNull()
+    expect(tradesLeft(100n, 10n, 0)).toBeNull()
+  })
+
+  it('reperele se scriu o singura data: prima valoare vazuta si prima a zilei', () => {
+    const l = fakeLedger()
+    const a = navMarks(l, 200_000_000n, '2026-08-20')
+    expect(a.first).toBe(200_000_000n)
+    expect(a.dayOpen).toBe(200_000_000n)
+    const b = navMarks(l, 220_000_000n, '2026-08-20')
+    expect(b.first).toBe(200_000_000n)
+    expect(b.dayOpen).toBe(200_000_000n)
+    const c = navMarks(l, 220_000_000n, '2026-08-21')
+    expect(c.first).toBe(200_000_000n)
+    expect(c.dayOpen).toBe(220_000_000n)
+    expect(l.kvGet('nav.last')).toBe('220000000')
+  })
+})
+
+describe('trader: darea de seama', () => {
+  it('spune ce tine seiful si cat valoreaza, cu reperul de la prima citire', async () => {
+    const job = jobCfg()
+    const ledger = fakeLedger()
+    /* 0.0129 NVDA la $200 = $2.58 */
+    const lines = await trader.report!(
+      discoverInput(clientFor({ nvdaBal: 12_906_168_112_630_544n }), job, { ledger })
+    )
+    expect(lineOf(lines, 'position').value).toContain('NVDA')
+    expect(lineOf(lines, 'value').value).toContain('$2.58')
+    expect(lineOf(lines, 'value').value).toContain('since start +0.00%')
+
+    /* pretul urca 10%: reperul ramane pe loc, deci castigul se vede */
+    const after = await trader.report!(
+      discoverInput(clientFor({ nvdaBal: 12_906_168_112_630_544n, nvdaUsd8: 22_000_000_000n }), job, { ledger })
+    )
+    expect(lineOf(after, 'value').value).toContain('since start +10.00%')
+  })
+
+  it('gazul aproape terminat e alarma, nu o cifra printre altele', async () => {
+    const job = jobCfg()
+    const lines = await trader.report!(
+      discoverInput(clientFor({ usdgBal: 2_000_000n, gasWei: 20_000_000_000_000n }), job, {
+        ledger: fakeLedger({ done: 1, gasWei: 8_000_000_000_000n })
+      })
+    )
+    expect(lineOf(lines, 'gas').value).toContain('~2 rotations')
+    expect(lineOf(lines, 'gas').level).toBe('bad')
+  })
+
+  it('vault-ul pauzat si proba uscata se vad, ca doua feluri de "nu se intampla nimic"', async () => {
+    const job = jobCfg()
+    const lines = await trader.report!(
+      discoverInput(clientFor({ usdgBal: 2_000_000n, paused: true }), job, {
+        ledger: fakeLedger(),
+        cfg: cfg({ execution: { dryRun: true } })
+      })
+    )
+    expect(lineOf(lines, 'halted').level).toBe('bad')
+    expect(lineOf(lines, 'mode').level).toBe('warn')
+  })
+
+  it('fara creier, raportul e un singur rand si acela e rosu', async () => {
+    const lines = await trader.report!(
+      discoverInput(clientFor({}), jobCfg({ brain: { dir: '/nope/nothing-here' } }), { ledger: fakeLedger() })
+    )
+    expect(lines).toHaveLength(1)
+    expect(lines[0]!.level).toBe('bad')
   })
 })

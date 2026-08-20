@@ -155,6 +155,17 @@ export const ConfigSchema = z.object({
       url: z.string().nullable().default(null),
       failUrl: z.string().nullable().default(null),
       timeoutMs: z.number().int().positive().default(5000)
+    }).default({}),
+    /**
+     * Soneria operatorului. URL-ul complet al topicului ("https://ntfy.sh/xyz")
+     * e un secret de facto: cine il stie, citeste si scrie in el. De aia se
+     * pune din mediu, nu in fisier.
+     */
+    ntfy: z.object({
+      enabled: z.boolean().default(false),
+      url: z.string().nullable().default(null),
+      digestHour: z.number().int().min(0).max(23).nullable().default(9),
+      timeoutMs: z.number().int().positive().default(8000)
     }).default({})
   }).default({}),
 

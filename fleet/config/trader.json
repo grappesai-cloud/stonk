@@ -156,6 +156,13 @@
       "url": "env:HEARTBEAT_URL",
       "failUrl": null,
       "timeoutMs": 5000
+    },
+    "_ntfy": "Soneria operatorului, acelasi topic pe care tipa si Uptime Kuma. Rezumatul zilnic spune ce tine seiful si cat valoreaza; alarmele (gaz pe terminate, vault pauzat, oracol vechi in cursul saptamanii) pleaca pe loc. Un bot cu bani in mana care tace arata la fel si cand merge, si cand e blocat.",
+    "ntfy": {
+      "enabled": true,
+      "url": "env:NTFY_URL",
+      "digestHour": 9,
+      "timeoutMs": 8000
     }
   },
   "api": {

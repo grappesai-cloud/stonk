@@ -20,6 +20,7 @@ import { execute } from './executor.js'
 import { RaceBook } from './race.js'
 import { backupDue, backupOnce } from './ledger/backup.js'
 import { beat, beatFailure } from './alerts/heartbeat.js'
+import { maybeDigest } from './alerts/digest.js'
 import { isWedged, watchdogSec } from './health.js'
 import { standbyReason } from './standby.js'
 import { log } from './log.js'
@@ -287,6 +288,9 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
         lastStandby = waiting
         lastCompletedMs = Date.now()
         await beat(cfg.alerts.heartbeat)
+        /* si in asteptare: un agent care sta de doua zile e exact ce vrei sa
+           afli, iar pulsul singur arata la fel ca unul care lucreaza */
+        await maybeDigest(ctx)
       } else {
         if (lastStandby) log.info('addresses are in place, going back to work')
         lastStandby = null
@@ -296,6 +300,9 @@ export async function runForever(ctx: Ctx, onRun?: (o: RunOutcome) => void): Pro
         lastCompletedMs = Date.now()
         await beat(cfg.alerts.heartbeat)
         maybeBackup(ctx)
+        /* dupa rulare, nu inainte: rezumatul zilei sa vada si ce s-a facut in
+           rularea asta, nu starea de acum zece minute */
+        await maybeDigest(ctx)
         log.info(
           {
             done: o.done,
