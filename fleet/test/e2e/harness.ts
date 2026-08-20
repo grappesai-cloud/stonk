@@ -53,6 +53,14 @@ export interface AnvilOptions {
   noMining?: boolean
   /** 'fees' (implicit) sau 'fifo' */
   order?: 'fees' | 'fifo'
+  /**
+   * Auto-limitarea cererilor de fork (compute units/secunda).
+   *
+   * RPC-ul public al lantului taie cu 429 cand anvil trage stare in rafale, si
+   * un 429 reincercat la nesfarsit arata exact ca un timeout la doua etaje mai
+   * sus. Mai bine cerem incet si primim, decat repede si deloc.
+   */
+  cups?: number
 }
 
 /**
@@ -77,7 +85,10 @@ export async function startRpcProxy(target: string, port = 8899): Promise<{ url:
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: Buffer.concat(chunks).toString('utf8'),
-          signal: AbortSignal.timeout(30_000)
+          /* rabdator: un fork care executa un deploy intreg poate tine o
+             cerere remote mult peste 30s; podul care taie primul transforma
+             o asteptare in "connection closed" la doua etaje mai sus */
+          signal: AbortSignal.timeout(120_000)
         })
         const body = await upstream.text()
         res.writeHead(upstream.status, { 'content-type': 'application/json' })
@@ -102,6 +113,7 @@ export async function startAnvil(port = 8545, opts: AnvilOptions = {}): Promise<
   }
   if (opts.noMining) args.push('--no-mining')
   if (opts.order) args.push('--order', opts.order)
+  if (opts.cups) args.push('--compute-units-per-second', String(opts.cups))
 
   /* iesirea NU se arunca: cand forkul nu porneste, singurul loc in care scrie
      de ce e chiar aici, si un test care spune doar "nu a pornit" te trimite sa
