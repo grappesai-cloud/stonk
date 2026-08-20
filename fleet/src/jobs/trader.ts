@@ -33,7 +33,8 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 import { parseAbi, type Address, type Hex, type PublicClient } from 'viem'
-import { abiWithErrors, zAddress, zBig, type Config } from '../core/config.js'
+import { abiOf, zAddress, zBig, type Config } from '../core/config.js'
+import type { Abi } from 'viem'
 import { log } from '../core/log.js'
 import type { DiscoverInput, Job, JobCheck, Target, WorkItem } from '../core/work.js'
 
@@ -59,6 +60,16 @@ export type TradeIntent = {
   hookData: Hex
 }
 
+export type AggTrade = {
+  tokenIn: Address
+  tokenOut: Address
+  amountIn: bigint
+  minAmountOut: bigint
+  aggregator: Address
+  swapData: Hex
+}
+export type SwapQuote = { aggregator: Address; swapData: Hex; minAmountOut: bigint }
+
 export interface Brain {
   CASH: string
   SIGNALS: Record<number, Signal>
@@ -68,6 +79,16 @@ export interface Brain {
   loadSeries(symbols: string[], range: string, cacheDir: string): Promise<Series>
   encodeTrade(t: TradeIntent): Hex
   poolKey(a: Address, b: Address, fee: number, tickSpacing: number, hooks: Address): PoolKey
+  /** calea prin agregator: OPTIONALA, un creier mai vechi merge fara ea (doar v4) */
+  encodeAggregatorTrade?(t: AggTrade): Hex
+  fetchAggregatorSwap?(
+    chainId: number,
+    from: Address,
+    tokenIn: Address,
+    tokenOut: Address,
+    amountIn: bigint,
+    slippagePct: number
+  ): Promise<SwapQuote>
 }
 
 const brains = new Map<string, Brain>()
@@ -84,8 +105,13 @@ export async function loadBrain(dir: string): Promise<Brain> {
   if (cached) return cached
   const root = resolve(dir)
   const layouts = [
-    { signals: 'dist/src/backtest/signals.js', data: 'dist/src/backtest/data.js', trade: 'dist/src/trade.js' },
-    { signals: 'src/backtest/signals.ts', data: 'src/backtest/data.ts', trade: 'src/trade.ts' }
+    {
+      signals: 'dist/src/backtest/signals.js',
+      data: 'dist/src/backtest/data.js',
+      trade: 'dist/src/trade.js',
+      aggregator: 'dist/src/aggregator.js'
+    },
+    { signals: 'src/backtest/signals.ts', data: 'src/backtest/data.ts', trade: 'src/trade.ts', aggregator: 'src/aggregator.ts' }
   ]
   for (const l of layouts) {
     if (!existsSync(join(root, l.signals))) continue
@@ -94,6 +120,9 @@ export async function loadBrain(dir: string): Promise<Brain> {
       import(pathToFileURL(join(root, l.data)).href),
       import(pathToFileURL(join(root, l.trade)).href)
     ])
+    /* agregatorul e o bucata mai noua de creier: lipsa lui nu strica nimic, doar
+       lasa traderul pe calea v4 */
+    const agg = existsSync(join(root, l.aggregator)) ? await import(pathToFileURL(join(root, l.aggregator)).href) : null
     const brain: Brain = {
       CASH: sig.CASH,
       SIGNALS: sig.SIGNALS,
@@ -102,7 +131,8 @@ export async function loadBrain(dir: string): Promise<Brain> {
       OCTANE: sig.OCTANE,
       loadSeries: dat.loadSeries,
       encodeTrade: trd.encodeTrade,
-      poolKey: trd.poolKey
+      poolKey: trd.poolKey,
+      ...(agg ? { encodeAggregatorTrade: agg.encodeAggregatorTrade, fetchAggregatorSwap: agg.fetch1inchSwap } : {})
     }
     const missing = (Object.keys(brain) as Array<keyof Brain>).filter((k) => brain[k] === undefined)
     if (missing.length > 0) {
@@ -129,6 +159,14 @@ export const TraderSchema = z.object({
   registry: zAddress,
   /** de unde se incarca creierul privat */
   brain: z.object({ dir: z.string().default('./brain') }).default({}),
+  /**
+   * Caile de executie: 'v4' = doar pool-ul canonic; 'aggregator' = doar prin
+   * agregator; 'best' = amandoua, simulate din contul agentului, castiga
+   * incasarea mai mare. Calea de agregator cere ONEINCH_API_KEY in mediu,
+   * bucata de agregator in creier si adresa aprobata in allowlist-ul on-chain;
+   * fara oricare din ele, traderul ramane pe v4 si spune de ce.
+   */
+  execution: z.enum(['v4', 'aggregator', 'best']).default('v4'),
   tokens: z.record(
     z.string(),
     z.object({
@@ -179,7 +217,14 @@ const accountAbi = parseAbi([
 const registryAbi = parseAbi([
   'function policyOf(uint16 id) view returns ((uint256 maxTradeUsd, uint256 maxDailyUsd, uint32 maxSlippageBps, uint32 cooldownSec, uint32 maxStaleSec, bool exists))',
   'function routeOf(address a, address b) view returns ((uint24 fee, int24 tickSpacing, address hooks, bool exists))',
-  'function paused() view returns (bool)'
+  'function paused() view returns (bool)',
+  'function isAllowedAggregator(address a) view returns (bool)'
+])
+
+/* ambele apeluri ale contului, ca target-ul sa poata encoda oricare dupa meta.fn */
+const executeAbi = parseAbi([
+  'function executeTrade(bytes params) returns (uint256 amountOut)',
+  'function executeAggregatorTrade(bytes params) returns (uint256 amountOut)'
 ])
 const feedAbi = parseAbi([
   'function latestRoundData() view returns (uint80, int256, uint256, uint256, uint80)',
@@ -367,13 +412,13 @@ export const trader: Job<TraderJob> = {
    * din meta. Fara bucata (probele generice) ramane colectia din configurare.
    */
   target(cfg, job, item?): Target {
-    const abi = abiWithErrors(
-      'function executeTrade(bytes params) returns (uint256 amountOut)',
-      cfg.target.errorSignatures,
-      'trader executeTrade'
+    const errors = cfg.target.errorSignatures.flatMap(
+      (e) => abiOf(e, 'target.errorSignatures') as unknown as unknown[]
     )
+    const abi = [...(executeAbi as unknown as unknown[]), ...errors] as Abi
     const address = (item?.meta.account as Address | undefined) ?? cfg.target.address
-    return { address, abi, functionName: 'executeTrade' }
+    const functionName = (item?.meta.fn as 'executeTrade' | 'executeAggregatorTrade' | undefined) ?? 'executeTrade'
+    return { address, abi, functionName }
   },
 
   async authority(client, cfg, job) {
@@ -456,29 +501,110 @@ export const trader: Job<TraderJob> = {
       return []
     }
 
-    /* ruta CANONICA din registry: fee/tickSpacing/hooks ale pool-ului cu lichiditate.
-       PoolKey construit altfel e respins de guard (pool == perechea sortata). */
-    const route = await client.readContract({
-      address: job.registry,
-      abi: registryAbi,
-      functionName: 'routeOf',
-      args: [tin.address, tout.address]
-    })
-    if (!route.exists) {
-      log.warn(`${tag} [${sig.name}] no pool route for ${current}/${target}, holding`)
+    const inUsd = usdValue(balance, tin.decimals, pin.usd8)
+    const fairOut = (inUsd * 10n ** BigInt(tout.decimals)) / pout.usd8
+    /* minOut din ORACOL, nu din quote: guard-ul cere oricum banda asta, deci
+       toate caile de executie primesc acelasi minim */
+    const minOut = (fairOut * BigInt(10_000 - policy.maxSlippageBps)) / 10_000n
+
+    type Candidate = { via: 'v4' | 'aggregator'; fn: 'executeTrade' | 'executeAggregatorTrade'; data: Hex; simulated?: bigint }
+    const candidates: Candidate[] = []
+
+    if (job.execution !== 'aggregator') {
+      /* ruta CANONICA din registry: fee/tickSpacing/hooks ale pool-ului cu lichiditate.
+         PoolKey construit altfel e respins de guard (pool == perechea sortata). */
+      const route = await client.readContract({
+        address: job.registry,
+        abi: registryAbi,
+        functionName: 'routeOf',
+        args: [tin.address, tout.address]
+      })
+      if (route.exists) {
+        const intent: TradeIntent = {
+          tokenIn: tin.address,
+          tokenOut: tout.address,
+          amountIn: balance,
+          minAmountOut: minOut,
+          poolKey: brain.poolKey(tin.address, tout.address, route.fee, route.tickSpacing, route.hooks),
+          hookData: '0x'
+        }
+        candidates.push({ via: 'v4', fn: 'executeTrade', data: brain.encodeTrade(intent) })
+      } else {
+        log.warn(`${tag} [${sig.name}] no pool route for ${current}/${target}`)
+      }
+    }
+
+    if (job.execution !== 'v4') {
+      const quoteFn = brain.fetchAggregatorSwap
+      const encodeAgg = brain.encodeAggregatorTrade
+      if (!quoteFn || !encodeAgg) {
+        log.warn(`${tag} execution=${job.execution} but this brain has no aggregator module, staying on v4`)
+      } else if (!process.env.ONEINCH_API_KEY) {
+        log.warn(`${tag} execution=${job.execution} but ONEINCH_API_KEY is missing, staying on v4`)
+      } else {
+        try {
+          const q = await quoteFn(cfg.network.chainId, st.account, tin.address, tout.address, balance, policy.maxSlippageBps / 100)
+          /* allowlist-ul on-chain decide ce router are voie sa primeasca banii
+             vaultului; un quote catre alt router nu e o cale, e o alarma */
+          const allowed = await client.readContract({
+            address: job.registry,
+            abi: registryAbi,
+            functionName: 'isAllowedAggregator',
+            args: [q.aggregator]
+          })
+          if (!allowed) {
+            log.warn(`${tag} aggregator ${q.aggregator} is not on the on-chain allowlist, skipping that path`)
+          } else {
+            candidates.push({
+              via: 'aggregator',
+              fn: 'executeAggregatorTrade',
+              data: encodeAgg({
+                tokenIn: tin.address,
+                tokenOut: tout.address,
+                amountIn: balance,
+                minAmountOut: minOut,
+                aggregator: q.aggregator,
+                swapData: q.swapData
+              })
+            })
+          }
+        } catch (e) {
+          log.warn(`${tag} aggregator quote failed: ${(e as Error).message}`)
+        }
+      }
+    }
+
+    if (candidates.length === 0) {
+      log.warn(`${tag} [${sig.name}] no execution path for ${current} -> ${target}, holding`)
       return []
     }
 
-    const inUsd = usdValue(balance, tin.decimals, pin.usd8)
-    const fairOut = (inUsd * 10n ** BigInt(tout.decimals)) / pout.usd8
-    const minOut = (fairOut * BigInt(10_000 - policy.maxSlippageBps)) / 10_000n
-    const intent: TradeIntent = {
-      tokenIn: tin.address,
-      tokenOut: tout.address,
-      amountIn: balance,
-      minAmountOut: minOut,
-      poolKey: brain.poolKey(tin.address, tout.address, route.fee, route.tickSpacing, route.hooks),
-      hookData: '0x'
+    /* BEST EXECUTION: cu mai multe cai, fiecare se simuleaza din contul agentului
+       (eth_call, fara semnatura) si castiga incasarea mai mare. O cale care pica
+       la simulare iese din discutie. */
+    let chosen = candidates[0]!
+    if (candidates.length > 1) {
+      for (const c of candidates) {
+        try {
+          const { result } = await client.simulateContract({
+            address: st.account,
+            abi: executeAbi,
+            functionName: c.fn,
+            args: [c.data],
+            account: from
+          })
+          c.simulated = result as bigint
+        } catch (e) {
+          log.warn(`${tag} ${c.via} simulation failed: ${(e as Error).message.split('\n')[0]}`)
+        }
+      }
+      const viable = candidates.filter((c) => c.simulated !== undefined)
+      if (viable.length === 0) {
+        log.warn(`${tag} [${sig.name}] every path reverts in simulation (liquidity or slippage), holding`)
+        return []
+      }
+      chosen = viable.reduce((a, b) => ((b.simulated ?? 0n) > (a.simulated ?? 0n) ? b : a))
+      log.info(`${tag} best-exec: ${viable.map((c) => `${c.via}=${c.simulated}`).join(' vs ')} -> ${chosen.via}`)
     }
 
     /* costul = cat avem voie sa pierdem fata de oracol: valoarea de intrare minus
@@ -492,7 +618,7 @@ export const trader: Job<TraderJob> = {
       {
         key: `rotate:${job.tokenId}:${day}:${current}->${target}`,
         label: `ROTATE ${tag} ${current} -> ${target}`,
-        args: [brain.encodeTrade(intent)],
+        args: [chosen.data],
         /* castigul unei rotatii e alpha-ul strategiei, nu se citeste inainte */
         rewardWei: 0n,
         rewardMeasured: false,
@@ -509,6 +635,8 @@ export const trader: Job<TraderJob> = {
           strategy: sig.name,
           from: current,
           to: target,
+          fn: chosen.fn,
+          via: chosen.via,
           amountIn: balance.toString(),
           minAmountOut: minOut.toString(),
           inUsd8: inUsd.toString(),
@@ -628,6 +756,21 @@ export const trader: Job<TraderJob> = {
       } catch (e) {
         checks.push({ name: 'price history', ok: false, detail: `cannot load daily bars: ${(e as Error).message}` })
       }
+    }
+
+    if (job.execution !== 'v4') {
+      const hasModule = !!(brain.fetchAggregatorSwap && brain.encodeAggregatorTrade)
+      const hasKey = !!process.env.ONEINCH_API_KEY
+      checks.push({
+        name: 'aggregator path',
+        ok: hasModule && hasKey,
+        detail: !hasModule
+          ? 'execution wants the aggregator but this brain has no aggregator module: rebuild financial-nfa'
+          : hasKey
+            ? 'brain module present, ONEINCH_API_KEY set. The quoted router must also pass the on-chain allowlist.'
+            : 'ONEINCH_API_KEY is missing: quotes cannot be fetched, the trader stays on v4',
+        fatal: job.execution === 'aggregator' && (!hasModule || !hasKey)
+      })
     }
 
     const rate8 = await ethUsd8(client, job)

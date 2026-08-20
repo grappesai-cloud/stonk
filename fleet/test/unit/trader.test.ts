@@ -55,6 +55,9 @@ interface FakeState {
   nvdaBal?: bigint
   nvdaUsd8?: bigint
   updatedAt?: bigint
+  aggAllowed?: boolean
+  v4Out?: bigint
+  aggOut?: bigint
 }
 
 function clientFor(state: FakeState = {}) {
@@ -91,10 +94,16 @@ function clientFor(state: FakeState = {}) {
       }
       if (a === USDG_TOKEN && functionName === 'balanceOf') return state.usdgBal ?? 0n
       if (a === NVDA_TOKEN && functionName === 'balanceOf') return state.nvdaBal ?? 0n
+      if (a === REGISTRY && functionName === 'isAllowedAggregator') return state.aggAllowed ?? true
       throw new Error(`unexpected read: ${functionName} at ${address}`)
     },
     async getBlock() {
       return { timestamp: NOW }
+    },
+    async simulateContract({ functionName }: { functionName: string }) {
+      if (functionName === 'executeTrade') return { result: state.v4Out ?? 4_975_000_000_000_000_000n }
+      if (functionName === 'executeAggregatorTrade') return { result: state.aggOut ?? 5_100_000_000_000_000_000n }
+      throw new Error(`unexpected simulate: ${functionName}`)
     }
   } as never
 }
@@ -238,6 +247,72 @@ describe('trader: descoperirea', () => {
     expect(items).toHaveLength(1)
     expect(items[0]!.costMeasured).toBe(false)
     expect(items[0]!.costWei).toBe(0n)
+  })
+})
+
+describe('trader: best execution', () => {
+  it('cu execution=best si agregator mai bun la simulare, castiga agregatorul, iar tinta stie functia din meta', async () => {
+    process.env.ONEINCH_API_KEY = 'test-key'
+    try {
+      const job = jobCfg({ execution: 'best' })
+      const items = await trader.discover(
+        discoverInput(clientFor({ usdgBal: 1_000_000_000n, aggOut: 5_100_000_000_000_000_000n }), job)
+      )
+      expect(items).toHaveLength(1)
+      expect(items[0]!.meta.via).toBe('aggregator')
+      expect(items[0]!.meta.fn).toBe('executeAggregatorTrade')
+      const t = trader.target(cfg(), job, items[0])
+      expect(t.functionName).toBe('executeAggregatorTrade')
+    } finally {
+      delete process.env.ONEINCH_API_KEY
+    }
+  })
+
+  it('cu v4 mai bun la simulare, ramane v4 chiar daca agregatorul exista', async () => {
+    process.env.ONEINCH_API_KEY = 'test-key'
+    try {
+      const items = await trader.discover(
+        discoverInput(clientFor({ usdgBal: 1_000_000_000n, aggOut: 1n }), jobCfg({ execution: 'best' }))
+      )
+      expect(items).toHaveLength(1)
+      expect(items[0]!.meta.via).toBe('v4')
+      expect(items[0]!.meta.fn).toBe('executeTrade')
+    } finally {
+      delete process.env.ONEINCH_API_KEY
+    }
+  })
+
+  it('un router care nu e in allowlist-ul on-chain nu devine cale de executie', async () => {
+    process.env.ONEINCH_API_KEY = 'test-key'
+    try {
+      const items = await trader.discover(
+        discoverInput(
+          clientFor({ usdgBal: 1_000_000_000n, aggAllowed: false, aggOut: 9_000_000_000_000_000_000n }),
+          jobCfg({ execution: 'best' })
+        )
+      )
+      expect(items).toHaveLength(1)
+      expect(items[0]!.meta.via).toBe('v4')
+    } finally {
+      delete process.env.ONEINCH_API_KEY
+    }
+  })
+
+  it('fara ONEINCH_API_KEY, execution=best cade cuminte pe v4', async () => {
+    delete process.env.ONEINCH_API_KEY
+    const items = await trader.discover(
+      discoverInput(clientFor({ usdgBal: 1_000_000_000n }), jobCfg({ execution: 'best' }))
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0]!.meta.via).toBe('v4')
+  })
+
+  it('execution=aggregator fara cheie e o configurare pe care doctorul o pica', async () => {
+    delete process.env.ONEINCH_API_KEY
+    const checks = await trader.checks!(discoverInput(clientFor({}), jobCfg({ execution: 'aggregator' })))
+    const c = checks.find((x) => x.name === 'aggregator path')
+    expect(c!.ok).toBe(false)
+    expect(c!.fatal).toBe(true)
   })
 })
 
