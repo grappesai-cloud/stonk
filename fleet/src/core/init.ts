@@ -48,6 +48,12 @@ export interface Discovered {
 }
 
 const WORDS: Record<AgentKind, { action: RegExp; value: RegExp; discovery: RegExp; event: RegExp }> = {
+  paymaster: {
+    action: /flush|claim|distribute|deposit|sweep/i,
+    value: /balance|claimable|deposited|pending/i,
+    discovery: /operator|distributor|nextid|claimable/i,
+    event: /flushed|claimed|deposited/i
+  },
   ringer: {
     action: /clock ?in|clockin|ring|poke|ping|trigger|kick|start|advance|tick|crank/i,
     value: /pot|pool|prize|jackpot|reward|tip|bounty|accrued|balance/i,

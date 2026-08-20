@@ -1,0 +1,137 @@
+{
+  "_": "PAYMASTER: the fleet's hands on the fee pipeline. The coin's creator fees land in the Treasury as ETH; this agent flushes them (ETH -> USDG -> RewardDistributor, one operator-gated call whose only possible destination is the distributor) and then claims every agent's share into its own vault. Money never sits on this key.",
+  "_cadence": "windowsPerDay slices the UTC day and the ledger's once-per-key rule makes each window flush at most once. Launch day: set 4. Steady state: 1. Claims computed in the same run as a flush see pre-flush balances, so a fresh deposit is claimed on the NEXT run, ~10 minutes later - deliberate, correctness over haste.",
+  "watchtower": false,
+  "agent": {
+    "kind": "paymaster",
+    "id": 3,
+    "name": "PAYMASTER #0001",
+    "collection": null,
+    "wallet": null,
+    "owner": null
+  },
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": [
+      "https://rpc.mainnet.chain.robinhood.com"
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 2000
+  },
+  "target": {
+    "address": "0xde4A43508bC80ED0e52Afb1B0F5a44444B3d4F28",
+    "_": "the Treasury on 4663 (deployed 21 Aug 2026, deliberately unverified until launch)",
+    "errorSignatures": [
+      "error NotOperator()",
+      "error NothingToFlush()",
+      "error InsufficientOutput()",
+      "error SwapFailed()",
+      "error NoAgents()",
+      "error NothingToClaim()"
+    ],
+    "deployBlock": 0
+  },
+  "job": {
+    "treasury": "0xde4A43508bC80ED0e52Afb1B0F5a44444B3d4F28",
+    "distributor": "0xC2e27F510B91DaFCB3741008ae3cEc5546Fcbc4c",
+    "collection": "0x34e54a669c1a864093d4fe8646f2d5a4155b6533",
+    "usdg": {
+      "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "decimals": 6
+    },
+    "_eth": "static ETH/USD for the flush floor and cost accounting; refresh when ETH moves a lot, replace with a feed when 4663 grows one",
+    "eth": {
+      "feed": null,
+      "usd8": "230000000000"
+    },
+    "maxSlippageBps": 150,
+    "minFlushWei": "200000000000000",
+    "windowsPerDay": 1,
+    "claimBatch": 25,
+    "minClaimTotal": "10000",
+    "maxTokens": 2000
+  },
+  "policy": {
+    "_": "campaign mode: a flush does not pay for itself on the spot (the payoff is funded agents). The hard rails: per-item cost cap and the daily spend budget, both measured against the flush slippage allowance.",
+    "mode": "campaign",
+    "profitMultiple": 1.5,
+    "minRewardWei": "0",
+    "minStakeWei": "0",
+    "requireMeasuredReward": false,
+    "requireMeasuredCost": true,
+    "maxCostPerJobWei": "50000000000000000",
+    "dailySpendBudgetWei": "100000000000000000",
+    "cooldownSec": 0,
+    "maxJobsPerRun": 40,
+    "batchSize": 1,
+    "gasCapPerCall": "3000000",
+    "maxGasPriceWei": null,
+    "dailyGasBudgetWei": "20000000000000000",
+    "denyKeys": []
+  },
+  "execution": {
+    "dryRun": false,
+    "privateKey": "env:PAYMASTER_KEY",
+    "beneficiary": null,
+    "confirmations": 1,
+    "maxFeePerGasWei": null,
+    "maxPriorityFeePerGasWei": null,
+    "killSwitchFile": "./data/STOP-paymaster",
+    "maxConsecutiveFailures": 5
+  },
+  "runner": {
+    "mode": "interval",
+    "intervalSec": 600,
+    "jitterSec": 30,
+    "pollMs": 2000,
+    "staleAfterSec": 1800,
+    "watchdogSec": 3600
+  },
+  "alerts": {
+    "telegram": {
+      "enabled": false,
+      "token": "env:TELEGRAM_TOKEN",
+      "channel": null,
+      "digestHour": 9,
+      "gasLowWei": "50000000000000"
+    },
+    "heartbeat": {
+      "url": "env:HEARTBEAT_URL",
+      "failUrl": null,
+      "timeoutMs": 5000
+    },
+    "ntfy": {
+      "enabled": true,
+      "url": "env:NTFY_URL",
+      "digestHour": 9,
+      "timeoutMs": 8000
+    }
+  },
+  "api": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8808,
+    "cors": [
+      "*"
+    ],
+    "rateLimitPerMinute": 120
+  },
+  "console": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8809,
+    "token": "env:CONSOLE_TOKEN"
+  },
+  "storage": {
+    "file": "./data/paymaster.db",
+    "backup": {
+      "enabled": true,
+      "dir": "./data/backups",
+      "everyHours": 6,
+      "keep": 28
+    }
+  }
+}

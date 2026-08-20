@@ -10,6 +10,7 @@ import { stocker } from './stocker.js'
 import { lobbyist } from './lobbyist.js'
 import { courier } from './courier.js'
 import { trader } from './trader.js'
+import { paymaster } from './paymaster.js'
 
 const JOBS: Record<AgentKind, Job<never>> = {
   ringer: ringer as unknown as Job<never>,
@@ -17,7 +18,8 @@ const JOBS: Record<AgentKind, Job<never>> = {
   stocker: stocker as unknown as Job<never>,
   lobbyist: lobbyist as unknown as Job<never>,
   courier: courier as unknown as Job<never>,
-  trader: trader as unknown as Job<never>
+  trader: trader as unknown as Job<never>,
+  paymaster: paymaster as unknown as Job<never>
 }
 
 export function jobFor(kind: AgentKind): Job<never> {
@@ -26,4 +28,4 @@ export function jobFor(kind: AgentKind): Job<never> {
   return j
 }
 
-export { ringer, miner, stocker, lobbyist, courier, trader }
+export { ringer, miner, stocker, lobbyist, courier, trader, paymaster }

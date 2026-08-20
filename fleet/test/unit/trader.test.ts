@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { decodeAbiParameters } from 'viem'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ConfigSchema } from '../../src/core/config.js'
-import { drawdownBrake, loadBrain, movePct, navMarks, signed, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
+import { drawdownBrake, loadBrain, movePct, navMarks, resolveTokenIds, signed, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
 
 const BRAIN_DIR = fileURLToPath(new URL('./fixtures/brain', import.meta.url))
 const CACHE = join(tmpdir(), `trader-test-${process.pid}`)
@@ -562,7 +562,7 @@ describe('trader: minimul strans din simulare', () => {
     expect(m.minAmountOut).toBe('5074500000000000000')
     expect(m.simulatedOut).toBe('5100000000000000000')
     /* costul scade odata cu minimul strans: pierdem mai putin fata de oracol */
-    expect(BigInt(items[0]!.meta.maxLossUsd8)).toBeLessThan(500_000_000n)
+    expect(BigInt(items[0]!.meta.maxLossUsd8 ?? '0')).toBeLessThan(500_000_000n)
   })
 
   it('cand pool-ul da fix cat podeaua, minimul ramane podeaua', async () => {
@@ -575,5 +575,112 @@ describe('trader: minimul strans din simulare', () => {
       discoverInput(clientFor({ usdgBal: 1_000_000_000n, v4Out: 6_000_000_000_000_000_000n }), jobCfg({ tightenBps: 0 }))
     )
     expect(items[0]!.meta.minAmountOut).toBe('4975000000000000000')
+  })
+})
+
+/* ------------------------------------------------------------------ fleet mode */
+
+const ACCT2 = '0x000000000000000000000000000000000000acc2'
+const ACCT3 = '0x000000000000000000000000000000000000acc3'
+
+/**
+ * A three-token collection: #1 is ours and funded, #2 belongs to a foreign key
+ * (its holder rotated the bot away), #3 is ours but empty. One process, one
+ * scan, exactly one rotation.
+ */
+function fleetClient(over: Record<string, unknown> = {}) {
+  const accounts: Record<string, string> = { '1': ACCT, '2': ACCT2, '3': ACCT3 }
+  const signers: Record<string, string> = {
+    [ACCT]: SIGNER,
+    [ACCT2]: '0x000000000000000000000000000000000000beef',
+    [ACCT3]: SIGNER
+  }
+  const usdgBal: Record<string, bigint> = { [ACCT]: 1_000_000_000n, [ACCT2]: 500_000_000n, [ACCT3]: 0n }
+  return {
+    async readContract({ address, functionName, args }: { address: string; functionName: string; args?: unknown[] }) {
+      const a = address.toLowerCase()
+      if (a === COLLECTION) {
+        if (functionName === 'nextId') return 4n
+        if (functionName === 'strategyOf') return 6
+        if (functionName === 'accountOf') return accounts[String(args?.[0])]
+      }
+      if (signers[address as string] !== undefined || signers[a] !== undefined) {
+        const acct = signers[address as string] !== undefined ? (address as string) : a
+        if (functionName === 'agentSigner') return signers[acct]
+        if (functionName === 'paused') return false
+      }
+      if (a === REGISTRY) {
+        if (functionName === 'paused') return false
+        if (functionName === 'policyOf')
+          return { maxTradeUsd: 0n, maxDailyUsd: 0n, maxSlippageBps: 50, cooldownSec: 1800, maxStaleSec: 3600, exists: true }
+        if (functionName === 'routeOf') return { fee: 3000, tickSpacing: 60, hooks: ZERO, exists: true }
+        if (functionName === 'isAllowedAggregator') return true
+      }
+      if (a === NVDA_FEED) {
+        if (functionName === 'latestRoundData') return [1n, 20_000_000_000n, 0n, NOW, 1n]
+        if (functionName === 'decimals') return 8
+      }
+      if (a === USDG_TOKEN && functionName === 'balanceOf') return usdgBal[args?.[0] as string] ?? 0n
+      if (a === NVDA_TOKEN && functionName === 'balanceOf') return 0n
+      throw new Error(`unexpected read: ${functionName} at ${address} ${JSON.stringify(args)}`)
+    },
+    async getBlock() {
+      return { timestamp: NOW }
+    },
+    async getBalance() {
+      return 300_000_000_000_000n
+    },
+    async simulateContract({ functionName }: { functionName: string }) {
+      if (functionName === 'executeTrade') return { result: 4_975_000_000_000_000_000n }
+      throw new Error(`unexpected simulate: ${functionName}`)
+    },
+    ...over
+  } as never
+}
+
+describe('trader: fleet mode (many NFTs, one process)', () => {
+  it('scans every minted token and rotates only the funded vault whose key is ours', async () => {
+    const job = jobCfg({ tokenId: undefined, tokenIds: 'all' })
+    const items = await trader.discover(discoverInput(fleetClient(), job))
+    expect(items).toHaveLength(1)
+    expect(items[0]!.key).toBe(`rotate:1:${DAY}:USDG->NVDA`)
+    expect(items[0]!.meta.account).toBe(ACCT)
+  })
+
+  it('a foreign agent key is a skip, never an attempt: the holder rotated us away and that is their right', async () => {
+    const job = jobCfg({ tokenId: undefined, tokenIds: { from: 2, to: 2 } })
+    const items = await trader.discover(discoverInput(fleetClient(), job))
+    expect(items).toHaveLength(0)
+  })
+
+  it('tokenIds "all" follows nextId, so freshly minted agents join without a config change', async () => {
+    const ids = await resolveTokenIds(fleetClient(), cfg(), jobCfg({ tokenId: undefined, tokenIds: 'all' }))
+    expect(ids).toEqual([1n, 2n, 3n])
+  })
+
+  it('maxTokens is a hard backstop on "all"', async () => {
+    const ids = await resolveTokenIds(fleetClient(), cfg(), jobCfg({ tokenId: undefined, tokenIds: 'all', maxTokens: 2 }))
+    expect(ids).toEqual([1n, 2n])
+  })
+
+  it('a vault below the dust floor is treated as empty instead of signing a dust rotation', async () => {
+    const job = jobCfg({ tokenId: undefined, tokenIds: { from: 1, to: 1 }, minVaultUsd8: '2000000000000' }) // $20,000 floor
+    const items = await trader.discover(discoverInput(fleetClient(), job))
+    expect(items).toHaveLength(0)
+  })
+
+  it('the config refuses a job with neither tokenId nor tokenIds', () => {
+    expect(() => trader.parse({ registry: REGISTRY, tokens: {}, eth: { usd8: '1' } })).toThrow(/tokenId/)
+  })
+
+  it('the fleet report aggregates value across vaults and counts the foreign key', async () => {
+    const job = jobCfg({ tokenId: undefined, tokenIds: 'all' })
+    const ledger = fakeLedger()
+    const lines = await trader.report!(discoverInput(fleetClient(), job, { ledger }))
+    const fleet = lines.find((l) => l.name === 'fleet')!
+    expect(fleet.value).toContain('2 managed of 3 minted')
+    expect(fleet.value).toContain('1 foreign-key')
+    const value = lines.find((l) => l.name === 'value')!
+    expect(value.value).toContain('$1500.00') // $1000 + $500, the foreign vault still counts as fleet NAV
   })
 })

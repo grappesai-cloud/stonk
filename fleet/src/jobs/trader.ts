@@ -35,6 +35,7 @@ import { z } from 'zod'
 import { formatEther, formatUnits, parseAbi, type Address, type Hex, type PublicClient } from 'viem'
 import { abiOf, zAddress, zBig, type Config } from '../core/config.js'
 import type { Abi } from 'viem'
+import { batchRead } from '../core/chain/batch.js'
 import { log } from '../core/log.js'
 import {
   STRANGER,
@@ -161,8 +162,28 @@ export function plantBrain(dir: string, brain: Brain): void {
 }
 
 export const TraderSchema = z.object({
-  /** NFT-ul operat de instanta asta; al doilea NFT = alta configurare, alt proces, alta cheie */
-  tokenId: zBig,
+  /** a single NFT operated by this instance (the original mode; still fully supported) */
+  tokenId: zBig.optional(),
+  /**
+   * Or a whole fleet in ONE process. 'all' follows the collection's nextId, so
+   * freshly minted agents are picked up on the next run with zero operator
+   * work: the mint installs the bot key on chain, and this scan finds it. A
+   * {from,to} range pins an explicit window instead.
+   *
+   * One process for N vaults works because the per-vault state is read in
+   * batched multicalls and the heavy things (brain, price series, oracle
+   * prices, policies) are shared per run, not per token.
+   */
+  tokenIds: z.union([z.literal('all'), z.object({ from: zBig, to: zBig })]).optional(),
+  /** runaway backstop for 'all': never scan more tokens than this */
+  maxTokens: z.number().int().min(1).max(5000).default(1000),
+  /**
+   * Vaults worth less than this (USD, 8 decimals) are treated as empty. Most
+   * minted vaults hold nothing until rewards flow; scanning is cheap but
+   * signing dust rotations is not, and the on-chain guard would refuse a
+   * zero-notional trade anyway.
+   */
+  minVaultUsd8: zBig.default(10_000_000n),
   /** StrategyRegistry: politici, rute canonice de pool, circuit-breaker global */
   registry: zAddress,
   /** de unde se incarca creierul privat */
@@ -238,6 +259,8 @@ export const TraderSchema = z.object({
      */
     cacheDir: z.string().default('./data/prices-live')
   }).default({})
+}).refine((j) => j.tokenId !== undefined || j.tokenIds !== undefined, {
+  message: 'set job.tokenId (one agent) or job.tokenIds (a fleet)'
 })
 
 export type TraderJob = z.infer<typeof TraderSchema>
@@ -277,10 +300,10 @@ interface NftState {
   globallyPaused: boolean
 }
 
-async function nftState(client: PublicClient, cfg: Config, job: TraderJob): Promise<NftState> {
+async function nftState(client: PublicClient, cfg: Config, job: TraderJob, tokenId: bigint): Promise<NftState> {
   const [strategyId, account] = await Promise.all([
-    client.readContract({ address: cfg.target.address, abi: nftAbi, functionName: 'strategyOf', args: [job.tokenId] }),
-    client.readContract({ address: cfg.target.address, abi: nftAbi, functionName: 'accountOf', args: [job.tokenId] })
+    client.readContract({ address: cfg.target.address, abi: nftAbi, functionName: 'strategyOf', args: [tokenId] }),
+    client.readContract({ address: cfg.target.address, abi: nftAbi, functionName: 'accountOf', args: [tokenId] })
   ])
   const [agentSigner, paused, globallyPaused] = await Promise.all([
     client.readContract({ address: account, abi: accountAbi, functionName: 'agentSigner' }),
@@ -288,6 +311,95 @@ async function nftState(client: PublicClient, cfg: Config, job: TraderJob): Prom
     client.readContract({ address: job.registry, abi: registryAbi, functionName: 'paused' })
   ])
   return { account, strategyId: Number(strategyId), agentSigner, paused, globallyPaused }
+}
+
+/**
+ * Which tokenIds this process manages. 'all' follows the collection's nextId,
+ * so a freshly minted agent joins the fleet on the very next run without
+ * anyone touching a config file.
+ */
+export async function resolveTokenIds(client: PublicClient, cfg: Config, job: TraderJob): Promise<bigint[]> {
+  if (job.tokenId !== undefined) return [job.tokenId]
+  if (job.tokenIds && job.tokenIds !== 'all') {
+    const out: bigint[] = []
+    for (let i = job.tokenIds.from; i <= job.tokenIds.to && out.length < job.maxTokens; i++) out.push(i)
+    return out
+  }
+  const nextId = await client.readContract({ address: cfg.target.address, abi: nftAbi, functionName: 'nextId' })
+  const count = Math.min(Number(nextId) - 1, job.maxTokens)
+  return Array.from({ length: Math.max(count, 0) }, (_, i) => BigInt(i + 1))
+}
+
+/** one vault's prefetched state: identity, keys, and every balance in one place */
+export interface VaultScan {
+  id: bigint
+  strategyId: number
+  account: Address
+  agentSigner: Address | null
+  paused: boolean
+  balances: Map<string, bigint>
+}
+
+/**
+ * Reads the whole fleet's state in three batched passes instead of five reads
+ * per token: identities, then keys, then balances. With 700 tokens and eight
+ * assets that is ~7000 reads collapsed into ~25 RPC round trips. Everything
+ * downstream (discover, report, doctor) consumes this one shape.
+ */
+export async function scanVaults(client: PublicClient, cfg: Config, job: TraderJob, ids: bigint[]): Promise<VaultScan[]> {
+  const mc = cfg.network.multicall3
+  const base = await batchRead(
+    client,
+    mc,
+    ids.flatMap((id) => [
+      { address: cfg.target.address, abi: nftAbi as never, functionName: 'strategyOf', args: [id] },
+      { address: cfg.target.address, abi: nftAbi as never, functionName: 'accountOf', args: [id] }
+    ])
+  )
+  const scans: VaultScan[] = []
+  ids.forEach((id, i) => {
+    const account = base[i * 2 + 1] as Address | null
+    if (!account) return
+    scans.push({
+      id,
+      strategyId: Number((base[i * 2] as number | bigint | null) ?? 0),
+      account,
+      agentSigner: null,
+      paused: false,
+      balances: new Map()
+    })
+  })
+
+  const keys = await batchRead(
+    client,
+    mc,
+    scans.flatMap((v) => [
+      { address: v.account, abi: accountAbi as never, functionName: 'agentSigner' },
+      { address: v.account, abi: accountAbi as never, functionName: 'paused' }
+    ])
+  )
+  scans.forEach((v, i) => {
+    v.agentSigner = (keys[i * 2] as Address | null) ?? null
+    v.paused = Boolean(keys[i * 2 + 1])
+  })
+
+  const syms = Object.keys(job.tokens)
+  const bals = await batchRead(
+    client,
+    mc,
+    scans.flatMap((v) =>
+      syms.map((sym) => ({
+        address: job.tokens[sym]!.address,
+        abi: erc20Abi as never,
+        functionName: 'balanceOf',
+        args: [v.account]
+      }))
+    )
+  )
+  scans.forEach((v, i) => {
+    syms.forEach((sym, j) => v.balances.set(sym, (bals[i * syms.length + j] as bigint | null) ?? 0n))
+  })
+  return scans
 }
 
 function hasFeed(tok: { feed: Address | null } | undefined): tok is { feed: Address } {
@@ -362,39 +474,6 @@ async function ethUsd8(client: PublicClient, job: TraderJob): Promise<bigint> {
 function usdToWei(usd8: bigint, rate8: bigint): bigint {
   if (rate8 <= 0n) return 0n
   return (usd8 * 10n ** 18n) / rate8
-}
-
-/**
- * Activul dominant din vault: cel cu cea mai mare valoare USD, cash inclus.
- * Vault-ul detine UN activ la un moment dat (rotatii all-in); restul e praf.
- */
-async function dominantAsset(
-  client: PublicClient,
-  job: TraderJob,
-  cash: string,
-  account: Address,
-  maxStaleSec: number,
-  nowSec: bigint
-): Promise<{ current: string; balance: bigint; price: Price }> {
-  let best = cash
-  let bestUsd = -1n
-  let bestBal = 0n
-  let bestPrice: Price = { usd8: 100_000_000n, stale: false }
-  for (const sym of Object.keys(job.tokens)) {
-    const tok = job.tokens[sym]!
-    if (!hasFeed(tok) && sym !== cash) continue
-    const bal = await client.readContract({ address: tok.address, abi: erc20Abi, functionName: 'balanceOf', args: [account] })
-    if (bal === 0n) continue
-    const p = await priceOf(client, job, cash, sym, maxStaleSec, nowSec)
-    const usd = usdValue(bal, tok.decimals, p.usd8)
-    if (usd > bestUsd) {
-      bestUsd = usd
-      best = sym
-      bestBal = bal
-      bestPrice = p
-    }
-  }
-  return { current: best, balance: bestBal, price: bestPrice }
 }
 
 // ---- darea de seama: cifrele care se citesc, nu se calculeaza pe lant
@@ -534,22 +613,17 @@ export async function vaultNav(
  * timp valoarea e sub linie — repornirea adevarata e o decizie de om, nu o
  * apasare de buton: ori revine valoarea, ori se schimba pragul.
  */
-export async function drawdownBrake(args: {
-  client: PublicClient
+export function applyBrake(args: {
   cfg: Config
   job: TraderJob
   ledger: NavStore
-  cash: string
-  account: Address
-  maxStaleSec: number
-  nowSec: bigint
+  navUsd8: bigint
   tag: string
-}): Promise<string | null> {
-  const { client, cfg, job, ledger, cash, account, maxStaleSec, nowSec, tag } = args
+}): string | null {
+  const { cfg, job, ledger, navUsd8, tag } = args
   const limit = job.maxDrawdownBps
   if (limit === null) return null
 
-  const { navUsd8 } = await vaultNav(client, job, cash, account, maxStaleSec, nowSec)
   const { first } = navMarks(ledger, navUsd8, localDay())
   if (first <= 0n) return null
 
@@ -578,6 +652,24 @@ export async function drawdownBrake(args: {
     log.fatal({ reason }, `${tag} DRAWDOWN BRAKE: standing down`)
   }
   return reason
+}
+
+/** the single-vault wrapper: reads the NAV, then applies the shared brake */
+export async function drawdownBrake(args: {
+  client: PublicClient
+  cfg: Config
+  job: TraderJob
+  ledger: NavStore
+  cash: string
+  account: Address
+  maxStaleSec: number
+  nowSec: bigint
+  tag: string
+}): Promise<string | null> {
+  const { client, cfg, job, ledger, cash, account, maxStaleSec, nowSec, tag } = args
+  if (job.maxDrawdownBps === null) return null
+  const { navUsd8 } = await vaultNav(client, job, cash, account, maxStaleSec, nowSec)
+  return applyBrake({ cfg, job, ledger, navUsd8, tag })
 }
 
 function ago(sec: number): string {
@@ -650,7 +742,9 @@ export const trader: Job<TraderJob> = {
 
   async authority(client, cfg, job) {
     try {
-      const s = await nftState(client, cfg, job)
+      const ids = await resolveTokenIds(client, cfg, job)
+      if (ids.length === 0) return null
+      const s = await nftState(client, cfg, job, ids[0]!)
       return s.agentSigner
     } catch {
       return null
@@ -658,253 +752,334 @@ export const trader: Job<TraderJob> = {
   },
 
   async discover({ client, cfg, job, ledger, from }): Promise<WorkItem[]> {
-    const tag = `#${job.tokenId}`
     let brain: Brain
     try {
       brain = await loadBrain(job.brain.dir)
     } catch (e) {
-      /* fara creier agentul sta pe loc si spune de ce, nu intra in bucla de
-         caderi: e aceeasi filozofie ca asteptarea adreselor */
-      log.error({ err: (e as Error).message }, `${tag} no brain, standing aside`)
+      /* no brain: stand aside and say why instead of crash-looping, the same
+         philosophy as waiting for addresses */
+      log.error({ err: (e as Error).message }, 'no brain, standing aside')
       return []
     }
     const cash = brain.CASH
     if (!job.tokens[cash]) {
-      log.error(`${tag} the cash token ${cash} is missing from job.tokens, cannot value the vault`)
+      log.error(`the cash token ${cash} is missing from job.tokens, cannot value any vault`)
       return []
     }
 
-    const st = await nftState(client, cfg, job)
-    if (st.agentSigner.toLowerCase() !== from.toLowerCase()) {
-      log.warn({ agentSigner: st.agentSigner, from }, `${tag} the operator key is not the agent signer, nothing to do`)
-      return []
-    }
-    if (st.paused || st.globallyPaused) {
-      log.warn({ paused: st.paused, globallyPaused: st.globallyPaused }, `${tag} paused, standing aside`)
-      return []
-    }
-    const sig = brain.SIGNALS[st.strategyId]
-    if (!sig) {
-      log.warn({ strategyId: st.strategyId }, `${tag} strategy is experimental or disabled, nothing to trade`)
+    const ids = await resolveTokenIds(client, cfg, job)
+    if (ids.length === 0) {
+      log.info('no tokens minted yet, nothing to manage')
       return []
     }
 
-    const { series, last } = await seriesOfToday(job, brain)
-    if (last < sig.warmup) {
-      /* sub warmup, momentum/MA ies pe ferestre trunchiate: semnal degradat, mai bine stam */
-      log.warn({ bars: last + 1, warmup: sig.warmup }, `${tag} not enough price history for ${sig.name}, holding`)
+    /* one switch for the whole fleet: read once, not once per token */
+    const globallyPaused = await client.readContract({ address: job.registry, abi: registryAbi, functionName: 'paused' })
+    if (globallyPaused) {
+      log.warn('the registry is globally paused, every vault stands aside')
       return []
     }
 
-    const policy = await client.readContract({
-      address: job.registry,
-      abi: registryAbi,
-      functionName: 'policyOf',
-      args: [st.strategyId]
-    })
-    if (!policy.exists) {
-      log.warn({ strategyId: st.strategyId }, `${tag} strategy has no on-chain policy, nothing would pass the guard`)
-      return []
-    }
-
+    const scans = await scanVaults(client, cfg, job, ids)
     const nowSec = (await client.getBlock()).timestamp
+    const syms = Object.keys(job.tokens)
 
-    /* frana inaintea semnalului: daca seiful a pierdut prea mult, nu conteaza
-       ce zice strategia astazi */
-    const braked = await drawdownBrake({
-      client,
-      cfg,
-      job,
-      ledger,
-      cash,
-      account: st.account,
-      maxStaleSec: policy.maxStaleSec,
-      nowSec,
-      tag
-    })
-    if (braked) {
-      log.warn(`${tag} [${sig.name}] drawdown brake: ${braked}`)
-      return []
+    /* shared per RUN, not per token: 700 vaults must not mean 700 oracle reads,
+       700 policy reads and 700 price-series loads. One of each, cached. */
+    const priceCache = new Map<string, Price>()
+    const getPrice = async (sym: string, maxStaleSec: number): Promise<Price> => {
+      const k = `${sym}:${maxStaleSec}`
+      const hit = priceCache.get(k)
+      if (hit) return hit
+      const price = await priceOf(client, job, cash, sym, maxStaleSec, nowSec)
+      priceCache.set(k, price)
+      return price
     }
-
-    const { current, balance, price: pin } = await dominantAsset(client, job, cash, st.account, policy.maxStaleSec, nowSec)
-    const target = sig.target(series, last, current)
-
-    if (target === current || balance === 0n) {
-      log.info(`${tag} [${sig.name}] hold ${current}`)
-      return []
+    type Policy = {
+      maxTradeUsd: bigint
+      maxDailyUsd: bigint
+      maxSlippageBps: number
+      cooldownSec: number
+      maxStaleSec: number
+      exists: boolean
     }
-    const tin = job.tokens[current]
-    const tout = job.tokens[target]
-    if (!tin || !tout || (!hasFeed(tout) && target !== cash)) {
-      log.warn(`${tag} [${sig.name}] no token or feed configured for ${current} -> ${target}, holding`)
-      return []
-    }
-    const pout = await priceOf(client, job, cash, target, policy.maxStaleSec, nowSec)
-    if (pin.stale || pout.stale) {
-      /* fix fereastra de weekend: oracolul doarme, botul sta. Guard-ul ar respinge oricum. */
-      log.warn(`${tag} [${sig.name}] oracle is stale for ${pin.stale ? current : target}, market is closed`)
-      return []
-    }
-
-    const inUsd = usdValue(balance, tin.decimals, pin.usd8)
-    const fairOut = (inUsd * 10n ** BigInt(tout.decimals)) / pout.usd8
-    /* minOut din ORACOL, nu din quote: guard-ul cere oricum banda asta, deci
-       toate caile de executie primesc acelasi minim */
-    const minOut = (fairOut * BigInt(10_000 - policy.maxSlippageBps)) / 10_000n
-
-    /* fiecare cale stie sa se REconstruiasca pe alt minim: fara asta, minimul
-       nu se poate strange dupa ce simularea ne arata cat da de fapt pool-ul */
-    type Candidate = {
-      via: 'v4' | 'aggregator'
-      fn: 'executeTrade' | 'executeAggregatorTrade'
-      data: Hex
-      build: (min: bigint) => Hex
-      simulated?: bigint
-    }
-    const candidates: Candidate[] = []
-
-    if (job.execution !== 'aggregator') {
-      /* ruta CANONICA din registry: fee/tickSpacing/hooks ale pool-ului cu lichiditate.
-         PoolKey construit altfel e respins de guard (pool == perechea sortata). */
-      const route = await client.readContract({
-        address: job.registry,
-        abi: registryAbi,
-        functionName: 'routeOf',
-        args: [tin.address, tout.address]
-      })
-      if (route.exists) {
-        const poolKey = brain.poolKey(tin.address, tout.address, route.fee, route.tickSpacing, route.hooks)
-        const build = (min: bigint): Hex =>
-          brain.encodeTrade({
-            tokenIn: tin.address,
-            tokenOut: tout.address,
-            amountIn: balance,
-            minAmountOut: min,
-            poolKey,
-            hookData: '0x'
-          } satisfies TradeIntent)
-        candidates.push({ via: 'v4', fn: 'executeTrade', data: build(minOut), build })
-      } else {
-        log.warn(`${tag} [${sig.name}] no pool route for ${current}/${target}`)
-      }
-    }
-
-    if (job.execution !== 'v4') {
-      const quoteFn = brain.fetchAggregatorSwap
-      const encodeAgg = brain.encodeAggregatorTrade
-      if (!quoteFn || !encodeAgg) {
-        log.warn(`${tag} execution=${job.execution} but this brain has no aggregator module, staying on v4`)
-      } else if (!process.env.ONEINCH_API_KEY) {
-        log.warn(`${tag} execution=${job.execution} but ONEINCH_API_KEY is missing, staying on v4`)
-      } else {
-        try {
-          const q = await quoteFn(cfg.network.chainId, st.account, tin.address, tout.address, balance, policy.maxSlippageBps / 100)
-          /* allowlist-ul on-chain decide ce router are voie sa primeasca banii
-             vaultului; un quote catre alt router nu e o cale, e o alarma */
-          const allowed = await client.readContract({
-            address: job.registry,
-            abi: registryAbi,
-            functionName: 'isAllowedAggregator',
-            args: [q.aggregator]
-          })
-          if (!allowed) {
-            log.warn(`${tag} aggregator ${q.aggregator} is not on the on-chain allowlist, skipping that path`)
-          } else {
-            const build = (min: bigint): Hex =>
-              encodeAgg({
-                tokenIn: tin.address,
-                tokenOut: tout.address,
-                amountIn: balance,
-                minAmountOut: min,
-                aggregator: q.aggregator,
-                swapData: q.swapData
-              })
-            candidates.push({ via: 'aggregator', fn: 'executeAggregatorTrade', data: build(minOut), build })
-          }
-        } catch (e) {
-          log.warn(`${tag} aggregator quote failed: ${(e as Error).message}`)
-        }
-      }
-    }
-
-    if (candidates.length === 0) {
-      log.warn(`${tag} [${sig.name}] no execution path for ${current} -> ${target}, holding`)
-      return []
-    }
-
-    /* BEST EXECUTION: fiecare cale se simuleaza din contul agentului (eth_call,
-       fara semnatura). Cine da mai mult castiga; cine pica la simulare iese din
-       discutie. Se simuleaza si cand e o singura cale: cifra aia e si arbitrul
-       intre cai, si masura cu care se strange minimul mai jos. */
-    const trySim = async (c: Candidate, data: Hex): Promise<bigint | null> => {
+    const policyCache = new Map<number, Policy | null>()
+    const getPolicy = async (strategyId: number): Promise<Policy | null> => {
+      if (policyCache.has(strategyId)) return policyCache.get(strategyId) ?? null
+      let out: Policy | null = null
       try {
-        const { result } = await client.simulateContract({
-          address: st.account,
-          abi: executeAbi,
-          functionName: c.fn,
-          args: [data],
-          account: from
-        })
-        return result as bigint
+        const raw = (await client.readContract({
+          address: job.registry,
+          abi: registryAbi,
+          functionName: 'policyOf',
+          args: [strategyId]
+        })) as Policy
+        out = raw.exists ? raw : null
       } catch (e) {
-        log.warn(`${tag} ${c.via} simulation failed: ${(e as Error).message.split('\n')[0]}`)
-        return null
+        log.warn({ strategyId, err: (e as Error).message }, 'policy unreadable')
       }
+      policyCache.set(strategyId, out)
+      return out
     }
+    let seriesCache: { series: Series; last: number } | null = null
+    const getSeries = async (): Promise<{ series: Series; last: number }> =>
+      (seriesCache ??= await seriesOfToday(job, brain))
 
-    for (const c of candidates) {
-      const out = await trySim(c, c.data)
-      if (out !== null) c.simulated = out
-    }
-    const viable = candidates.filter((c) => c.simulated !== undefined)
-    if (viable.length === 0) {
-      log.warn(`${tag} [${sig.name}] every path reverts in simulation (liquidity or slippage), holding`)
-      return []
-    }
-    let chosen = viable.reduce((a, b) => ((b.simulated ?? 0n) > (a.simulated ?? 0n) ? b : a))
-    if (viable.length > 1) {
-      log.info(`${tag} best-exec: ${viable.map((c) => `${c.via}=${c.simulated}`).join(' vs ')} -> ${chosen.via}`)
-    }
-
-    /**
-     * M-3: podeaua de oracol e o PODEA, nu o tinta. Un pool care ar da mai mult
-     * are voie sa umple fix la podea, si diferenta ramane la el. Stim din
-     * simulare cat da de fapt, deci ridicam minimul pana aproape de acolo.
-     *
-     * Se pastreaza doar daca simularea trece si CU minimul strans: intre
-     * simulare si minerit pretul se misca, si un minim prea lacom transforma o
-     * rotatie buna intr-un revert platit cu gaz.
-     */
-    let finalMinOut = minOut
-    if (job.tightenBps > 0 && chosen.simulated !== undefined) {
-      const tightened = (chosen.simulated * BigInt(10_000 - job.tightenBps)) / 10_000n
-      if (tightened > minOut) {
-        const data = chosen.build(tightened)
-        const out = await trySim(chosen, data)
-        if (out !== null) {
-          log.info(
-            `${tag} minOut tightened ${minOut} -> ${tightened} (simulated ${chosen.simulated}, ${job.tightenBps}bps below)`
-          )
-          chosen = { ...chosen, data, simulated: out }
-          finalMinOut = tightened
+    /* the drawdown brake watches the FLEET's total value: one ledger, one line.
+       Reward deposits raise the value, never lower it, so the brake can only get
+       less sensitive from inflows - the failure mode is a quiet one, not a false
+       stop. On any manual top-up, nav.first must still be reset. */
+    let fleetNavUsd8 = 0n
+    for (const v of scans) {
+      for (const sym of syms) {
+        const tok = job.tokens[sym]!
+        if (!hasFeed(tok) && sym !== cash) continue
+        const bal = v.balances.get(sym) ?? 0n
+        if (bal === 0n) continue
+        try {
+          const price = await getPrice(sym, 3600)
+          fleetNavUsd8 += usdValue(bal, tok.decimals, price.usd8)
+        } catch {
+          /* unpriceable symbol: not counted, same rule as the report */
         }
       }
     }
+    const braked = applyBrake({ cfg, job, ledger, navUsd8: fleetNavUsd8, tag: `fleet(${scans.length})` })
+    if (braked) {
+      log.warn(`drawdown brake: ${braked}`)
+      return []
+    }
 
-    /* costul = cat avem voie sa pierdem fata de oracol: valoarea de intrare minus
-       ce acceptam minim la iesire. Marfa nu e cost, se intoarce schimbata. */
-    const minOutUsd = usdValue(finalMinOut, tout.decimals, pout.usd8)
-    const lossUsd8 = inUsd > minOutUsd ? inUsd - minOutUsd : 0n
-    const rate8 = await ethUsd8(client, job)
-    const day = new Date().toISOString().slice(0, 10)
+    const items: WorkItem[] = []
+    const skipped = { foreign: 0, paused: 0, noSignal: 0, empty: 0, hold: 0 }
 
-    return [
-      {
-        key: `rotate:${job.tokenId}:${day}:${current}->${target}`,
+    for (const v of scans) {
+      const tag = `#${v.id}`
+      if (!v.agentSigner || v.agentSigner.toLowerCase() !== from.toLowerCase()) {
+        /* someone rotated their key away from our bot: their right, our skip */
+        skipped.foreign++
+        continue
+      }
+      if (v.paused) {
+        skipped.paused++
+        continue
+      }
+      const sig = brain.SIGNALS[v.strategyId]
+      if (!sig) {
+        skipped.noSignal++
+        continue
+      }
+      const policy = await getPolicy(v.strategyId)
+      if (!policy) {
+        skipped.noSignal++
+        continue
+      }
+      const { series, last } = await getSeries()
+      if (last < sig.warmup) {
+        /* below warmup, momentum/MA run on truncated windows: degraded signal, better to stand */
+        log.warn({ bars: last + 1, warmup: sig.warmup }, `${tag} not enough price history for ${sig.name}, holding`)
+        continue
+      }
+
+      /* the dominant asset, from the prefetched balances: vaults hold ONE asset
+         at a time (all-in rotations); the rest is dust */
+      let current = cash
+      let balance = 0n
+      let bestUsd = -1n
+      let pin: Price = { usd8: 100_000_000n, stale: false }
+      for (const sym of syms) {
+        const tok = job.tokens[sym]!
+        if (!hasFeed(tok) && sym !== cash) continue
+        const bal = v.balances.get(sym) ?? 0n
+        if (bal === 0n) continue
+        const price = await getPrice(sym, policy.maxStaleSec)
+        const usdv = usdValue(bal, tok.decimals, price.usd8)
+        if (usdv > bestUsd) {
+          bestUsd = usdv
+          current = sym
+          balance = bal
+          pin = price
+        }
+      }
+      if (balance === 0n || bestUsd < job.minVaultUsd8) {
+        /* most freshly minted vaults hold nothing until rewards flow; dust below
+           the floor is not a position, and the on-chain guard would refuse it */
+        skipped.empty++
+        continue
+      }
+
+      const target = sig.target(series, last, current)
+      if (target === current) {
+        skipped.hold++
+        log.info(`${tag} [${sig.name}] hold ${current}`)
+        continue
+      }
+      const tin = job.tokens[current]
+      const tout = job.tokens[target]
+      if (!tin || !tout || (!hasFeed(tout) && target !== cash)) {
+        log.warn(`${tag} [${sig.name}] no token or feed configured for ${current} -> ${target}, holding`)
+        continue
+      }
+      const pout = await getPrice(target, policy.maxStaleSec)
+      if (pin.stale || pout.stale) {
+        /* the weekend window: the oracle sleeps, the bot stands. The guard would refuse anyway. */
+        log.warn(`${tag} [${sig.name}] oracle is stale for ${pin.stale ? current : target}, market is closed`)
+        continue
+      }
+
+      const inUsd = usdValue(balance, tin.decimals, pin.usd8)
+      const fairOut = (inUsd * 10n ** BigInt(tout.decimals)) / pout.usd8
+      /* minOut comes from the ORACLE, not from a quote: the guard demands this
+         band anyway, so every execution path gets the same floor */
+      const minOut = (fairOut * BigInt(10_000 - policy.maxSlippageBps)) / 10_000n
+
+      /* every path knows how to REBUILD itself on a different floor: without
+         that, the floor cannot be tightened after simulation shows the real fill */
+      type Candidate = {
+        via: 'v4' | 'aggregator'
+        fn: 'executeTrade' | 'executeAggregatorTrade'
+        data: Hex
+        build: (min: bigint) => Hex
+        simulated?: bigint
+      }
+      const candidates: Candidate[] = []
+
+      if (job.execution !== 'aggregator') {
+        /* the CANONICAL route from the registry: the fee/tickSpacing/hooks of the
+           pool with liquidity. A PoolKey built any other way is refused by the guard. */
+        const route = await client.readContract({
+          address: job.registry,
+          abi: registryAbi,
+          functionName: 'routeOf',
+          args: [tin.address, tout.address]
+        })
+        if (route.exists) {
+          const poolKey = brain.poolKey(tin.address, tout.address, route.fee, route.tickSpacing, route.hooks)
+          const build = (min: bigint): Hex =>
+            brain.encodeTrade({
+              tokenIn: tin.address,
+              tokenOut: tout.address,
+              amountIn: balance,
+              minAmountOut: min,
+              poolKey,
+              hookData: '0x'
+            } satisfies TradeIntent)
+          candidates.push({ via: 'v4', fn: 'executeTrade', data: build(minOut), build })
+        } else {
+          log.warn(`${tag} [${sig.name}] no pool route for ${current}/${target}`)
+        }
+      }
+
+      if (job.execution !== 'v4') {
+        const quoteFn = brain.fetchAggregatorSwap
+        const encodeAgg = brain.encodeAggregatorTrade
+        if (!quoteFn || !encodeAgg) {
+          log.warn(`${tag} execution=${job.execution} but this brain has no aggregator module, staying on v4`)
+        } else if (!process.env.ONEINCH_API_KEY) {
+          log.warn(`${tag} execution=${job.execution} but ONEINCH_API_KEY is missing, staying on v4`)
+        } else {
+          try {
+            const q = await quoteFn(cfg.network.chainId, v.account, tin.address, tout.address, balance, policy.maxSlippageBps / 100)
+            /* the on-chain allowlist decides which router may touch the vault's
+               money; a quote to any other router is an alarm, not a path */
+            const allowed = await client.readContract({
+              address: job.registry,
+              abi: registryAbi,
+              functionName: 'isAllowedAggregator',
+              args: [q.aggregator]
+            })
+            if (!allowed) {
+              log.warn(`${tag} aggregator ${q.aggregator} is not on the on-chain allowlist, skipping that path`)
+            } else {
+              const build = (min: bigint): Hex =>
+                encodeAgg({
+                  tokenIn: tin.address,
+                  tokenOut: tout.address,
+                  amountIn: balance,
+                  minAmountOut: min,
+                  aggregator: q.aggregator,
+                  swapData: q.swapData
+                })
+              candidates.push({ via: 'aggregator', fn: 'executeAggregatorTrade', data: build(minOut), build })
+            }
+          } catch (e) {
+            log.warn(`${tag} aggregator quote failed: ${(e as Error).message}`)
+          }
+        }
+      }
+
+      if (candidates.length === 0) {
+        log.warn(`${tag} [${sig.name}] no execution path for ${current} -> ${target}, holding`)
+        continue
+      }
+
+      /* BEST EXECUTION: every path is simulated from the agent account (eth_call,
+         no signature). The bigger fill wins; a path that reverts is out. Simulating
+         even a lone path matters: that number is also the yardstick the floor is
+         tightened against. */
+      const trySim = async (c: Candidate, data: Hex): Promise<bigint | null> => {
+        try {
+          const { result } = await client.simulateContract({
+            address: v.account,
+            abi: executeAbi,
+            functionName: c.fn,
+            args: [data],
+            account: from
+          })
+          return result as bigint
+        } catch (e) {
+          log.warn(`${tag} ${c.via} simulation failed: ${(e as Error).message.split('\n')[0]}`)
+          return null
+        }
+      }
+
+      for (const c of candidates) {
+        const out = await trySim(c, c.data)
+        if (out !== null) c.simulated = out
+      }
+      const viable = candidates.filter((c) => c.simulated !== undefined)
+      if (viable.length === 0) {
+        log.warn(`${tag} [${sig.name}] every path reverts in simulation (liquidity or slippage), holding`)
+        continue
+      }
+      let chosen = viable.reduce((a, b) => ((b.simulated ?? 0n) > (a.simulated ?? 0n) ? b : a))
+      if (viable.length > 1) {
+        log.info(`${tag} best-exec: ${viable.map((c) => `${c.via}=${c.simulated}`).join(' vs ')} -> ${chosen.via}`)
+      }
+
+      /* M-3: the oracle floor is a FLOOR, not a target. A pool that would give
+         more may fill exactly at the floor and keep the difference. Simulation
+         says what the pool really gives, so the floor climbs to just below it -
+         kept only if simulation still passes with the tightened floor, because
+         prices move between simulation and mining. */
+      let finalMinOut = minOut
+      if (job.tightenBps > 0 && chosen.simulated !== undefined) {
+        const tightened = (chosen.simulated * BigInt(10_000 - job.tightenBps)) / 10_000n
+        if (tightened > minOut) {
+          const data = chosen.build(tightened)
+          const out = await trySim(chosen, data)
+          if (out !== null) {
+            log.info(
+              `${tag} minOut tightened ${minOut} -> ${tightened} (simulated ${chosen.simulated}, ${job.tightenBps}bps below)`
+            )
+            chosen = { ...chosen, data, simulated: out }
+            finalMinOut = tightened
+          }
+        }
+      }
+
+      /* the cost is what we may lose against the oracle: entry value minus the
+         minimum we accept out. The goods are not a cost; they come back swapped. */
+      const minOutUsd = usdValue(finalMinOut, tout.decimals, pout.usd8)
+      const lossUsd8 = inUsd > minOutUsd ? inUsd - minOutUsd : 0n
+      const rate8 = await ethUsd8(client, job)
+      const day = new Date().toISOString().slice(0, 10)
+
+      items.push({
+        key: `rotate:${v.id}:${day}:${current}->${target}`,
         label: `ROTATE ${tag} ${current} -> ${target}`,
         args: [chosen.data],
-        /* castigul unei rotatii e alpha-ul strategiei, nu se citeste inainte */
+        /* a rotation's reward is the strategy's alpha; it cannot be read up front */
         rewardWei: 0n,
         rewardMeasured: false,
         stakeWei: usdToWei(inUsd, rate8),
@@ -912,11 +1087,11 @@ export const trader: Job<TraderJob> = {
         costWei: usdToWei(lossUsd8, rate8),
         costMeasured: rate8 > 0n,
         costToken: null,
-        /* aceeasi rotatie nu se trimite de doua ori in aceeasi zi; ziua urmatoare
-           e alta cheie, deci alta decizie */
+        /* the same rotation is never sent twice in one day; tomorrow is a new
+           key, hence a new decision */
         once: true,
         meta: {
-          account: st.account,
+          account: v.account,
           strategy: sig.name,
           from: current,
           to: target,
@@ -924,15 +1099,24 @@ export const trader: Job<TraderJob> = {
           via: chosen.via,
           amountIn: balance.toString(),
           minAmountOut: finalMinOut.toString(),
-          /* si podeaua de oracol, ca sa se vada in registru CU CAT s-a strans */
+          /* the oracle floor too, so the ledger shows HOW MUCH was tightened */
           oracleFloor: minOut.toString(),
           simulatedOut: chosen.simulated === undefined ? '' : chosen.simulated.toString(),
           inUsd8: inUsd.toString(),
           maxLossUsd8: lossUsd8.toString(),
           day
         }
-      }
-    ]
+      })
+    }
+
+    if (items.length === 0 && scans.length > 1) {
+      log.info(
+        `fleet of ${scans.length}: nothing to rotate ` +
+          `(${skipped.hold} holding, ${skipped.empty} empty, ${skipped.foreign} foreign key, ` +
+          `${skipped.paused} paused, ${skipped.noSignal} no strategy)`
+      )
+    }
+    return items
   },
 
   async checks({ client, cfg, job, from }): Promise<JobCheck[]> {
@@ -956,14 +1140,105 @@ export const trader: Job<TraderJob> = {
       })
     }
 
+    let ids: bigint[] = []
+    try {
+      ids = await resolveTokenIds(client, cfg, job)
+    } catch (e) {
+      checks.push({
+        name: 'collection',
+        ok: false,
+        detail: `cannot resolve the token list: ${(e as Error).message}`,
+        fatal: true
+      })
+      return checks
+    }
+    if (ids.length === 0) {
+      checks.push({
+        name: 'collection',
+        ok: true,
+        detail: 'no tokens minted yet; the fleet idles until the first mint and picks it up on the next run'
+      })
+      return checks
+    }
+
+    if (ids.length > 1) {
+      /* fleet mode: per-token litanies would drown the signal, so the doctor
+         answers the fleet-level questions instead */
+      const scans = await scanVaults(client, cfg, job, ids)
+      const ours = scans.filter((v) => v.agentSigner && v.agentSigner.toLowerCase() === from.toLowerCase())
+      const isStranger = from.toLowerCase() === STRANGER.toLowerCase()
+      checks.push({
+        name: 'operator key is an agent signer',
+        ok: ours.length > 0 || isStranger,
+        detail: isStranger
+          ? `no key loaded; ${scans.length} vault(s) scanned`
+          : `${ours.length} of ${scans.length} vault(s) list this key as their agentSigner` +
+            (ours.length === 0 ? '. Every executeTrade would revert.' : ''),
+        fatal: ours.length === 0 && !isStranger
+      })
+
+      const strategies = [...new Set(ours.map((v) => v.strategyId))]
+      const tradable = strategies.filter((sid) => !!brain!.SIGNALS[sid])
+      checks.push({
+        name: 'strategies',
+        ok: strategies.length === 0 || tradable.length > 0,
+        detail:
+          strategies.length === 0
+            ? 'no managed vaults yet'
+            : `managed vaults run strategy ${strategies.join(', ')}; ` +
+              `${tradable.length} of ${strategies.length} have a signal implementation`,
+        fatal: strategies.length > 0 && tradable.length === 0
+      })
+
+      const warmups = tradable.map((sid) => brain!.SIGNALS[sid]!.warmup)
+      if (warmups.length > 0) {
+        try {
+          const { last } = await seriesOfToday(job, brain)
+          const need = Math.max(...warmups)
+          checks.push({
+            name: 'price history',
+            ok: last >= need,
+            detail:
+              last >= need
+                ? `${last + 1} daily bars cached, deepest warmup ${need} covered`
+                : `${last + 1} bars is under the ${need} bar warmup: signals would be degraded, so the fleet holds`
+          })
+        } catch (e) {
+          checks.push({ name: 'price history', ok: false, detail: `cannot load daily bars: ${(e as Error).message}` })
+        }
+      }
+
+      const rate8m = await ethUsd8(client, job)
+      checks.push({
+        name: 'ETH is priced',
+        ok: rate8m > 0n,
+        detail:
+          rate8m > 0n
+            ? `1 ETH = ${rate8m} (usd, 8 decimals) for cost accounting`
+            : 'no eth.feed and no eth.usd8: rotation costs cannot be valued, and unmeasured costs are refused',
+        fatal: rate8m <= 0n
+      })
+      if (cfg.policy.dailySpendBudgetWei === null) {
+        checks.push({
+          name: 'daily spend budget',
+          ok: false,
+          detail:
+            'policy.dailySpendBudgetWei is not set: with a whole fleet rotating there is no ceiling ' +
+            'on the slippage burned in a day'
+        })
+      }
+      return checks
+    }
+
+    const tokenId = ids[0]!
     let st: NftState | null = null
     try {
-      st = await nftState(client, cfg, job)
+      st = await nftState(client, cfg, job, tokenId)
     } catch (e) {
       checks.push({
         name: 'nft state',
         ok: false,
-        detail: `cannot read NFT #${job.tokenId} from the collection: ${(e as Error).message}`,
+        detail: `cannot read NFT #${tokenId} from the collection: ${(e as Error).message}`,
         fatal: true
       })
       return checks
@@ -974,7 +1249,7 @@ export const trader: Job<TraderJob> = {
       name: 'operator key is the agent signer',
       ok: isSigner,
       detail: isSigner
-        ? `${from} matches the on-chain agentSigner of NFT #${job.tokenId}`
+        ? `${from} matches the on-chain agentSigner of NFT #${tokenId}`
         : `the 6551 account ${st.account} expects ${st.agentSigner}, this process signs as ${from}. ` +
           `Every executeTrade would revert. Set the per-NFT key of this instance.`,
       fatal: !isSigner
@@ -1103,7 +1378,108 @@ export const trader: Job<TraderJob> = {
       return [{ name: 'brain', value: `not loaded: ${(e as Error).message}`, level: 'bad' }]
     }
     const cash = brain.CASH
-    const st = await nftState(client, cfg, job)
+    const ids = await resolveTokenIds(client, cfg, job)
+    if (ids.length === 0) return [{ name: 'fleet', value: 'no tokens minted yet; waiting for the first mint' }]
+
+    if (ids.length > 1) {
+      /* fleet mode: one report for the whole book. Per-vault detail belongs in
+         the ledger; the daily message answers "what is the money doing". */
+      const scans = await scanVaults(client, cfg, job, ids)
+      const nowSec = (await client.getBlock()).timestamp
+      const syms = Object.keys(job.tokens)
+      const ours = scans.filter((v) => from.toLowerCase() === STRANGER.toLowerCase() || (v.agentSigner ?? '').toLowerCase() === from.toLowerCase())
+
+      const priceCache = new Map<string, Price>()
+      let navUsd8 = 0n
+      let funded = 0
+      const bySym = new Map<string, bigint>()
+      for (const v of scans) {
+        let vaultUsd = 0n
+        for (const sym of syms) {
+          const tok = job.tokens[sym]!
+          if (!hasFeed(tok) && sym !== cash) continue
+          const bal = v.balances.get(sym) ?? 0n
+          if (bal === 0n) continue
+          let price = priceCache.get(sym)
+          if (!price) {
+            try {
+              price = await priceOf(client, job, cash, sym, 3600, nowSec)
+              priceCache.set(sym, price)
+            } catch {
+              continue
+            }
+          }
+          const usdv = usdValue(bal, tok.decimals, price.usd8)
+          vaultUsd += usdv
+          if (usdv >= 1_000_000n) bySym.set(sym, (bySym.get(sym) ?? 0n) + usdv)
+        }
+        navUsd8 += vaultUsd
+        if (vaultUsd >= 1_000_000n) funded++
+      }
+
+      const { first, dayOpen } = navMarks(ledger, navUsd8, localDay())
+      const sinceStart = movePct(first, navUsd8)
+      const paused = scans.filter((v) => v.paused).length
+      const foreign = scans.length - ours.length
+
+      const top = [...bySym.entries()]
+        .sort((a, b) => (b[1] > a[1] ? 1 : -1))
+        .slice(0, 4)
+        .map(([sym, usdv]) => `${sym} ${usd(usdv)}`)
+
+      const lines: ReportLine[] = [
+        {
+          name: 'fleet',
+          value:
+            `${ours.length} managed of ${scans.length} minted, ${funded} funded` +
+            (foreign > 0 ? `, ${foreign} foreign-key` : '') +
+            (paused > 0 ? `, ${paused} paused` : ''),
+          level: paused > 0 ? 'warn' : undefined
+        },
+        {
+          name: 'value',
+          value: `${usd(navUsd8)} | today ${signed(movePct(dayOpen, navUsd8))} | since start ${signed(sinceStart)}`,
+          level: sinceStart !== null && sinceStart <= -20 ? 'warn' : undefined
+        },
+        { name: 'positions', value: top.length ? top.join(' + ') : 'all vaults empty' }
+      ]
+
+      if (job.maxDrawdownBps !== null) {
+        const tripped = ledger.kvGet('brake.armed') === '1'
+        const dropBps = navUsd8 >= first ? 0 : Number(((first - navUsd8) * 10_000n) / first)
+        lines.push({
+          name: 'drawdown brake',
+          value: tripped
+            ? `TRIPPED, no rotations leave: ${ledger.kvGet('brake.reason') ?? 'value below the line'}`
+            : `${(dropBps / 100).toFixed(2)}% of the ${(job.maxDrawdownBps / 100).toFixed(2)}% allowance used`,
+          level: tripped ? 'bad' : undefined
+        })
+      }
+
+      if (from.toLowerCase() === STRANGER.toLowerCase()) {
+        lines.push({ name: 'gas', value: 'unknown: this process has no operator key' })
+      } else {
+        const gasWei = await client.getBalance({ address: from })
+        const life = ledger.totals(0)
+        const left = tradesLeft(gasWei, life.gasWei, life.done)
+        lines.push({
+          name: 'gas',
+          value: `${formatEther(gasWei)} ${cfg.network.nativeSymbol}${left === null ? '' : ` (~${left} rotations)`}`,
+          level: left === null ? undefined : left < 5 ? 'bad' : left < 20 ? 'warn' : undefined
+        })
+      }
+      if (cfg.execution.dryRun) {
+        lines.push({ name: 'mode', value: 'DRY RUN, nothing is being signed', level: 'warn' })
+      }
+      const lastWork = ledger.recentEvents(40).find((e) => e.kind === 'work')
+      lines.push({
+        name: 'last rotation',
+        value: lastWork ? `${lastWork.key} ${ago(Math.floor(Date.now() / 1000) - lastWork.at)}` : 'none yet'
+      })
+      return lines
+    }
+
+    const st = await nftState(client, cfg, job, ids[0]!)
     const sig = brain.SIGNALS[st.strategyId]
 
     /* fara politica citita, vechimea acceptata a oracolului ramane o ora: e

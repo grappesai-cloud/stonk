@@ -143,13 +143,11 @@ services:
       start_period: 20s
       retries: 3
 
-  # Al doilea agent: acelasi cod, acelasi creier, ACEEASI cheie de agent (e
-  # setata pe seiful lui la mint), alt NFT si alt registru.
-  #
-  # Un serviciu per NFT merge pentru doi si NU merge pentru 700. E pasul
-  # intermediar cinstit pana cand traderul stie sa tina o lista de NFT-uri
-  # intr-un singur proces, cu citiri in bloc prin multicall.
-  trader2:
+  # PAYMASTER: the fleet's hands on the fee pipeline. Flushes the Treasury
+  # (coin fees, ETH -> USDG -> RewardDistributor) and claims every agent's
+  # share into its own vault. Its key can only pick flush timing and the price
+  # floor - the money's destination is pinned in the contracts.
+  paymaster:
     <<: *agent
     environment:
       LOG_FORMAT: json
@@ -157,16 +155,12 @@ services:
       CONSOLE_HOST: 0.0.0.0
       TZ: Europe/Bucharest
     ports:
-      - "127.0.0.1:8806:8806"
-      - "10.0.0.1:8806:8806"
-      - "127.0.0.1:8807:8807"
-    volumes:
-      - ./data:/app/data
-      - ./config:/app/config:ro
-      - ./brain:/app/brain:ro
-    command: ["start", "-c", "./config/trader2.json"]
+      - "127.0.0.1:8808:8808"
+      - "10.0.0.1:8808:8808"
+      - "127.0.0.1:8809:8809"
+    command: ["start", "-c", "./config/paymaster.json"]
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8806/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8808/health"]
       interval: 30s
       timeout: 5s
       start_period: 20s

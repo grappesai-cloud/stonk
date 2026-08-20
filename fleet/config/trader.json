@@ -1,5 +1,5 @@
 {
-  "_": "TRADER, mainile flotei pe Financial NFA: roteste vault-ul NFT #1 dupa semnalele din backtest. Un agent = UN NFT; al doilea NFT inseamna inca un fisier ca asta, cu alta cheie. Adresele colectiei si registrului sunt pe zero pana la deploy: agentul asteapta singur, nu crapa.",
+  "_": "TRADER, the fleet's hands on Financial NFA: rotates EVERY vault of the collection whose agentSigner is this process's key, following the private brain's signals. One process, N NFTs; holders who rotate their key away or pause are skipped, as is their right.",
   "_brain": "Creierul (strategiile) NU sta in repo-ul asta public: se monteaza din financial-nfa (build-uit) in ./brain, care e in .gitignore. Fara creier agentul sta si spune de ce.",
   "watchtower": false,
   "agent": {
@@ -49,7 +49,10 @@
     "deployBlock": 0
   },
   "job": {
-    "tokenId": 1,
+    "_tokenIds": "ONE process for the WHOLE collection: 'all' follows nextId, so a freshly minted agent is picked up on the next run with zero operator work (the mint installs the bot key on chain). Per-vault state is read in batched multicalls; brain, price series, oracle prices and policies are shared per run. Empty vaults (most, until rewards flow) are skipped below minVaultUsd8.",
+    "tokenIds": "all",
+    "maxTokens": 1000,
+    "minVaultUsd8": "10000000",
     "registry": "0x2f974396e1ddf941cF9ad866fA267bdf1df557de",
     "brain": {
       "dir": "./brain"
@@ -122,7 +125,7 @@
     "maxCostPerJobWei": "50000000000000000",
     "dailySpendBudgetWei": "150000000000000000",
     "cooldownSec": 3600,
-    "maxJobsPerRun": 1,
+    "maxJobsPerRun": 10,
     "batchSize": 1,
     "gasCapPerCall": "2500000",
     "maxGasPriceWei": null,
