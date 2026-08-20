@@ -143,6 +143,35 @@ services:
       start_period: 20s
       retries: 3
 
+  # Al doilea agent: acelasi cod, acelasi creier, ACEEASI cheie de agent (e
+  # setata pe seiful lui la mint), alt NFT si alt registru.
+  #
+  # Un serviciu per NFT merge pentru doi si NU merge pentru 700. E pasul
+  # intermediar cinstit pana cand traderul stie sa tina o lista de NFT-uri
+  # intr-un singur proces, cu citiri in bloc prin multicall.
+  trader2:
+    <<: *agent
+    environment:
+      LOG_FORMAT: json
+      API_HOST: 0.0.0.0
+      CONSOLE_HOST: 0.0.0.0
+      TZ: Europe/Bucharest
+    ports:
+      - "127.0.0.1:8806:8806"
+      - "10.0.0.1:8806:8806"
+      - "127.0.0.1:8807:8807"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+      - ./brain:/app/brain:ro
+    command: ["start", "-c", "./config/trader2.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8806/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # Lista de asteptare a site-ului. NU e un agent: e singurul serviciu din tot
   # proiectul care primeste scriere de la un strain, si de aia sta separat, cu
   # baza lui si portul lui.
