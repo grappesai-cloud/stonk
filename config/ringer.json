@@ -73,10 +73,11 @@
     },
     "event": {
       "_": "RoundStarted nu spune cine a apasat, deci caietul de curse ia expeditorul tranzactiei.",
-      "signature": "event RoundStarted(address token, uint64 round, uint256 pot, uint256 totalWeight)",
+      "signature": "event RoundStarted(address indexed token, uint64 indexed round, uint256 pot, uint256 totalWeight)",
       "callerField": null,
       "rewardField": null,
-      "slotField": "token"
+      "slotField": "token",
+      "_indexed": "ATENTIE: campurile indexate TREBUIE marcate. Fara ele topicul iese acelasi, deci filtrul pare sa mearga, dar decodarea arunca si caietul ramane gol pe tacute."
     },
     "race": {
       "priorityBumpBps": 2000,

@@ -71,10 +71,11 @@
     "batchSize": 40,
     "readChunk": 500,
     "event": {
-      "signature": "event ClockedIn(address token, uint64 round, uint256 tokenId, address wallet, uint256 amount)",
+      "signature": "event ClockedIn(address indexed token, uint64 indexed round, uint256 indexed tokenId, address wallet, uint256 amount)",
       "callerField": null,
       "idField": "tokenId",
-      "amountField": "amount"
+      "amountField": "amount",
+      "_indexed": "ATENTIE: campurile indexate TREBUIE marcate. Fara ele topicul iese acelasi, deci filtrul pare sa mearga, dar decodarea arunca si caietul ramane gol pe tacute."
     },
     "roundState": {
       "_": "o citire pe jeton, ca sa nu intrebam de mii de ori degeaba",

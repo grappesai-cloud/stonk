@@ -62,10 +62,11 @@
       "address": null
     },
     "event": {
-      "signature": "event RoundOpened(uint256 round, uint256 potWei, uint256 totalWeight, uint32 menuVersion)",
+      "signature": "event RoundOpened(uint256 indexed round, uint256 potWei, uint256 totalWeight, uint32 menuVersion)",
       "callerField": null,
       "rewardField": null,
-      "slotField": null
+      "slotField": null,
+      "_indexed": "ATENTIE: campurile indexate TREBUIE marcate. Fara ele topicul iese acelasi, deci filtrul pare sa mearga, dar decodarea arunca si caietul ramane gol pe tacute."
     },
     "race": {
       "priorityBumpBps": 2000,
