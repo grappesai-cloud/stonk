@@ -1,0 +1,16 @@
+.DS_Store
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.local
+
+# nft: generated outputs, rebuilt from code
+nft/out/
+nft/gallery.html
+nft/gallery_v50.html
+nft/gallery-data.json
+
+# nft: local reference material, not published
+nft/ref/
+nft/ref2/
