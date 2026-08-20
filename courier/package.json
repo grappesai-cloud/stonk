@@ -1,0 +1,31 @@
+{
+  "name": "stonk-courier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Courier: the delivery agent for the Stonk Agents fleet. Finds unclaimed drops sitting in ERC-6551 broker wallets and delivers them.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "bin": { "courier": "./bin/courier.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "courier": "tsx src/cli.ts",
+    "test": "vitest run test/unit",
+    "test:e2e": "vitest run test/e2e --testTimeout=180000",
+    "test:all": "vitest run --testTimeout=180000",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "pino": "^9.6.0",
+    "viem": "^2.23.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  }
+}

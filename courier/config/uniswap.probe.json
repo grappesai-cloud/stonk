@@ -1,0 +1,50 @@
+{
+  "_": "Proba pe un contract adevarat de pe 4663 pe care NU l-am scris noi. Pozitiile Uniswap V3 tin taxe nerevendicate (tokensOwed0/1) in NFT-uri, deci au exact forma pe care o cauta Courier. Nu se livreaza nimic: e proba de citire si de detectare a autorizarii.",
+
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": ["https://rpc.mainnet.chain.robinhood.com"],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 100
+  },
+
+  "erc6551": {
+    "registry": "0x000000006551c19487814612e58FE06813775758",
+    "implementation": "0x41C8f39463A868d3A88af00cd0fe7102F30E44eC",
+    "salt": "0x0000000000000000000000000000000000000000000000000000000000000000"
+  },
+
+  "brokers": {
+    "address": "0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3",
+    "idStrategy": "range",
+    "firstId": 1,
+    "maxId": 300
+  },
+
+  "drops": {
+    "address": "0x73991a25C818Bf1f1128dEAaB1492D45638DE0D3",
+    "pending": {
+      "signature": "function positions(uint256 tokenId) view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)",
+      "args": ["$tokenId"],
+      "nativeFields": [],
+      "tokenFields": [
+        { "field": "tokensOwed0", "token": "0x0000000000000000000000000000000000000001", "decimals": 18, "symbol": "TOKEN0", "weiPerToken": "0" },
+        { "field": "tokensOwed1", "token": "0x0000000000000000000000000000000000000002", "decimals": 6, "symbol": "TOKEN1", "weiPerToken": "0" }
+      ]
+    },
+    "deliverSignature": "function collect((uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max) params) returns (uint256 amount0, uint256 amount1)",
+    "deliverArgs": [
+      { "tokenId": "$tokenId", "recipient": "$wallet", "amount0Max": "$max128", "amount1Max": "$max128" }
+    ],
+    "errorSignatures": [],
+    "readChunk": 150
+  },
+
+  "policy": { "minValueWei": "0", "cooldownSec": 0 },
+  "execution": { "dryRun": true },
+  "api": { "enabled": false },
+  "storage": { "file": ":memory:" }
+}
