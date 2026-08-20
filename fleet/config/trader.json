@@ -22,8 +22,8 @@
     "blockTimeMs": 2000
   },
   "target": {
-    "address": "0x0000000000000000000000000000000000000000",
-    "_": "colectia AgentNFT, dupa deploy-ul financial-nfa pe 4663",
+    "address": "0xD0D67Fa6328e593BF2E6eEF964088c362691d1b5",
+    "_": "colectia AgentNFT, deployata pe 4663 pe 20 aug 2026",
     "errorSignatures": [
       "error NotOwner()",
       "error NotAgent()",
@@ -50,7 +50,7 @@
   },
   "job": {
     "tokenId": 1,
-    "registry": "0x0000000000000000000000000000000000000000",
+    "registry": "0x2f974396e1ddf941cF9ad866fA267bdf1df557de",
     "brain": { "dir": "./brain" },
     "_tokens": "actiunile tokenizate REALE de pe 4663, cu feed-urile Chainlink verificate on-chain (20 aug). USDG e cash-ul: fara feed, valoreaza $1.",
     "tokens": {
@@ -63,8 +63,8 @@
       "PLTR": { "address": "0x894E1EC2D74FFE5AEF8Dc8A9e84686acCB964F2A", "decimals": 18, "feed": "0x820ABedFF239034956B7A9d2F0a331f9F075eB4c" },
       "AMD":  { "address": "0x86923f96303D656E4aa86D9d42D1e57ad2023fdC", "decimals": 18, "feed": "0x943A29E7ae51A4798823ca9eEd2ed533B2A22C72" }
     },
-    "_eth": "cursul ETH/USD pentru contabilitate in wei: pune feed-ul Chainlink daca exista pe 4663, altfel un curs static usd8. Cu amandoua pe zero, doctor pica si niciun trade nu pleaca: cost nemasurat = refuz.",
-    "eth": { "feed": null, "usd8": "0" },
+    "_eth": "cursul ETH/USD pentru contabilitate in wei (plafoanele pe alunecare). Static, pus la go-live (20 aug: ~$2275); e o rigla de buget, nu de executie — executia se masoara contra oracolelor de stock. De improspatat cand ETH se misca mult, sau inlocuit cu feed daca apare unul pe 4663.",
+    "eth": { "feed": null, "usd8": "227500000000" },
     "history": { "range": "1y", "cacheDir": "./data/prices-live" }
   },
   "policy": {
