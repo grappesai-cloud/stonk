@@ -1,0 +1,354 @@
+/* =========================================================================
+   STONK AGENTS
+     1. Fonturi
+     2. Variabile         <- tema se schimba aici
+     3. Baza
+     4. Fundal si straturi
+     5. Componente (butoane, pastile, etichete)
+     6. Bara de sus
+     7. Hero
+     8. Banda
+     9. Cifre
+    10. Flota (sina orizontala)
+    11. Pasii
+    12. Mint si formular
+    13. Subsol
+    14. Miscare si ecrane mici
+   ========================================================================= */
+
+/* ---------- 1. Fonturi ---------- */
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400 900;font-stretch:62.5% 125%;font-display:swap;
+  src:url('../assets/fonts/archivo-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400 900;font-stretch:62.5% 125%;font-display:swap;
+  src:url('../assets/fonts/archivo-latin-ext.woff2') format('woff2');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:swap;
+  src:url('../assets/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+/* ---------- 2. Variabile ---------- */
+:root{
+  --bg:#000;
+  --panel:#0a0a0a;
+  --panel-2:#101010;
+  --green:#00c805;
+  --green-hot:#00ff2b;
+  --green-soft:rgba(0,200,5,.12);
+  --red:#ff5000;
+  --text:#fff;
+  --dim:rgba(255,255,255,.58);
+  --faint:rgba(255,255,255,.34);
+  --line:rgba(255,255,255,.10);
+  --line-2:rgba(255,255,255,.055);
+
+  --sans:'Archivo',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  --wrap:1180px;
+  --pad:clamp(20px,4vw,40px);
+  --nav-h:68px;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+
+/* ---------- 3. Baza ---------- */
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:400 17px/1.55 var(--sans);font-stretch:100%;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+img,canvas{max-width:100%;display:block}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+::selection{background:var(--green);color:#000}
+
+.wrap{width:100%;max-width:var(--wrap);margin:0 auto;padding-inline:var(--pad)}
+.mono{font-family:var(--mono);font-weight:500;letter-spacing:.1em;text-transform:uppercase;font-size:11px}
+.faint{color:var(--faint)}
+.hl{color:var(--green);font-style:normal}
+
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.035em;line-height:1.02;font-stretch:100%}
+.h-display{font-size:clamp(44px,8.4vw,104px)}
+.h-display.sm{font-size:clamp(34px,5.4vw,64px)}
+.h-display .line{display:block}
+.h-2{font-size:clamp(28px,4.2vw,46px);letter-spacing:-.03em;line-height:1.06}
+.lede{margin:0;color:var(--dim);font-size:clamp(16px,1.5vw,19px);max-width:56ch}
+.lede.sm{font-size:16px}
+.eyebrow{margin:0 0 14px;color:var(--faint)}
+
+section{position:relative}
+.sec-head{max-width:60ch;margin-bottom:52px;display:grid;gap:16px}
+
+/* apariitia la scroll */
+[data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .8s var(--ease),transform .8s var(--ease)}
+[data-reveal].in{opacity:1;transform:none}
+
+/* ---------- 4. Fundal ---------- */
+.bg-grid,.bg-aura,.bg-spot,.grain{position:fixed;inset:0;pointer-events:none;z-index:0}
+.bg-grid{
+  background-image:linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
+  background-size:72px 72px;
+  mask-image:radial-gradient(ellipse 100% 70% at 50% 0%,#000 20%,transparent 78%);
+}
+.bg-aura{background:radial-gradient(ellipse 60% 45% at 50% -8%,rgba(0,200,5,.18),transparent 70%)}
+.bg-spot{
+  background:radial-gradient(340px circle at var(--mx,50%) var(--my,50%),rgba(0,200,5,.10),transparent 70%);
+  transition:opacity .4s;
+}
+.grain{
+  opacity:.035;z-index:3;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+main{position:relative;z-index:1}
+
+.progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:60;background:transparent}
+.progress i{display:block;height:100%;width:0;background:var(--green);box-shadow:0 0 14px var(--green)}
+
+.cursor{position:fixed;top:0;left:0;width:26px;height:26px;margin:-13px 0 0 -13px;z-index:70;
+  pointer-events:none;opacity:0;transition:opacity .3s,transform .18s var(--ease)}
+.cursor i{display:block;width:100%;height:100%;border:1px solid rgba(255,255,255,.5);border-radius:50%}
+.cursor.on{opacity:1}
+.cursor.hot{transform:scale(1.5)}
+.cursor.hot i{border-color:var(--green);background:var(--green-soft)}
+@media (hover:none){.cursor{display:none}}
+
+/* ---------- 5. Componente ---------- */
+.btn{
+  --bd:var(--line);
+  position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:46px;padding:0 22px;border-radius:999px;border:1px solid var(--bd);
+  font-weight:600;font-size:15px;letter-spacing:-.01em;white-space:nowrap;
+  background:transparent;cursor:pointer;overflow:hidden;
+  transition:background .25s,color .25s,border-color .25s,transform .25s var(--ease);
+}
+.btn::after{ /* lumina care trece la hover */
+  content:'';position:absolute;inset:0;transform:translateX(-120%);
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);
+  transition:transform .7s var(--ease);
+}
+.btn:hover::after{transform:translateX(120%)}
+.btn-solid{background:var(--green);border-color:var(--green);color:#000}
+.btn-solid:hover{background:var(--green-hot);border-color:var(--green-hot)}
+.btn-ghost:hover{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.04)}
+.btn-sm{height:38px;padding:0 16px;font-size:14px}
+.btn-lg{height:54px;padding:0 30px;font-size:16px}
+.btn-block{width:100%}
+.btn:disabled{opacity:.5;cursor:default}
+
+.chip{display:inline-flex;align-items:center;gap:9px;margin:0 0 26px;padding:7px 14px 7px 11px;
+  border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.02)}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);
+  animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.chip span{color:var(--dim)}
+
+.tag{padding:3px 8px;border:1px solid var(--line);border-radius:6px;color:var(--faint)}
+
+/* ---------- 6. Bara de sus ---------- */
+.nav{
+  position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:50;
+  display:flex;align-items:center;gap:24px;padding-inline:var(--pad);
+  border-bottom:1px solid transparent;transition:background .3s,border-color .3s,backdrop-filter .3s;
+}
+.nav.stuck{background:rgba(0,0,0,.72);backdrop-filter:blur(14px);border-bottom-color:var(--line)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.02em;font-size:15px;white-space:nowrap}
+.brand-mark{width:20px;height:20px;fill:none;stroke:var(--green);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.brand-mark .thin{stroke-width:2}
+.nav-links{display:flex;gap:26px;margin-left:14px}
+.nav-links a{color:var(--dim);font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover,.nav-links a.on{color:var(--text)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.eth{color:var(--faint)}
+.eth b{color:var(--green);font-weight:600}
+.burger{display:none;width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:none;
+  cursor:pointer;padding:0;place-items:center;gap:5px}
+.burger span{display:block;width:15px;height:1.5px;background:var(--text);transition:transform .3s var(--ease)}
+.burger.on span:first-child{transform:translateY(3.25px) rotate(45deg)}
+.burger.on span:last-child{transform:translateY(-3.25px) rotate(-45deg)}
+
+.menu{position:fixed;inset:var(--nav-h) 0 auto;z-index:49;display:none;flex-direction:column;
+  padding:18px var(--pad) 26px;background:rgba(0,0,0,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.menu.on{display:flex}
+.menu a{padding:14px 0;border-bottom:1px solid var(--line-2);color:var(--dim);font-size:15px}
+
+/* ---------- 7. Hero ---------- */
+.hero{min-height:100svh;display:flex;align-items:center;padding:calc(var(--nav-h) + 40px) 0 60px;overflow:hidden}
+.hero-chart{position:absolute;inset:auto 0 0;width:100%;height:66%;z-index:0}
+.hero-fade{position:absolute;inset:auto 0 0;height:62%;z-index:0;
+  background:linear-gradient(to top,rgba(0,0,0,.92) 6%,rgba(0,0,0,.55) 40%,transparent 100%)}
+.hero-inner{position:relative;z-index:1;display:grid;gap:26px;justify-items:start}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+
+.quote{
+  margin-top:26px;width:min(420px,100%);padding:16px 18px;border:1px solid var(--line);border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+  backdrop-filter:blur(8px);transition:transform .3s var(--ease);will-change:transform;
+}
+.quote-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.quote-feed{display:grid;gap:9px;min-height:76px}
+.quote-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:baseline;
+  font-size:11.5px;letter-spacing:.04em;animation:rowIn .5s var(--ease) both}
+.quote-row b{color:var(--dim);font-weight:500}
+.quote-row u{text-decoration:none;color:var(--faint);margin-left:8px}
+.quote-row em{font-style:normal;color:var(--green);font-weight:600}
+@keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.scroll-hint{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:1;
+  display:grid;justify-items:center;gap:8px;color:var(--faint);font-family:var(--mono);
+  font-size:10px;letter-spacing:.18em}
+.scroll-hint i{width:1px;height:26px;background:linear-gradient(var(--green),transparent);animation:drop 2s infinite}
+@keyframes drop{0%{opacity:0;transform:scaleY(.2)}40%{opacity:1}100%{opacity:0;transform:scaleY(1)}}
+
+/* ---------- 8. Banda ---------- */
+.tape{border-block:1px solid var(--line);padding:14px 0;overflow:hidden;background:var(--panel)}
+.tape-row{display:flex;gap:44px;width:max-content;animation:slide 42s linear infinite}
+.tape-row span{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--faint);
+  display:flex;align-items:center;gap:44px;white-space:nowrap}
+.tape-row span::after{content:'';width:4px;height:4px;border-radius:50%;background:var(--green)}
+@keyframes slide{to{transform:translateX(-50%)}}
+.tape:hover .tape-row{animation-play-state:paused}
+
+/* ---------- 9. Cifre ---------- */
+.stats{padding:88px 0 20px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.stat{background:var(--panel);padding:30px 26px}
+.stat b{display:block;font-family:var(--mono);font-size:clamp(30px,3.4vw,42px);font-weight:700;letter-spacing:-.03em}
+.stat span{display:block;margin-top:10px;color:var(--faint);font-size:13px}
+
+/* ---------- 10. Flota ---------- */
+.rail{position:relative}
+.rail-stick{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;
+  gap:44px;overflow:hidden;padding-top:var(--nav-h)}
+.rail-head{max-width:56ch}
+.rail-track{display:flex;gap:22px;padding-inline:var(--pad);will-change:transform}
+.card{
+  flex:0 0 clamp(280px,32vw,400px);min-height:clamp(300px,42vh,380px);
+  display:flex;flex-direction:column;gap:14px;padding:28px;
+  border:1px solid var(--line);border-radius:20px;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  transition:border-color .3s,transform .3s var(--ease);
+}
+.card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;
+  background:radial-gradient(300px circle at var(--cx,50%) var(--cy,50%),var(--green-soft),transparent 70%)}
+.card:hover{border-color:rgba(0,200,5,.4)}
+.card:hover::before{opacity:1}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start}
+.card-code{font-family:var(--mono);font-size:44px;font-weight:700;letter-spacing:-.04em;color:rgba(255,255,255,.14)}
+.card-glyph{width:38px;height:38px;stroke:var(--green);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.card h3{font-size:26px;letter-spacing:-.025em}
+.card-role{color:var(--green);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+.card p{margin:0;color:var(--dim);font-size:15px}
+.card-earns{margin-top:auto;padding-top:16px;border-top:1px solid var(--line-2);
+  display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.card-earns b{color:var(--text);font-weight:600}
+
+.rail-bar{height:2px;background:var(--line);margin-inline:var(--pad);border-radius:2px;overflow:hidden}
+.rail-bar i{display:block;height:100%;width:22%;background:var(--green);border-radius:2px;transform-origin:left}
+
+/* ---------- 11. Pasii ---------- */
+.loop{padding:120px 0}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:1px;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.step{background:var(--panel);padding:30px 26px;display:grid;gap:10px;position:relative}
+.step-n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--green)}
+.step h3{font-size:21px}
+.step p{margin:0;color:var(--dim);font-size:15px}
+.step::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:0;background:var(--green);
+  transition:width .8s var(--ease)}
+.step.in::after{width:100%}
+
+/* ---------- 12. Mint ---------- */
+.mint{padding:60px 0 130px}
+.mint-inner{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(30px,5vw,70px);align-items:start}
+.mint-left{display:grid;gap:22px;justify-items:start}
+.count{margin-top:6px;display:grid;gap:12px}
+.count-row{display:flex;gap:10px}
+.count-cell{min-width:74px;padding:14px 10px;border:1px solid var(--line);border-radius:14px;
+  background:var(--panel);text-align:center}
+.count-cell b{display:block;font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em}
+.count-cell span{display:block;margin-top:6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--faint)}
+.contract{margin:0}
+.contract a{border-bottom:1px solid var(--line)}
+.contract button{margin-left:10px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;
+  background:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint)}
+.contract button:hover{color:var(--green);border-color:var(--green)}
+
+.form{display:grid;gap:16px;padding:30px;border:1px solid var(--line);border-radius:20px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.form-head{display:grid;gap:6px;margin-bottom:4px}
+.form-head h3{font-family:var(--mono);font-size:12px;letter-spacing:.16em}
+.form-head p{margin:0;font-size:14px}
+.field{display:grid;gap:8px}
+.field span{color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.14em}
+.field input,.field select{
+  height:46px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.5);
+  outline:none;transition:border-color .2s,background .2s;
+  -webkit-appearance:none;appearance:none;
+}
+.field select{background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+  background-position:calc(100% - 20px) 20px,calc(100% - 15px) 20px;background-size:5px 5px;background-repeat:no-repeat}
+.field input:focus,.field select:focus{border-color:var(--green);background:rgba(0,200,5,.04)}
+.field input::placeholder{color:rgba(255,255,255,.26)}
+.form-msg{margin:0;min-height:16px;color:var(--faint)}
+.form-msg.ok{color:var(--green)}
+.form-msg.err{color:var(--red)}
+
+/* ---------- 13. Subsol ---------- */
+.foot{border-top:1px solid var(--line);padding:56px 0 44px}
+.foot-inner{display:grid;gap:26px}
+.foot-mail{font-size:clamp(22px,3vw,34px);font-weight:700;letter-spacing:-.03em;width:fit-content;
+  border-bottom:1px solid var(--line);padding-bottom:4px;transition:border-color .25s,color .25s}
+.foot-mail:hover{color:var(--green);border-color:var(--green)}
+.foot-links{display:flex;flex-wrap:wrap;gap:22px}
+.foot-links a,.foot-links span{color:var(--faint);transition:color .2s}
+.foot-links a:hover{color:var(--green)}
+.foot-links span::after{content:' SOON';color:rgba(255,255,255,.2)}
+.foot-note{margin:0;text-transform:none;letter-spacing:.02em;font-size:11px}
+
+/* ---------- 14. Miscare si ecrane mici ---------- */
+@media (max-width:900px){
+  .mint-inner{grid-template-columns:1fr}
+  .nav-links{display:none}
+  .burger{display:grid}
+  .rail-stick{height:auto;position:static;padding:100px 0 60px}
+  .rail-track{overflow-x:auto;scroll-snap-type:x mandatory;transform:none !important;
+    padding-bottom:16px;-webkit-overflow-scrolling:touch}
+  .rail-track::-webkit-scrollbar{display:none}
+  .card{scroll-snap-align:center;flex-basis:min(78vw,340px)}
+  .rail-bar{display:none}
+  .hero{min-height:auto;padding-top:calc(var(--nav-h) + 56px)}
+  .hero-chart,.hero-fade{height:48%}
+  .scroll-hint{display:none}
+  .quote{width:100%}
+}
+@media (max-width:560px){
+  /* la latimea asta bara de sus are marca, pretul, butonul si meniul.
+     Pretul e cel mai putin important dintre ele, deci pleaca primul. */
+  .eth{display:none}
+  .hero-actions{width:100%}
+  .hero-actions .btn{flex:1 1 100%}
+  .stats{padding-top:56px}
+  .loop{padding:80px 0}
+  .form{padding:22px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important}
+  [data-reveal]{opacity:1;transform:none}
+}
+
+/* ---------------------------------------------------- starea unei clase --
+   Verde plin = agentul lucreaza pe lant. Contur stins = meseria nu exista
+   inca acolo. Diferenta se vede dintr-o privire, fara sa citesti nimic. */
+.card-state{
+  margin-left:auto;font:600 10px/1 var(--mono);letter-spacing:.14em;
+  padding:5px 8px;border-radius:999px;align-self:flex-start;
+}
+.card-state-live{background:var(--green);color:#000}
+.card-state-soon{border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.45)}
+.card-top{align-items:flex-start}

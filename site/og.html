@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>OG card</title>
+  <!--
+    Sablonul pentru assets/og.jpg (1200x630).
+    Nu e o pagina publica: se deschide doar cand vrei sa refaci imaginea.
+    Cum o refaci: deschizi fisierul in browser, faci o captura a dreptunghiului
+    de 1200x630 din coltul stanga-sus si o salvezi peste assets/og.jpg.
+  -->
+  <style>
+    @font-face {
+      font-family: 'Archivo';
+      font-weight: 400 900;
+      font-stretch: 62.5% 125%;
+      src: url('assets/fonts/archivo-latin.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-weight: 400 700;
+      src: url('assets/fonts/jetbrains-mono-latin.woff2') format('woff2');
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { background: #111; }
+
+    .og {
+      position: relative;
+      width: 1200px;
+      height: 630px;
+      overflow: hidden;
+      background: #000;
+      color: #edf2ea;
+      font-family: 'Archivo', Arial, sans-serif;
+    }
+
+    /* grila + halou, ca pe site */
+    .og::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, rgba(198, 255, 61, 0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(198, 255, 61, 0.07) 1px, transparent 1px);
+      background-size: 60px 60px;
+      -webkit-mask-image: radial-gradient(75% 70% at 40% 45%, #000 10%, transparent 100%);
+    }
+    .og::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(52% 46% at 78% 108%, rgba(198, 255, 61, 0.22) 0%, rgba(198, 255, 61, 0) 70%);
+    }
+
+    .inner {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      padding: 58px 64px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .top { display: flex; align-items: center; justify-content: space-between; }
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      color: rgba(237, 242, 234, 0.6);
+    }
+    .logo b { color: #c6ff3d; }
+    .chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: #c6ff3d;
+      background: rgba(198, 255, 61, 0.1);
+      border-left: 3px solid #c6ff3d;
+      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+    }
+    .chip i { width: 9px; height: 9px; background: #c6ff3d; box-shadow: 0 0 12px #c6ff3d; }
+
+    h1 {
+      font-weight: 900;
+      font-stretch: 125%;
+      font-size: 90px;
+      line-height: 0.88;
+      letter-spacing: -0.045em;
+      text-transform: uppercase;
+      max-width: 13ch;
+    }
+    h1 em { font-style: normal; color: #c6ff3d; text-shadow: 0 0 70px rgba(198, 255, 61, 0.45); }
+
+    .bottom {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 40px;
+    }
+    .sub {
+      max-width: 46ch;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px;
+      line-height: 1.7;
+      letter-spacing: 0.02em;
+      color: rgba(237, 242, 234, 0.62);
+    }
+    .url {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: #c6ff3d;
+      white-space: nowrap;
+    }
+
+    /* hexagonul din puncte, acelasi motiv ca holograma de pe site */
+    .hex {
+      position: absolute;
+      right: 26px;
+      top: 52%;
+      transform: translateY(-50%);
+      width: 286px;
+      height: 286px;
+      opacity: 0.55;
+    }
+    .hex i,
+    .hex b {
+      position: absolute;
+      background-image: radial-gradient(circle, #c6ff3d 1.7px, transparent 1.8px);
+      background-size: 12px 12px;
+      clip-path: polygon(50% 1%, 97% 26%, 97% 74%, 50% 99%, 3% 74%, 3% 26%);
+    }
+    .hex i { inset: 0; }
+    /* hexagonul interior in negru taie o gaura, deci ramane un inel */
+    .hex b {
+      inset: 21%;
+      background-image: none;
+      background: #000;
+    }
+    .hex .core {
+      position: absolute;
+      inset: 38%;
+      background-image: radial-gradient(circle, #c6ff3d 1.7px, transparent 1.8px);
+      background-size: 12px 12px;
+      clip-path: polygon(50% 1%, 97% 26%, 97% 74%, 50% 99%, 3% 74%, 3% 26%);
+    }
+
+    /* scanlines */
+    .scan {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      opacity: 0.4;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.3) 3px, rgba(0, 0, 0, 0.3) 4px);
+    }
+
+    /* colturi de vizor */
+    .corner {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border: 2px solid #c6ff3d;
+      z-index: 4;
+      opacity: 0.8;
+    }
+    .c1 { top: 26px; left: 26px; border-right: 0; border-bottom: 0; }
+    .c2 { top: 26px; right: 26px; border-left: 0; border-bottom: 0; }
+    .c3 { bottom: 26px; left: 26px; border-right: 0; border-top: 0; }
+    .c4 { bottom: 26px; right: 26px; border-left: 0; border-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="og">
+    <div class="hex"><i></i><b></b><span class="core"></span></div>
+
+    <div class="inner">
+      <div class="top">
+        <div class="logo">STONK<b>AGENTS</b></div>
+        <div class="chip"><i></i>MINT OPEN</div>
+      </div>
+
+      <h1>Agents<br><em>that clock in</em></h1>
+
+      <div class="bottom">
+        <div class="sub">
+          ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem
+          and keep the yield inside their own wallets.
+        </div>
+        <div class="url">STONK.GRAPPES.DEV</div>
+      </div>
+    </div>
+
+    <div class="scan"></div>
+    <span class="corner c1"></span>
+    <span class="corner c2"></span>
+    <span class="corner c3"></span>
+    <span class="corner c4"></span>
+  </div>
+</body>
+</html>

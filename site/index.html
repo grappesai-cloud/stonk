@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stonk Agents</title>
+  <meta name="description" content="Mintable ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem and keep the yield inside their own wallets.">
+  <meta name="theme-color" content="#000000">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="canonical" href="https://stonk.grappes.dev/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Stonk Agents">
+  <meta property="og:url" content="https://stonk.grappes.dev/">
+  <meta property="og:title" content="Stonk Agents · Agents that clock in">
+  <meta property="og:description" content="Mintable ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem and keep the yield inside their own wallets.">
+  <meta property="og:image" content="https://stonk.grappes.dev/assets/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Stonk Agents · Agents that clock in">
+  <meta name="twitter:description" content="Mintable ERC-6551 NFT workers that run the jobs of the StonkBrokers ecosystem and keep the yield inside their own wallets.">
+  <meta name="twitter:image" content="https://stonk.grappes.dev/assets/og.jpg">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- straturi de fundal: grila fina, aura verde, granulatie -->
+  <div class="bg-grid"></div>
+  <div class="bg-aura"></div>
+  <div class="bg-spot" data-spot></div>
+  <div class="grain"></div>
+
+  <!-- bara de progres a scrollului -->
+  <div class="progress"><i data-progress></i></div>
+
+  <!-- cursor propriu -->
+  <div class="cursor" data-cursor><i></i></div>
+
+  <!-- ====================== BARA DE SUS ====================== -->
+  <header class="nav" data-nav-bar>
+    <a class="brand" href="#top" data-magnet>
+      <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 17.5 8 11l4 3.5L22 4"/><path d="M16 4h6v6" class="thin"/></svg>
+      <span class="brand-name" data-brand></span>
+    </a>
+    <nav class="nav-links" data-nav></nav>
+    <div class="nav-right">
+      <span class="eth mono" data-eth hidden></span>
+      <a class="btn btn-solid btn-sm" href="#mint" data-magnet data-t="navCta"></a>
+      <button class="burger" data-burger aria-label="menu"><span></span><span></span></button>
+    </div>
+  </header>
+  <nav class="menu" data-menu></nav>
+
+  <main id="top">
+
+    <!-- ====================== HERO ====================== -->
+    <section class="hero">
+      <canvas class="hero-chart" data-chart aria-hidden="true"></canvas>
+      <div class="hero-fade"></div>
+
+      <div class="wrap hero-inner">
+        <p class="chip" data-reveal>
+          <i class="dot"></i><span class="mono scramble" data-t="hero.eyebrow"></span>
+        </p>
+
+        <h1 class="h-display" data-reveal>
+          <span class="line" data-t="hero.titleTop"></span>
+          <span class="line" data-t="hero.titleBottom"></span>
+        </h1>
+
+        <p class="lede" data-reveal data-t="hero.note"></p>
+
+        <div class="hero-actions" data-reveal>
+          <a class="btn btn-solid btn-lg" href="#mint" data-magnet data-t="hero.cta1"></a>
+          <a class="btn btn-ghost btn-lg" href="#fleet" data-magnet data-t="hero.cta2"></a>
+        </div>
+
+        <!-- cardul plutitor cu jobul curent -->
+        <div class="quote" data-reveal data-tilt>
+          <div class="quote-top">
+            <span class="mono faint" data-t="hero.feedTitle"></span>
+            <span class="tag mono" data-t="hero.feedTag"></span>
+          </div>
+          <div class="quote-feed mono" data-feed></div>
+        </div>
+      </div>
+
+      <a class="scroll-hint mono" href="#fleet"><span data-t="classes.hint"></span><i></i></a>
+    </section>
+
+    <!-- ====================== BANDA ====================== -->
+    <div class="tape" aria-hidden="true">
+      <div class="tape-row" data-tape></div>
+    </div>
+
+    <!-- ====================== CIFRE ====================== -->
+    <section class="stats wrap">
+      <div class="stat-grid" data-stats></div>
+    </section>
+
+    <!-- ====================== CLASELE (sina orizontala) ====================== -->
+    <section class="rail" id="fleet" data-rail>
+      <div class="rail-stick">
+        <div class="wrap rail-head">
+          <p class="eyebrow mono scramble" data-t="classes.eyebrow"></p>
+          <h2 class="h-2" data-t="classes.title"></h2>
+        </div>
+        <div class="rail-track" data-track></div>
+        <div class="rail-bar"><i data-rail-bar></i></div>
+      </div>
+    </section>
+
+    <!-- ====================== BUCLA ====================== -->
+    <section class="loop wrap" id="loop">
+      <div class="sec-head">
+        <p class="eyebrow mono scramble" data-reveal data-t="loop.eyebrow"></p>
+        <h2 class="h-2" data-reveal data-t="loop.title"></h2>
+        <p class="lede sm" data-reveal data-t="loop.body"></p>
+      </div>
+      <ol class="steps" data-steps></ol>
+    </section>
+
+    <!-- ====================== MINT + WHITELIST ====================== -->
+    <section class="mint" id="mint">
+      <div class="wrap mint-inner">
+        <div class="mint-left">
+          <p class="chip" data-reveal><i class="dot"></i><span class="mono" data-launch-label></span></p>
+          <h2 class="h-display sm" data-reveal>
+            <span class="line" data-t="cta.line1"></span>
+            <span class="line" data-t="cta.line2"></span>
+          </h2>
+          <p class="lede sm" data-reveal data-t="cta.sub"></p>
+
+          <div class="count" data-reveal>
+            <p class="mono faint" data-count-label></p>
+            <div class="count-row" data-count></div>
+          </div>
+
+          <p class="mono faint contract" data-contract></p>
+        </div>
+
+        <form class="form" data-form data-reveal novalidate>
+          <div class="form-head">
+            <h3 class="mono" data-t="access.title"></h3>
+            <p class="faint" data-t="access.subtitle"></p>
+          </div>
+          <label class="field">
+            <span class="mono" data-t="access.wallet"></span>
+            <input name="wallet" autocomplete="off" required data-ph="access.walletPh">
+          </label>
+          <label class="field">
+            <span class="mono" data-t="access.handle"></span>
+            <input name="handle" autocomplete="off" data-ph="access.handlePh">
+          </label>
+          <label class="field">
+            <span class="mono" data-t="access.klass"></span>
+            <select name="class" data-klass></select>
+          </label>
+          <button class="btn btn-solid btn-block" type="submit" data-t="access.send"></button>
+          <p class="form-msg mono" data-msg></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ====================== SUBSOL ====================== -->
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <a class="foot-mail" data-mail></a>
+      <nav class="foot-links mono" data-socials></nav>
+      <p class="mono faint foot-note" data-foot-note></p>
+    </div>
+  </footer>
+
+  <script src="js/content.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
