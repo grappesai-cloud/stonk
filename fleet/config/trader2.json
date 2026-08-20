@@ -22,8 +22,8 @@
     "blockTimeMs": 2000
   },
   "target": {
-    "address": "0xD0D67Fa6328e593BF2E6eEF964088c362691d1b5",
-    "_": "colectia AgentNFT, deployata pe 4663 pe 20 aug 2026",
+    "address": "0x34e54a669c1a864093d4fe8646f2d5a4155b6533",
+    "_": "AgentNFTv2 pe 4663 (deploy 20 aug, seara): colectia v2, agentul lui Vlad. Colectia v1 (0xD0D6...) e abandonata.",
     "errorSignatures": [
       "error NotOwner()",
       "error NotAgent()",
