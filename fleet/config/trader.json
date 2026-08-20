@@ -51,21 +51,61 @@
   "job": {
     "tokenId": 1,
     "registry": "0x2f974396e1ddf941cF9ad866fA267bdf1df557de",
-    "brain": { "dir": "./brain" },
+    "brain": {
+      "dir": "./brain"
+    },
     "_tokens": "actiunile tokenizate REALE de pe 4663, cu feed-urile Chainlink verificate on-chain (20 aug). USDG e cash-ul: fara feed, valoreaza $1.",
     "tokens": {
-      "USDG": { "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", "decimals": 6, "feed": null },
-      "NVDA": { "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC", "decimals": 18, "feed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15" },
-      "TSLA": { "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d", "decimals": 18, "feed": "0x4A1166a659A55625345e9515b32adECea5547C38" },
-      "SPY":  { "address": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C", "decimals": 18, "feed": "0x319724394D3A0e3669269846abE664Cd621f9f6A" },
-      "COIN": { "address": "0x6330D8C3178a418788dF01a47479c0ce7CCF450b", "decimals": 18, "feed": "0xA3a468A452940B7D6b69991207B508c609a98Ef2" },
-      "MSTR": { "address": "0xec262a75e413fAfD0dF80480274532C79D42da09", "decimals": 18, "feed": "0x2521a77F42098357e83bDea7fBb2A38745bf9280" },
-      "PLTR": { "address": "0x894E1EC2D74FFE5AEF8Dc8A9e84686acCB964F2A", "decimals": 18, "feed": "0x820ABedFF239034956B7A9d2F0a331f9F075eB4c" },
-      "AMD":  { "address": "0x86923f96303D656E4aa86D9d42D1e57ad2023fdC", "decimals": 18, "feed": "0x943A29E7ae51A4798823ca9eEd2ed533B2A22C72" }
+      "USDG": {
+        "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "decimals": 6,
+        "feed": null
+      },
+      "NVDA": {
+        "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        "decimals": 18,
+        "feed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15"
+      },
+      "TSLA": {
+        "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+        "decimals": 18,
+        "feed": "0x4A1166a659A55625345e9515b32adECea5547C38"
+      },
+      "SPY": {
+        "address": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+        "decimals": 18,
+        "feed": "0x319724394D3A0e3669269846abE664Cd621f9f6A"
+      },
+      "COIN": {
+        "address": "0x6330D8C3178a418788dF01a47479c0ce7CCF450b",
+        "decimals": 18,
+        "feed": "0xA3a468A452940B7D6b69991207B508c609a98Ef2"
+      },
+      "MSTR": {
+        "address": "0xec262a75e413fAfD0dF80480274532C79D42da09",
+        "decimals": 18,
+        "feed": "0x2521a77F42098357e83bDea7fBb2A38745bf9280"
+      },
+      "PLTR": {
+        "address": "0x894E1EC2D74FFE5AEF8Dc8A9e84686acCB964F2A",
+        "decimals": 18,
+        "feed": "0x820ABedFF239034956B7A9d2F0a331f9F075eB4c"
+      },
+      "AMD": {
+        "address": "0x86923f96303D656E4aa86D9d42D1e57ad2023fdC",
+        "decimals": 18,
+        "feed": "0x943A29E7ae51A4798823ca9eEd2ed533B2A22C72"
+      }
     },
     "_eth": "cursul ETH/USD pentru contabilitate in wei (plafoanele pe alunecare). Static, pus la go-live (20 aug: ~$2275); e o rigla de buget, nu de executie — executia se masoara contra oracolelor de stock. De improspatat cand ETH se misca mult, sau inlocuit cu feed daca apare unul pe 4663.",
-    "eth": { "feed": null, "usd8": "227500000000" },
-    "history": { "range": "1y", "cacheDir": "./data/prices-live" }
+    "eth": {
+      "feed": null,
+      "usd8": "227500000000"
+    },
+    "history": {
+      "range": "1y",
+      "cacheDir": "./data/prices-live"
+    }
   },
   "policy": {
     "_": "Rotatia nu se plateste singura pe loc (castigul e alpha-ul strategiei), deci mod campanie. Franele care raman tari: plafonul pe bucata si bugetul zilnic, amandoua pe ALUNECARE (cat avem voie sa pierdem fata de oracol), nu pe marfa.",
@@ -86,7 +126,7 @@
     "denyKeys": []
   },
   "execution": {
-    "dryRun": true,
+    "dryRun": false,
     "privateKey": "env:TRADER_KEY",
     "beneficiary": null,
     "confirmations": 1,
