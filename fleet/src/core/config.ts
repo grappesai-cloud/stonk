@@ -30,7 +30,7 @@ export const zBig = z.union([z.string(), z.number(), z.bigint()]).transform((v, 
   }
 })
 
-export const AGENT_KINDS = ['ringer', 'miner', 'stocker', 'lobbyist', 'courier'] as const
+export const AGENT_KINDS = ['ringer', 'miner', 'stocker', 'lobbyist', 'courier', 'trader'] as const
 export type AgentKind = (typeof AGENT_KINDS)[number]
 
 export const ConfigSchema = z.object({

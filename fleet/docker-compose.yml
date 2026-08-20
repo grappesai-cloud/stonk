@@ -107,6 +107,29 @@ services:
       start_period: 20s
       retries: 3
 
+  # Mainile flotei pe Financial NFA: roteste vault-ul NFT-ului #1 dupa
+  # semnalele din backtest. Creierul (strategiile) NU e in imaginea publica:
+  # se monteaza din financial-nfa BUILD-UIT (are nevoie de dist/) in ./brain,
+  # care sta in .gitignore. Fara creier, agentul sta si spune de ce.
+  trader:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8804:8804"
+      # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui
+      - "10.0.0.1:8804:8804"
+      - "127.0.0.1:8805:8805"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+      - ./brain:/app/brain:ro
+    command: ["start", "-c", "./config/trader.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8804/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # Lista de asteptare a site-ului. NU e un agent: e singurul serviciu din tot
   # proiectul care primeste scriere de la un strain, si de aia sta separat, cu
   # baza lui si portul lui.

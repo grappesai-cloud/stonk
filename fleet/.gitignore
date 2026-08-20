@@ -1,6 +1,10 @@
 node_modules
-dist
+# ancorat: build-ul e doar ./dist; creierul DE PROBA din test/unit/fixtures are si el un dist/
+/dist
 .env
+# creierul PRIVAT al traderului (financial-nfa montat local): NU intra in repo-ul
+# public. Ancorat la radacina: test/unit/fixtures/brain e creier DE PROBA si se comite.
+/brain/
 *.log
 data/
 out/

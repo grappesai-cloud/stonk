@@ -1,0 +1,146 @@
+{
+  "_": "TRADER, mainile flotei pe Financial NFA: roteste vault-ul NFT #1 dupa semnalele din backtest. Un agent = UN NFT; al doilea NFT inseamna inca un fisier ca asta, cu alta cheie. Adresele colectiei si registrului sunt pe zero pana la deploy: agentul asteapta singur, nu crapa.",
+  "_brain": "Creierul (strategiile) NU sta in repo-ul asta public: se monteaza din financial-nfa (build-uit) in ./brain, care e in .gitignore. Fara creier agentul sta si spune de ce.",
+  "watchtower": false,
+  "agent": {
+    "kind": "trader",
+    "id": 1,
+    "name": "TRADER #0001",
+    "collection": null,
+    "wallet": null,
+    "owner": null
+  },
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": [
+      "https://rpc.mainnet.chain.robinhood.com"
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 2000
+  },
+  "target": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "_": "colectia AgentNFT, dupa deploy-ul financial-nfa pe 4663",
+    "errorSignatures": [
+      "error NotOwner()",
+      "error NotAgent()",
+      "error IsPaused()",
+      "error NotAllowedAsset(address token)",
+      "error NoPolicy()",
+      "error TradeTooBig()",
+      "error DailyCapExceeded()",
+      "error Cooldown()",
+      "error StaleOracle(address feed)",
+      "error BadOraclePrice(address feed)",
+      "error SlippageTooHigh()",
+      "error BadOperation()",
+      "error CallFailed()",
+      "error SameToken()",
+      "error PoolMismatch()",
+      "error NoRoute()",
+      "error GloballyPaused()",
+      "error ZeroNotional()",
+      "error SequencerDown()",
+      "error ApproveBlocked()"
+    ],
+    "deployBlock": 0
+  },
+  "job": {
+    "tokenId": 1,
+    "registry": "0x0000000000000000000000000000000000000000",
+    "brain": { "dir": "./brain" },
+    "_tokens": "actiunile tokenizate REALE de pe 4663, cu feed-urile Chainlink verificate on-chain (20 aug). USDG e cash-ul: fara feed, valoreaza $1.",
+    "tokens": {
+      "USDG": { "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", "decimals": 6, "feed": null },
+      "NVDA": { "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC", "decimals": 18, "feed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15" },
+      "TSLA": { "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d", "decimals": 18, "feed": "0x4A1166a659A55625345e9515b32adECea5547C38" },
+      "SPY":  { "address": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C", "decimals": 18, "feed": "0x319724394D3A0e3669269846abE664Cd621f9f6A" },
+      "COIN": { "address": "0x6330D8C3178a418788dF01a47479c0ce7CCF450b", "decimals": 18, "feed": "0xA3a468A452940B7D6b69991207B508c609a98Ef2" },
+      "MSTR": { "address": "0xec262a75e413fAfD0dF80480274532C79D42da09", "decimals": 18, "feed": "0x2521a77F42098357e83bDea7fBb2A38745bf9280" },
+      "PLTR": { "address": "0x894E1EC2D74FFE5AEF8Dc8A9e84686acCB964F2A", "decimals": 18, "feed": "0x820ABedFF239034956B7A9d2F0a331f9F075eB4c" },
+      "AMD":  { "address": "0x86923f96303D656E4aa86D9d42D1e57ad2023fdC", "decimals": 18, "feed": "0x943A29E7ae51A4798823ca9eEd2ed533B2A22C72" }
+    },
+    "_eth": "cursul ETH/USD pentru contabilitate in wei: pune feed-ul Chainlink daca exista pe 4663, altfel un curs static usd8. Cu amandoua pe zero, doctor pica si niciun trade nu pleaca: cost nemasurat = refuz.",
+    "eth": { "feed": null, "usd8": "0" },
+    "history": { "range": "1y", "cacheDir": "./data/prices-live" }
+  },
+  "policy": {
+    "_": "Rotatia nu se plateste singura pe loc (castigul e alpha-ul strategiei), deci mod campanie. Franele care raman tari: plafonul pe bucata si bugetul zilnic, amandoua pe ALUNECARE (cat avem voie sa pierdem fata de oracol), nu pe marfa.",
+    "mode": "campaign",
+    "profitMultiple": 1.5,
+    "minRewardWei": "0",
+    "minStakeWei": "0",
+    "requireMeasuredReward": false,
+    "requireMeasuredCost": true,
+    "maxCostPerJobWei": "50000000000000000",
+    "dailySpendBudgetWei": "150000000000000000",
+    "cooldownSec": 3600,
+    "maxJobsPerRun": 1,
+    "batchSize": 1,
+    "gasCapPerCall": "2500000",
+    "maxGasPriceWei": null,
+    "dailyGasBudgetWei": "20000000000000000",
+    "denyKeys": []
+  },
+  "execution": {
+    "dryRun": true,
+    "privateKey": "env:TRADER_KEY",
+    "beneficiary": null,
+    "confirmations": 1,
+    "maxFeePerGasWei": null,
+    "maxPriorityFeePerGasWei": null,
+    "killSwitchFile": "./data/STOP-trader",
+    "maxConsecutiveFailures": 5
+  },
+  "runner": {
+    "_": "Semnale pe bare ZILNICE: cadenta pe minute ajunge cu varf de spam. Intervalul e ca sa prinda desfacerea pietei si oracolele improspatate, nu ca sa tranzactioneze des.",
+    "mode": "interval",
+    "intervalSec": 600,
+    "jitterSec": 30,
+    "pollMs": 2000,
+    "staleAfterSec": 1800,
+    "watchdogSec": 3600
+  },
+  "alerts": {
+    "telegram": {
+      "enabled": false,
+      "token": "env:TELEGRAM_TOKEN",
+      "channel": null,
+      "digestHour": 9,
+      "gasLowWei": "2000000000000000"
+    },
+    "heartbeat": {
+      "url": "env:HEARTBEAT_URL",
+      "failUrl": null,
+      "timeoutMs": 5000
+    }
+  },
+  "api": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8804,
+    "cors": [
+      "*"
+    ],
+    "rateLimitPerMinute": 120
+  },
+  "console": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8805,
+    "token": "env:CONSOLE_TOKEN",
+    "_": "Pe loopback. Se ajunge prin tunel SSH: ssh -L 8805:127.0.0.1:8805 root@<server>, apoi http://127.0.0.1:8805/?token=<CONSOLE_TOKEN>"
+  },
+  "storage": {
+    "file": "./data/trader.db",
+    "backup": {
+      "enabled": true,
+      "dir": "./data/backups",
+      "everyHours": 6,
+      "keep": 28
+    }
+  }
+}

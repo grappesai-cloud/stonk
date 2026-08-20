@@ -1,0 +1,277 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { decodeAbiParameters } from 'viem'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { ConfigSchema } from '../../src/core/config.js'
+import { loadBrain, trader } from '../../src/jobs/trader.js'
+
+const BRAIN_DIR = fileURLToPath(new URL('./fixtures/brain', import.meta.url))
+const CACHE = join(tmpdir(), `trader-test-${process.pid}`)
+const DAY = new Date().toISOString().slice(0, 10)
+
+const COLLECTION = '0x00000000000000000000000000000000000000c1'
+const REGISTRY = '0x00000000000000000000000000000000000000b0'
+const ACCT = '0x000000000000000000000000000000000000acc1'
+const SIGNER = '0x000000000000000000000000000000000000f00d'
+const USDG_TOKEN = '0x0000000000000000000000000000000000000222'
+const NVDA_TOKEN = '0x0000000000000000000000000000000000000111'
+const NVDA_FEED = '0x0000000000000000000000000000000000000333'
+const ZERO = '0x0000000000000000000000000000000000000000'
+
+const NOW = BigInt(Math.floor(Date.now() / 1000))
+
+const cfg = (over: Record<string, unknown> = {}) =>
+  ConfigSchema.parse({
+    agent: { kind: 'trader' },
+    network: { name: 'x', chainId: 4663, rpc: ['http://a.test'] },
+    target: { address: COLLECTION, errorSignatures: ['error NotAgent()'] },
+    ...over
+  })
+
+const jobCfg = (over: Record<string, unknown> = {}) =>
+  trader.parse({
+    tokenId: 1,
+    registry: REGISTRY,
+    brain: { dir: BRAIN_DIR },
+    tokens: {
+      USDG: { address: USDG_TOKEN, decimals: 6, feed: null },
+      NVDA: { address: NVDA_TOKEN, decimals: 18, feed: NVDA_FEED }
+    },
+    eth: { usd8: '400000000000' },
+    history: { range: '1y', cacheDir: CACHE },
+    ...over
+  })
+
+interface FakeState {
+  strategyId?: number
+  agentSigner?: string
+  paused?: boolean
+  globallyPaused?: boolean
+  policyExists?: boolean
+  routeExists?: boolean
+  usdgBal?: bigint
+  nvdaBal?: bigint
+  nvdaUsd8?: bigint
+  updatedAt?: bigint
+}
+
+function clientFor(state: FakeState = {}) {
+  return {
+    async readContract({ address, functionName }: { address: string; functionName: string }) {
+      const a = address.toLowerCase()
+      if (a === COLLECTION) {
+        if (functionName === 'strategyOf') return state.strategyId ?? 6
+        if (functionName === 'accountOf') return ACCT
+      }
+      if (a === ACCT) {
+        if (functionName === 'agentSigner') return state.agentSigner ?? SIGNER
+        if (functionName === 'paused') return state.paused ?? false
+      }
+      if (a === REGISTRY) {
+        if (functionName === 'paused') return state.globallyPaused ?? false
+        if (functionName === 'policyOf') {
+          return {
+            maxTradeUsd: 0n,
+            maxDailyUsd: 0n,
+            maxSlippageBps: 50,
+            cooldownSec: 1800,
+            maxStaleSec: 3600,
+            exists: state.policyExists ?? true
+          }
+        }
+        if (functionName === 'routeOf') {
+          return { fee: 3000, tickSpacing: 60, hooks: ZERO, exists: state.routeExists ?? true }
+        }
+      }
+      if (a === NVDA_FEED) {
+        if (functionName === 'latestRoundData') return [1n, state.nvdaUsd8 ?? 20_000_000_000n, 0n, state.updatedAt ?? NOW, 1n]
+        if (functionName === 'decimals') return 8
+      }
+      if (a === USDG_TOKEN && functionName === 'balanceOf') return state.usdgBal ?? 0n
+      if (a === NVDA_TOKEN && functionName === 'balanceOf') return state.nvdaBal ?? 0n
+      throw new Error(`unexpected read: ${functionName} at ${address}`)
+    },
+    async getBlock() {
+      return { timestamp: NOW }
+    }
+  } as never
+}
+
+const discoverInput = (client: unknown, job: unknown, over: Record<string, unknown> = {}) =>
+  ({ client, cfg: cfg(), job, ledger: null, from: SIGNER, ...over }) as never
+
+function writeBars(closes: number[]): void {
+  const dir = join(CACHE, DAY)
+  mkdirSync(dir, { recursive: true })
+  const bars = closes.map((c, i) => ({ t: i + 1, c }))
+  writeFileSync(join(dir, 'NVDA.json'), JSON.stringify(bars))
+}
+
+beforeAll(() => {
+  writeBars([100, 105, 110, 120, 130])
+})
+
+describe('trader: creierul', () => {
+  it('fara creier, eroarea spune unde trebuia sa fie si ca e privat', async () => {
+    await expect(loadBrain('/nope/nothing-here')).rejects.toThrow(/PRIVATE financial-nfa/)
+  })
+
+  it('creierul de proba se incarca din layout-ul de build (dist/)', async () => {
+    const brain = await loadBrain(BRAIN_DIR)
+    expect(brain.CASH).toBe('USDG')
+    expect(brain.SIGNALS[6]!.name).toBe('Fixture Rotor')
+  })
+})
+
+describe('trader: configurarea', () => {
+  it('refuza configurarea fara tokenId si registry', () => {
+    expect(() => trader.parse({})).toThrow(/job\.(tokenId|registry)/)
+  })
+
+  it('tinta pe bucata e contul 6551 din meta, nu colectia', () => {
+    const job = jobCfg()
+    const generic = trader.target(cfg(), job)
+    expect(generic.address.toLowerCase()).toBe(COLLECTION)
+    const item = { meta: { account: ACCT } } as never
+    const perItem = trader.target(cfg(), job, item)
+    expect(perItem.address.toLowerCase()).toBe(ACCT)
+    expect(perItem.functionName).toBe('executeTrade')
+    expect(perItem.abi.some((x) => x.type === 'error' && (x as { name?: string }).name === 'NotAgent')).toBe(true)
+  })
+})
+
+describe('trader: descoperirea', () => {
+  it('vault-ul 100% cash SE ROTESTE cand semnalul cere: fix bug-ul runner-ului vechi, care sarea peste cash ca "fara feed" si nu pleca niciodata din USDG', async () => {
+    const job = jobCfg()
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n }), job))
+    expect(items).toHaveLength(1)
+    const it0 = items[0]!
+    expect(it0.key).toBe(`rotate:1:${DAY}:USDG->NVDA`)
+    expect(it0.once).toBe(true)
+    expect(it0.meta.from).toBe('USDG')
+    expect(it0.meta.to).toBe('NVDA')
+
+    // $1000 la intrare, slippage 50bps => acceptam minim 4.975 NVDA la $200
+    expect(it0.meta.inUsd8).toBe('100000000000')
+    expect(it0.meta.minAmountOut).toBe('4975000000000000000')
+    // pierderea tolerata: $5, in wei la cursul static de $4000/ETH
+    expect(it0.meta.maxLossUsd8).toBe('500000000')
+    expect(it0.costWei).toBe(1_250_000_000_000_000n)
+    expect(it0.costMeasured).toBe(true)
+    expect(it0.stakeWei).toBe(250_000_000_000_000_000n)
+    // castigul e alpha, nu se pretinde masurat
+    expect(it0.rewardWei).toBe(0n)
+    expect(it0.rewardMeasured).toBe(false)
+
+    // calldata decodabila, cu perechea ordonata pe adresa in PoolKey
+    const [decoded] = decodeAbiParameters(
+      [
+        {
+          type: 'tuple',
+          components: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'minAmountOut', type: 'uint256' },
+            {
+              name: 'poolKey',
+              type: 'tuple',
+              components: [
+                { name: 'currency0', type: 'address' },
+                { name: 'currency1', type: 'address' },
+                { name: 'fee', type: 'uint24' },
+                { name: 'tickSpacing', type: 'int24' },
+                { name: 'hooks', type: 'address' }
+              ]
+            },
+            { name: 'hookData', type: 'bytes' }
+          ]
+        }
+      ],
+      it0.args[0] as `0x${string}`
+    )
+    expect((decoded as { tokenIn: string }).tokenIn.toLowerCase()).toBe(USDG_TOKEN)
+    expect((decoded as { tokenOut: string }).tokenOut.toLowerCase()).toBe(NVDA_TOKEN)
+    expect((decoded as { amountIn: bigint }).amountIn).toBe(1_000_000_000n)
+    const pk = (decoded as { poolKey: { currency0: string; currency1: string } }).poolKey
+    expect(pk.currency0.toLowerCase() < pk.currency1.toLowerCase()).toBe(true)
+  })
+
+  it('semnal pe cash cand vault-ul e deja cash: hold, nicio bucata', async () => {
+    writeBars([130, 120, 110, 105, 100])
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n }), jobCfg()))
+    expect(items).toHaveLength(0)
+    writeBars([100, 105, 110, 120, 130])
+  })
+
+  it('oracol vechi = piata inchisa: sta, nu construieste rotatia', async () => {
+    const items = await trader.discover(
+      discoverInput(clientFor({ usdgBal: 1_000_000_000n, updatedAt: NOW - 100_000n }), jobCfg())
+    )
+    expect(items).toHaveLength(0)
+  })
+
+  it('cheia care nu e agentSigner nu propune nimic', async () => {
+    const items = await trader.discover(
+      discoverInput(clientFor({ usdgBal: 1_000_000_000n, agentSigner: '0x000000000000000000000000000000000000beef' }), jobCfg())
+    )
+    expect(items).toHaveLength(0)
+  })
+
+  it('vault pauzat sau circuit-breaker global: sta', async () => {
+    expect(await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, paused: true }), jobCfg()))).toHaveLength(0)
+    expect(
+      await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, globallyPaused: true }), jobCfg()))
+    ).toHaveLength(0)
+  })
+
+  it('fara ruta canonica de pool: sta, nu inventeaza un PoolKey', async () => {
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, routeExists: false }), jobCfg()))
+    expect(items).toHaveLength(0)
+  })
+
+  it('fara curs ETH, costul iese NEMASURAT, ca frana implicita sa il refuze', async () => {
+    const job = jobCfg({ eth: { usd8: '0' } })
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n }), job))
+    expect(items).toHaveLength(1)
+    expect(items[0]!.costMeasured).toBe(false)
+    expect(items[0]!.costWei).toBe(0n)
+  })
+})
+
+describe('trader: diagnosticul', () => {
+  it('cheia straina e fatala si spune ce asteapta lantul', async () => {
+    const checks = await trader.checks!(
+      discoverInput(clientFor({}), jobCfg(), { from: '0x000000000000000000000000000000000000beef' })
+    )
+    const c = checks.find((x) => x.name === 'operator key is the agent signer')
+    expect(c!.ok).toBe(false)
+    expect(c!.fatal).toBe(true)
+    expect(c!.detail).toContain(SIGNER)
+  })
+
+  it('creierul lipsa e fatal, restul verificarilor nici nu se mai incearca', async () => {
+    const job = jobCfg({ brain: { dir: '/nope/nothing-here' } })
+    const checks = await trader.checks!(discoverInput(clientFor({}), job))
+    expect(checks).toHaveLength(1)
+    expect(checks[0]!.name).toBe('brain')
+    expect(checks[0]!.fatal).toBe(true)
+  })
+
+  it('fara curs ETH, doctor pica inainte sa se piarda o luna in jurnal', async () => {
+    const checks = await trader.checks!(discoverInput(clientFor({}), jobCfg({ eth: { usd8: '0' } })))
+    const c = checks.find((x) => x.name === 'ETH is priced')
+    expect(c!.ok).toBe(false)
+    expect(c!.fatal).toBe(true)
+  })
+
+  it('cand totul e la locul lui, doctorul o spune', async () => {
+    const checks = await trader.checks!(discoverInput(clientFor({}), jobCfg()))
+    const bad = checks.filter((x) => !x.ok && x.name !== 'daily spend budget')
+    expect(bad).toHaveLength(0)
+    expect(checks.find((x) => x.name === 'universe tokens')!.ok).toBe(true)
+    expect(checks.find((x) => x.name === 'price history')!.ok).toBe(true)
+  })
+})

@@ -1,13 +1,15 @@
 # stonk-fleet
 
-**Ringer, Miner, Stocker and Lobbyist** — the rest of the Stonk Agents fleet.
-One core, one job module per agent. [Courier](../stonk-courier) stays where it
-is; this repo is where the other four live.
+**Ringer, Miner, Stocker, Lobbyist and Trader** — the rest of the Stonk Agents
+fleet. One core, one job module per agent. [Courier](../stonk-courier) stays
+where it is; this repo is where the others live.
 
 **Three of them are wired to the real StonkBrokers contracts and proven end to
 end on a fork of the live chain.** They are not earning yet for one reason
-only: the wallets have no gas. The other two are built and tested but have no
-contract to work on — see *What actually exists on chain* below.
+only: the wallets have no gas. Two more are built and tested but have no
+contract to work on — see *What actually exists on chain* below. **Trader** is
+different again: it works our **own** Financial NFA contracts and stands by
+until they are deployed on 4663.
 
 ```
 fleet init <address>    read the verified ABI, propose the signatures
@@ -119,6 +121,38 @@ Lobbyist it is the reverse: voting **with our lock** must be reserved to us, or
 anyone could vote with it. So `doctor` asks "can *we* call it?" and separately
 confirms that a stranger cannot. Without that distinction it would raise a
 false alarm on every start, and an alarm that always sounds stops being read.
+
+**TRADER** rotates a Financial NFA vault between tokenized stocks, following
+the same signals the backtest ran. It is the only agent in the fleet working
+on **our own contracts** — the NFT collection from the private financial-nfa
+repo — and that changes both usual questions:
+
+- the step-zero question flips, like Lobbyist's: `executeTrade` is reserved to
+  the NFT's agent key, so "can *we* call it, and is a stranger refused" is the
+  healthy state, not an alarm.
+- the real brake lives **in the contract** (asset allowlist, USD caps,
+  slippage-vs-oracle, cooldown, pause). What the fleet adds is what a contract
+  cannot know: a ledger with every decision and its reason, the operator's
+  daily budgets, the watchdog, and refusal by default when a number cannot be
+  measured up front.
+
+The brain is not in this repo, on purpose: this repo is public and the
+strategies are exactly the part that must not be. The trader loads them at
+start from a mounted checkout of the private financial-nfa repo, built
+(`job.brain.dir`, `./brain/`, gitignored). No brain — the agent stands by and
+says why. There is no vendored copy that could drift from the backtest or leak
+alpha into git.
+
+One trader = one NFT. Each process holds only that NFT's agent key, so a leak
+compromises one vault, not the fleet. A second NFT is a second config file
+with different ports, not new code.
+
+The cost of a rotation is not the goods — they stay in the vault, swapped into
+another asset. The cost is the **slippage allowance**: how far below the
+oracle-fair amount the trade may fill, which is exactly the margin
+`minAmountOut` tolerates. That number is measured before sending, written in
+the ledger, and counted against the daily spend budget — the same two taps
+Stocker uses, pointed at a different kind of spend.
 
 ---
 

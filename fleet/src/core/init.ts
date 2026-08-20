@@ -77,6 +77,15 @@ const WORDS: Record<AgentKind, { action: RegExp; value: RegExp; discovery: RegEx
     value: /bribe|reward|fee|incentive|payout|claimable|earned/i,
     discovery: /gauge|pool|epoch|period|weight|votes?|power|balanceOfNFT|locked/i,
     event: /voted|abstained|claimed|notify|bribe|deposit/i
+  },
+  /* traderul lucreaza pe contractele NOASTRE: `init` (facut pentru contracte
+     straine) nu are ce ghici la el, dar cuvintele exista ca sa nu fie cazul
+     special al fiecarui switch */
+  trader: {
+    action: /executeTrade|execute|trade|swap|rotate/i,
+    value: /balance|nav|value|equity/i,
+    discovery: /nextId|accountOf|strategyOf|paused|policy|route/i,
+    event: /trade|swap|rotated|executed/i
   }
 }
 
