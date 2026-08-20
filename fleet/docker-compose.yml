@@ -1,0 +1,138 @@
+# Sase procese, acelasi cod, configurari diferite. Meseria se alege din
+# `agent.kind`, nu din imagine, deci imaginea se construieste o data.
+#
+# Amandoi pornesc in VEGHE: masoara si tin indexul, nu semneaza nimic. Trecerea
+# la treaba adevarata se face din configurare, dupa ce `fleet doctor` spune ca
+# meseria exista pe contractul real.
+x-agent: &agent
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    LOG_FORMAT: json
+    # In container, legarea pe 127.0.0.1 ar ascunde serverul si de proxy-ul
+    # care publica portul. Granita nu se pierde: pe gazda, porturile de mai jos
+    # sunt publicate tot pe loopback.
+    API_HOST: 0.0.0.0
+    CONSOLE_HOST: 0.0.0.0
+  volumes:
+    # registrul si copiile lui traiesc pe gazda, nu in container
+    - ./data:/app/data
+    - ./config:/app/config:ro
+
+services:
+  ringer:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8790:8790"
+      # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui
+      - "10.0.0.1:8790:8790"
+      - "127.0.0.1:8791:8791"
+    command: ["start", "-c", "./config/ringer.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8790/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  miner:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8792:8792"
+      - "127.0.0.1:8793:8793"
+    command: ["start", "-c", "./config/miner.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8792/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  stocker:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8794:8794"
+      - "127.0.0.1:8795:8795"
+    command: ["start", "-c", "./config/stocker.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8794/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  lobbyist:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8796:8796"
+      - "127.0.0.1:8797:8797"
+    command: ["start", "-c", "./config/lobbyist.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8796/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  courier:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8798:8798"
+      # Si pe puntea docker, ca pagina publica (alt container, pe aceeasi
+      # masina) sa poata citi cifrele reale prin nginx-ul ei. NU pe IP-ul
+      # public: agentul ramane invizibil din internet.
+      - "10.0.0.1:8798:8798"
+      - "127.0.0.1:8799:8799"
+    command: ["start", "-c", "./config/courier.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8798/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  crank:
+    <<: *agent
+    ports:
+      - "127.0.0.1:8800:8800"
+      # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui
+      - "10.0.0.1:8800:8800"
+      - "127.0.0.1:8801:8801"
+    command: ["start", "-c", "./config/crank.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8800/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # Lista de asteptare a site-ului. NU e un agent: e singurul serviciu din tot
+  # proiectul care primeste scriere de la un strain, si de aia sta separat, cu
+  # baza lui si portul lui.
+  signup:
+    <<: *agent
+    environment:
+      LOG_FORMAT: json
+      SIGNUP_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:8802:8802"
+      - "10.0.0.1:8802:8802"
+    entrypoint: ["node", "dist/src/signup.js"]
+    command: []
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8802/count"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # Copia registrului se face si singura, din bot, la cateva ore. Asta e pentru
+  # cand vrei una acum, inainte de o migrare sau de un redeploy:
+  #   docker compose run --rm backup
+  backup:
+    <<: *agent
+    profiles: ["tools"]
+    restart: "no"
+    ports: []
+    command: ["backup", "-c", "./config/ringer.json"]

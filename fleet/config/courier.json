@@ -1,0 +1,162 @@
+{
+  "_": "COURIER, legat de contractul ADEVARAT. Impinge in portofelele 6551 ce si-au uitat brokerii acolo. Contractul NU plateste apelantul: raportul acestui agent nu arata profit, arata CAT a livrat si cui. Aia e dovada pe care o vinde un Stonk Agent.",
+  "_watchtower": "Pornit inseamna: masoara cursa, nu cheltui nimic. E modul cu care se incepe, fiindca raspunde la singura intrebare care conteaza inainte sa arzi gaz: butonul asta e liber sau il apasa deja altcineva mai rapid?",
+  "watchtower": true,
+  "agent": {
+    "kind": "courier",
+    "id": 0,
+    "name": "COURIER #0000",
+    "collection": null,
+    "wallet": null,
+    "owner": null
+  },
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": [
+      "https://rpc.mainnet.chain.robinhood.com"
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 2000
+  },
+  "target": {
+    "address": "0x55642A3F10F1Af5145D3d59021B1D6b03BB8692c",
+    "_": "SafetyDepositClockInV3, confirmat din variabilele site-ului lor",
+    "errorSignatures": [
+      "error RoundTooYoung()",
+      "error NothingToDistribute()",
+      "error WethNotAirdroppable()",
+      "error ProtocolTransferFailed()",
+      "error ClaimTransferFailed()",
+      "error EmptyClaim()",
+      "error EthFlushFailed()",
+      "error Reentrancy()"
+    ],
+    "deployBlock": 0
+  },
+  "job": {
+    "brokers": {
+      "address": "0x539CdD042c2f3d93EbC5BE7DfFf0c79F3B4fAbF0",
+      "firstId": 1,
+      "count": null,
+      "supply": null
+    },
+    "_tokens": "jetoanele de stoc, luate din colectie cu stockTokenAt()",
+    "tokens": [
+      "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+      "0x12f190a9F9d7D37a250758b26824B97CE941bF54",
+      "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC"
+    ],
+    "claimable": {
+      "signature": "function claimable(address token, uint256 tokenId) view returns (uint256)",
+      "args": [
+        "$gauge",
+        "$id"
+      ],
+      "field": null,
+      "address": null
+    },
+    "_action": "$gauges = lista de jetoane, $weights = lista de brokeri din lot. Contractul primeste liste, deci o tranzactie duce tot lotul.",
+    "action": {
+      "signature": "function clockIn(address[] tokens, uint256[] tokenIds)",
+      "args": [
+        "$gauges",
+        "$weights"
+      ],
+      "field": null,
+      "address": null
+    },
+    "batchSize": 40,
+    "readChunk": 500,
+    "event": {
+      "signature": "event ClockedIn(address indexed token, uint64 indexed round, uint256 indexed tokenId, address wallet, uint256 amount)",
+      "callerField": null,
+      "idField": "tokenId",
+      "amountField": "amount",
+      "_indexed": "ATENTIE: campurile indexate TREBUIE marcate. Fara ele topicul iese acelasi, deci filtrul pare sa mearga, dar decodarea arunca si caietul ramane gol pe tacute."
+    },
+    "roundState": {
+      "_": "o citire pe jeton, ca sa nu intrebam de mii de ori degeaba",
+      "signature": "function rounds(address token) view returns (uint64 round, uint64 startedAt, uint256 pot, uint256 remaining, uint256 totalWeight)",
+      "args": [
+        "$gauge"
+      ],
+      "field": null,
+      "address": null
+    },
+    "remainingField": "remaining"
+  },
+  "policy": {
+    "mode": "campaign",
+    "profitMultiple": 1.5,
+    "minRewardWei": "0",
+    "minStakeWei": "0",
+    "requireMeasuredReward": false,
+    "cooldownSec": 900,
+    "maxJobsPerRun": 40,
+    "batchSize": 1,
+    "gasCapPerCall": "8000000",
+    "maxGasPriceWei": null,
+    "dailyGasBudgetWei": "20000000000000000",
+    "denyKeys": []
+  },
+  "execution": {
+    "dryRun": true,
+    "privateKey": "env:COURIER_KEY",
+    "beneficiary": null,
+    "confirmations": 1,
+    "maxFeePerGasWei": null,
+    "maxPriorityFeePerGasWei": null,
+    "killSwitchFile": "./data/STOP-courier",
+    "maxConsecutiveFailures": 5
+  },
+  "runner": {
+    "mode": "interval",
+    "intervalSec": 600,
+    "jitterSec": 30,
+    "pollMs": 2000,
+    "staleAfterSec": 1200,
+    "watchdogSec": 2400
+  },
+  "alerts": {
+    "telegram": {
+      "enabled": false,
+      "token": "env:TELEGRAM_TOKEN",
+      "channel": null,
+      "digestHour": 9,
+      "gasLowWei": "2000000000000000"
+    },
+    "heartbeat": {
+      "url": "env:HEARTBEAT_URL",
+      "failUrl": null,
+      "timeoutMs": 5000
+    }
+  },
+  "api": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8798,
+    "cors": [
+      "*"
+    ],
+    "rateLimitPerMinute": 120
+  },
+  "console": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8799,
+    "token": "env:CONSOLE_TOKEN",
+    "_": "Pe loopback. Se ajunge prin tunel SSH: ssh -L 8799:127.0.0.1:8799 root@<server>, apoi http://127.0.0.1:8799/?token=<CONSOLE_TOKEN>"
+  },
+  "storage": {
+    "file": "./data/courier.db",
+    "backup": {
+      "enabled": true,
+      "dir": "./data/backups",
+      "everyHours": 6,
+      "keep": 28
+    }
+  }
+}
