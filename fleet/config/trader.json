@@ -97,6 +97,10 @@
         "feed": "0x943A29E7ae51A4798823ca9eEd2ed533B2A22C72"
       }
     },
+    "_maxDrawdownBps": "Frana de pierdere (M-2 din audit): sub 30% fata de valoarea de referinta (nav.first din registru) agentul nu mai roteste si trage siguranta o data. Plafonul zilnic marginește notionalul pe zi, nu sangerarea cumulata pe saptamani. LA ORICE ALIMENTARE a seifului se sterge nav.first, altfel depunerea apare ca profit si linia se muta singura.",
+    "maxDrawdownBps": 3000,
+    "_tightenBps": "Cat sub umplerea SIMULATA acceptam sa iasa tranzactia (M-3): podeaua de oracol e o podea, nu o tinta, si un pool care ar da mai mult are voie sa umple fix la podea. Simulam, aflam cat da de fapt, ridicam minimul. Prea strans = revert la miscari de pret intre simulare si minerit.",
+    "tightenBps": 50,
     "_eth": "cursul ETH/USD pentru contabilitate in wei (plafoanele pe alunecare). Static, pus la go-live (20 aug: ~$2275); e o rigla de buget, nu de executie — executia se masoara contra oracolelor de stock. De improspatat cand ETH se misca mult, sau inlocuit cu feed daca apare unul pe 4663.",
     "eth": {
       "feed": null,

@@ -175,6 +175,9 @@ export function stats(ctx: Ctx) {
     network: { name: cfg.network.name, chainId: cfg.network.chainId, symbol: cfg.network.nativeSymbol },
     mode: cfg.watchtower ? 'watchtower' : cfg.policy.mode,
     dryRun: cfg.execution.dryRun,
+    /* siguranta manuala, citita de pe disc la fiecare cerere: cine intreaba
+       trebuie sa afle starea de ACUM, nu pe cea de la pornirea procesului */
+    stopped: existsSync(cfg.execution.killSwitchFile),
     standby: ctx.control.standby,
     health: { lastRunAt: h.lastRunAt, ageSec: h.ageSec, stale: h.stale },
     live: {

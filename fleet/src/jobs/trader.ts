@@ -28,8 +28,8 @@
  * exact marja pe care o tolereaza minAmountOut. Aia se masoara inainte, se
  * scrie in registru si se aduna in bugetul zilnic de cheltuiala.
  */
-import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 import { formatEther, formatUnits, parseAbi, type Address, type Hex, type PublicClient } from 'viem'
@@ -200,6 +200,35 @@ export const TraderSchema = z.object({
       usd8: zBig.default(0n)
     })
     .default({}),
+  /**
+   * Frana de pierdere: sub cat la suta din valoarea de referinta agentul nu
+   * mai roteste si trage singur siguranta.
+   *
+   * Plafonul zilnic marginește cat notional trece intr-o zi, dar NU cat s-a
+   * pierdut cumulat in saptamani (M-2 din auditul independent). Un bot care
+   * face dus-intors platind alunecare la fiecare picior poate sangera incet,
+   * fara sa incalce nimic pe lant, si nimic nu il opreste.
+   *
+   * Cand se declanseaza: nu se mai propune nicio rotatie si se scrie siguranta
+   * o singura data (nu se lupta cu operatorul care o ridica inapoi), iar
+   * raportul o spune cu rosu, deci suna si telefonul. Repornirea e o decizie de
+   * om: ori valoarea revine peste linie, ori se schimba pragul aici.
+   *
+   * Referinta e `nav.first` din registru, adica prima valoare vazuta — deci la
+   * ORICE alimentare a seifului reperul trebuie sters, altfel depunerea apare
+   * ca profit si frana se muta fara sa vrei. null = fara frana.
+   */
+  maxDrawdownBps: z.number().int().min(0).max(10_000).nullable().default(3000),
+  /**
+   * Cu cat sub umplerea SIMULATA acceptam sa iasa tranzactia.
+   *
+   * Podeaua de oracol (ce cere guard-ul) e o podea, nu o tinta: un pool care
+   * ar da mai mult are voie sa umple exact la podea si diferenta ramane la el
+   * (M-3). Simulam din contul agentului, aflam cat ar da de fapt, si ridicam
+   * minimul cat de sus se poate fara sa devina fragil. Ramane mereu cel putin
+   * podeaua de oracol: mai jos de ea contractul refuza oricum.
+   */
+  tightenBps: z.number().int().min(0).max(5000).default(50),
   history: z.object({
     range: z.string().default('1y'),
     /**
@@ -436,6 +465,121 @@ export function navMarks(store: NavStore, navUsd8: bigint, day: string): { first
   return { first, dayOpen }
 }
 
+/**
+ * Ziua LOCALA, ca "azi" sa fie aceeasi zi cu a omului care citeste raportul
+ * dimineata. Cheia rotatiei ramane pe UTC: acolo conteaza sa fie stabila intre
+ * procese, nu sa semene cu ceasul de pe perete.
+ */
+export function localDay(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Tot ce tine seiful, pretuit: valoarea totala, ce e destul de mare cat sa se
+ * cheme pozitie, si daca vreun pret e vechi.
+ *
+ * Aceeasi socoteala hraneste si raportul, si frana de pierdere. Daca ar fi
+ * doua socoteli, s-ar putea contrazice exact in ziua in care conteaza.
+ */
+export async function vaultNav(
+  client: PublicClient,
+  job: TraderJob,
+  cash: string,
+  account: Address,
+  maxStaleSec: number,
+  nowSec: bigint
+): Promise<{ navUsd8: bigint; held: string[]; staleSym: string | null }> {
+  let navUsd8 = 0n
+  const held: string[] = []
+  let staleSym: string | null = null
+  for (const sym of Object.keys(job.tokens)) {
+    const tok = job.tokens[sym]!
+    if (!hasFeed(tok) && sym !== cash) continue
+    const bal = await client.readContract({
+      address: tok.address,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [account]
+    })
+    if (bal === 0n) continue
+    let p: Price
+    try {
+      p = await priceOf(client, job, cash, sym, maxStaleSec, nowSec)
+    } catch {
+      continue
+    }
+    const value = usdValue(bal, tok.decimals, p.usd8)
+    /* sub un cent e praf ramas dintr-o rotatie, nu pozitie: intra in valoare,
+       nu in lista */
+    navUsd8 += value
+    if (value >= 1_000_000n) {
+      held.push(`${Number(formatUnits(bal, tok.decimals)).toFixed(6)} ${sym} (${usd(value)})`)
+      if (p.stale) staleSym = sym
+    }
+  }
+  return { navUsd8, held, staleSym }
+}
+
+/**
+ * Frana de pierdere: cand valoarea seifului cade sub linie, agentul nu mai
+ * roteste si trage singur siguranta.
+ *
+ * Ce acopera si ce nu: plafonul zilnic marginește notionalul pe zi, nu
+ * pierderea cumulata pe saptamani. Un bot care se roteste des si plateste
+ * alunecare la fiecare picior poate sangera incet, fara sa incalce nimic pe
+ * lant (M-2 din auditul independent). Asta e franarea aia.
+ *
+ * Siguranta se scrie O SINGURA DATA per declansare: daca omul o ridica inapoi
+ * de pe telefon, agentul nu se lupta cu el. Rotatiile raman insa oprite cat
+ * timp valoarea e sub linie — repornirea adevarata e o decizie de om, nu o
+ * apasare de buton: ori revine valoarea, ori se schimba pragul.
+ */
+export async function drawdownBrake(args: {
+  client: PublicClient
+  cfg: Config
+  job: TraderJob
+  ledger: NavStore
+  cash: string
+  account: Address
+  maxStaleSec: number
+  nowSec: bigint
+  tag: string
+}): Promise<string | null> {
+  const { client, cfg, job, ledger, cash, account, maxStaleSec, nowSec, tag } = args
+  const limit = job.maxDrawdownBps
+  if (limit === null) return null
+
+  const { navUsd8 } = await vaultNav(client, job, cash, account, maxStaleSec, nowSec)
+  const { first } = navMarks(ledger, navUsd8, localDay())
+  if (first <= 0n) return null
+
+  const dropBps = navUsd8 >= first ? 0 : Number(((first - navUsd8) * 10_000n) / first)
+  if (dropBps < limit) {
+    if (ledger.kvGet('brake.armed') === '1') {
+      /* revenit peste linie: frana se rearmeaza pentru data viitoare, altfel ar
+         fi o frana de o singura folosinta */
+      ledger.kvSet('brake.armed', '0')
+      log.warn(`${tag} value back above the drawdown line, brake re-armed`)
+    }
+    return null
+  }
+
+  const reason = `value ${usd(navUsd8)} is ${(dropBps / 100).toFixed(2)}% below the ${usd(first)} mark, limit ${(limit / 100).toFixed(2)}%`
+  if (ledger.kvGet('brake.armed') !== '1') {
+    ledger.kvSet('brake.armed', '1')
+    ledger.kvSet('brake.reason', reason)
+    ledger.kvSet('brake.at', String(Math.floor(Date.now() / 1000)))
+    try {
+      mkdirSync(dirname(cfg.execution.killSwitchFile), { recursive: true })
+      writeFileSync(cfg.execution.killSwitchFile, `drawdown brake: ${reason}\n`)
+    } catch (e) {
+      log.error({ err: (e as Error).message }, `${tag} could not write the kill switch for the drawdown brake`)
+    }
+    log.fatal({ reason }, `${tag} DRAWDOWN BRAKE: standing down`)
+  }
+  return reason
+}
+
 function ago(sec: number): string {
   if (sec < 90) return 'just now'
   if (sec < 5400) return `${Math.round(sec / 60)}m ago`
@@ -513,7 +657,7 @@ export const trader: Job<TraderJob> = {
     }
   },
 
-  async discover({ client, cfg, job, from }): Promise<WorkItem[]> {
+  async discover({ client, cfg, job, ledger, from }): Promise<WorkItem[]> {
     const tag = `#${job.tokenId}`
     let brain: Brain
     try {
@@ -564,6 +708,25 @@ export const trader: Job<TraderJob> = {
     }
 
     const nowSec = (await client.getBlock()).timestamp
+
+    /* frana inaintea semnalului: daca seiful a pierdut prea mult, nu conteaza
+       ce zice strategia astazi */
+    const braked = await drawdownBrake({
+      client,
+      cfg,
+      job,
+      ledger,
+      cash,
+      account: st.account,
+      maxStaleSec: policy.maxStaleSec,
+      nowSec,
+      tag
+    })
+    if (braked) {
+      log.warn(`${tag} [${sig.name}] drawdown brake: ${braked}`)
+      return []
+    }
+
     const { current, balance, price: pin } = await dominantAsset(client, job, cash, st.account, policy.maxStaleSec, nowSec)
     const target = sig.target(series, last, current)
 
@@ -590,7 +753,15 @@ export const trader: Job<TraderJob> = {
        toate caile de executie primesc acelasi minim */
     const minOut = (fairOut * BigInt(10_000 - policy.maxSlippageBps)) / 10_000n
 
-    type Candidate = { via: 'v4' | 'aggregator'; fn: 'executeTrade' | 'executeAggregatorTrade'; data: Hex; simulated?: bigint }
+    /* fiecare cale stie sa se REconstruiasca pe alt minim: fara asta, minimul
+       nu se poate strange dupa ce simularea ne arata cat da de fapt pool-ul */
+    type Candidate = {
+      via: 'v4' | 'aggregator'
+      fn: 'executeTrade' | 'executeAggregatorTrade'
+      data: Hex
+      build: (min: bigint) => Hex
+      simulated?: bigint
+    }
     const candidates: Candidate[] = []
 
     if (job.execution !== 'aggregator') {
@@ -603,15 +774,17 @@ export const trader: Job<TraderJob> = {
         args: [tin.address, tout.address]
       })
       if (route.exists) {
-        const intent: TradeIntent = {
-          tokenIn: tin.address,
-          tokenOut: tout.address,
-          amountIn: balance,
-          minAmountOut: minOut,
-          poolKey: brain.poolKey(tin.address, tout.address, route.fee, route.tickSpacing, route.hooks),
-          hookData: '0x'
-        }
-        candidates.push({ via: 'v4', fn: 'executeTrade', data: brain.encodeTrade(intent) })
+        const poolKey = brain.poolKey(tin.address, tout.address, route.fee, route.tickSpacing, route.hooks)
+        const build = (min: bigint): Hex =>
+          brain.encodeTrade({
+            tokenIn: tin.address,
+            tokenOut: tout.address,
+            amountIn: balance,
+            minAmountOut: min,
+            poolKey,
+            hookData: '0x'
+          } satisfies TradeIntent)
+        candidates.push({ via: 'v4', fn: 'executeTrade', data: build(minOut), build })
       } else {
         log.warn(`${tag} [${sig.name}] no pool route for ${current}/${target}`)
       }
@@ -638,18 +811,16 @@ export const trader: Job<TraderJob> = {
           if (!allowed) {
             log.warn(`${tag} aggregator ${q.aggregator} is not on the on-chain allowlist, skipping that path`)
           } else {
-            candidates.push({
-              via: 'aggregator',
-              fn: 'executeAggregatorTrade',
-              data: encodeAgg({
+            const build = (min: bigint): Hex =>
+              encodeAgg({
                 tokenIn: tin.address,
                 tokenOut: tout.address,
                 amountIn: balance,
-                minAmountOut: minOut,
+                minAmountOut: min,
                 aggregator: q.aggregator,
                 swapData: q.swapData
               })
-            })
+            candidates.push({ via: 'aggregator', fn: 'executeAggregatorTrade', data: build(minOut), build })
           }
         } catch (e) {
           log.warn(`${tag} aggregator quote failed: ${(e as Error).message}`)
@@ -662,37 +833,68 @@ export const trader: Job<TraderJob> = {
       return []
     }
 
-    /* BEST EXECUTION: cu mai multe cai, fiecare se simuleaza din contul agentului
-       (eth_call, fara semnatura) si castiga incasarea mai mare. O cale care pica
-       la simulare iese din discutie. */
-    let chosen = candidates[0]!
-    if (candidates.length > 1) {
-      for (const c of candidates) {
-        try {
-          const { result } = await client.simulateContract({
-            address: st.account,
-            abi: executeAbi,
-            functionName: c.fn,
-            args: [c.data],
-            account: from
-          })
-          c.simulated = result as bigint
-        } catch (e) {
-          log.warn(`${tag} ${c.via} simulation failed: ${(e as Error).message.split('\n')[0]}`)
+    /* BEST EXECUTION: fiecare cale se simuleaza din contul agentului (eth_call,
+       fara semnatura). Cine da mai mult castiga; cine pica la simulare iese din
+       discutie. Se simuleaza si cand e o singura cale: cifra aia e si arbitrul
+       intre cai, si masura cu care se strange minimul mai jos. */
+    const trySim = async (c: Candidate, data: Hex): Promise<bigint | null> => {
+      try {
+        const { result } = await client.simulateContract({
+          address: st.account,
+          abi: executeAbi,
+          functionName: c.fn,
+          args: [data],
+          account: from
+        })
+        return result as bigint
+      } catch (e) {
+        log.warn(`${tag} ${c.via} simulation failed: ${(e as Error).message.split('\n')[0]}`)
+        return null
+      }
+    }
+
+    for (const c of candidates) {
+      const out = await trySim(c, c.data)
+      if (out !== null) c.simulated = out
+    }
+    const viable = candidates.filter((c) => c.simulated !== undefined)
+    if (viable.length === 0) {
+      log.warn(`${tag} [${sig.name}] every path reverts in simulation (liquidity or slippage), holding`)
+      return []
+    }
+    let chosen = viable.reduce((a, b) => ((b.simulated ?? 0n) > (a.simulated ?? 0n) ? b : a))
+    if (viable.length > 1) {
+      log.info(`${tag} best-exec: ${viable.map((c) => `${c.via}=${c.simulated}`).join(' vs ')} -> ${chosen.via}`)
+    }
+
+    /**
+     * M-3: podeaua de oracol e o PODEA, nu o tinta. Un pool care ar da mai mult
+     * are voie sa umple fix la podea, si diferenta ramane la el. Stim din
+     * simulare cat da de fapt, deci ridicam minimul pana aproape de acolo.
+     *
+     * Se pastreaza doar daca simularea trece si CU minimul strans: intre
+     * simulare si minerit pretul se misca, si un minim prea lacom transforma o
+     * rotatie buna intr-un revert platit cu gaz.
+     */
+    let finalMinOut = minOut
+    if (job.tightenBps > 0 && chosen.simulated !== undefined) {
+      const tightened = (chosen.simulated * BigInt(10_000 - job.tightenBps)) / 10_000n
+      if (tightened > minOut) {
+        const data = chosen.build(tightened)
+        const out = await trySim(chosen, data)
+        if (out !== null) {
+          log.info(
+            `${tag} minOut tightened ${minOut} -> ${tightened} (simulated ${chosen.simulated}, ${job.tightenBps}bps below)`
+          )
+          chosen = { ...chosen, data, simulated: out }
+          finalMinOut = tightened
         }
       }
-      const viable = candidates.filter((c) => c.simulated !== undefined)
-      if (viable.length === 0) {
-        log.warn(`${tag} [${sig.name}] every path reverts in simulation (liquidity or slippage), holding`)
-        return []
-      }
-      chosen = viable.reduce((a, b) => ((b.simulated ?? 0n) > (a.simulated ?? 0n) ? b : a))
-      log.info(`${tag} best-exec: ${viable.map((c) => `${c.via}=${c.simulated}`).join(' vs ')} -> ${chosen.via}`)
     }
 
     /* costul = cat avem voie sa pierdem fata de oracol: valoarea de intrare minus
        ce acceptam minim la iesire. Marfa nu e cost, se intoarce schimbata. */
-    const minOutUsd = usdValue(minOut, tout.decimals, pout.usd8)
+    const minOutUsd = usdValue(finalMinOut, tout.decimals, pout.usd8)
     const lossUsd8 = inUsd > minOutUsd ? inUsd - minOutUsd : 0n
     const rate8 = await ethUsd8(client, job)
     const day = new Date().toISOString().slice(0, 10)
@@ -721,7 +923,10 @@ export const trader: Job<TraderJob> = {
           fn: chosen.fn,
           via: chosen.via,
           amountIn: balance.toString(),
-          minAmountOut: minOut.toString(),
+          minAmountOut: finalMinOut.toString(),
+          /* si podeaua de oracol, ca sa se vada in registru CU CAT s-a strans */
+          oracleFloor: minOut.toString(),
+          simulatedOut: chosen.simulated === undefined ? '' : chosen.simulated.toString(),
           inUsd8: inUsd.toString(),
           maxLossUsd8: lossUsd8.toString(),
           day
@@ -917,41 +1122,9 @@ export const trader: Job<TraderJob> = {
     }
 
     const nowSec = (await client.getBlock()).timestamp
-    let navUsd8 = 0n
-    const held: string[] = []
-    let staleSym: string | null = null
-    for (const sym of Object.keys(job.tokens)) {
-      const tok = job.tokens[sym]!
-      if (!hasFeed(tok) && sym !== cash) continue
-      const bal = await client.readContract({
-        address: tok.address,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [st.account]
-      })
-      if (bal === 0n) continue
-      let p: Price
-      try {
-        p = await priceOf(client, job, cash, sym, maxStaleSec, nowSec)
-      } catch {
-        continue
-      }
-      const value = usdValue(bal, tok.decimals, p.usd8)
-      /* sub un cent e praf ramas dintr-o rotatie, nu pozitie: intra in valoare,
-         nu in lista */
-      navUsd8 += value
-      if (value >= 1_000_000n) {
-        held.push(`${Number(formatUnits(bal, tok.decimals)).toFixed(6)} ${sym} (${usd(value)})`)
-        if (p.stale) staleSym = sym
-      }
-    }
+    const { navUsd8, held, staleSym } = await vaultNav(client, job, cash, st.account, maxStaleSec, nowSec)
 
-    /* ziua LOCALA, ca "azi" din raport sa fie aceeasi zi cu a omului care il
-       citeste dimineata; cheia rotatiei ramane pe UTC, acolo conteaza sa fie
-       stabila intre procese, nu sa semene cu ceasul de pe perete */
-    const n = new Date()
-    const day = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
-    const { first, dayOpen } = navMarks(ledger, navUsd8, day)
+    const { first, dayOpen } = navMarks(ledger, navUsd8, localDay())
     const sinceStart = movePct(first, navUsd8)
 
     const lines: ReportLine[] = [
@@ -965,6 +1138,18 @@ export const trader: Job<TraderJob> = {
       },
       { name: 'strategy', value: sig ? `#${st.strategyId} ${sig.name}` : `#${st.strategyId} (no signal implementation)` }
     ]
+
+    if (job.maxDrawdownBps !== null) {
+      const tripped = ledger.kvGet('brake.armed') === '1'
+      const dropBps = navUsd8 >= first ? 0 : Number(((first - navUsd8) * 10_000n) / first)
+      lines.push({
+        name: 'drawdown brake',
+        value: tripped
+          ? `TRIPPED, no rotations leave: ${ledger.kvGet('brake.reason') ?? 'value below the line'}`
+          : `${(dropBps / 100).toFixed(2)}% of the ${(job.maxDrawdownBps / 100).toFixed(2)}% allowance used`,
+        level: tripped ? 'bad' : undefined
+      })
+    }
 
     if (from.toLowerCase() === STRANGER.toLowerCase()) {
       /* proces fara cheie (un `report` de pe laptop): soldul unui strain nu e

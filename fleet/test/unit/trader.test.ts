@@ -1,11 +1,11 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decodeAbiParameters } from 'viem'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ConfigSchema } from '../../src/core/config.js'
-import { loadBrain, movePct, navMarks, signed, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
+import { drawdownBrake, loadBrain, movePct, navMarks, signed, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
 
 const BRAIN_DIR = fileURLToPath(new URL('./fixtures/brain', import.meta.url))
 const CACHE = join(tmpdir(), `trader-test-${process.pid}`)
@@ -113,7 +113,7 @@ function clientFor(state: FakeState = {}) {
 }
 
 const discoverInput = (client: unknown, job: unknown, over: Record<string, unknown> = {}) =>
-  ({ client, cfg: cfg(), job, ledger: null, from: SIGNER, ...over }) as never
+  ({ client, cfg: cfg(), job, ledger: fakeLedger(), from: SIGNER, ...over }) as never
 
 function writeBars(closes: number[]): void {
   const dir = join(CACHE, DAY)
@@ -461,5 +461,119 @@ describe('trader: darea de seama', () => {
     )
     expect(lines).toHaveLength(1)
     expect(lines[0]!.level).toBe('bad')
+  })
+})
+
+describe('trader: frana de pierdere', () => {
+  const brakeArgs = (over: Record<string, unknown> = {}) => ({
+    client: clientFor({ usdgBal: 1_000_000_000n }),
+    cfg: cfg(),
+    job: jobCfg(),
+    ledger: fakeLedger(),
+    cash: 'USDG',
+    account: ACCT,
+    maxStaleSec: 3600,
+    nowSec: NOW,
+    tag: '#1',
+    ...over
+  })
+
+  it('cat timp valoarea e peste linie, frana tace', async () => {
+    const args = brakeArgs()
+    expect(await drawdownBrake(args as never)).toBeNull()
+    expect(args.ledger.kvGet('nav.first')).toBe('100000000000')
+  })
+
+  it('sub linie: se opreste, scrie siguranta si spune cu cat s-a cazut', async () => {
+    const dir = join(tmpdir(), `trader-brake-${process.pid}`)
+    const stop = join(dir, 'STOP-test')
+    const ledger = fakeLedger()
+    /* reper de $1000, iar acum vaultul mai are $600: 40% pierdere, peste 30% */
+    ledger.kvSet('nav.first', '100000000000')
+    const args = brakeArgs({
+      ledger,
+      client: clientFor({ usdgBal: 600_000_000n }),
+      cfg: cfg({ execution: { killSwitchFile: stop } })
+    })
+    const reason = await drawdownBrake(args as never)
+    expect(reason).toContain('40.00%')
+    expect(existsSync(stop)).toBe(true)
+    expect(ledger.kvGet('brake.armed')).toBe('1')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('nu se lupta cu omul: siguranta ridicata inapoi nu e rescrisa la fiecare rulare', async () => {
+    const dir = join(tmpdir(), `trader-brake2-${process.pid}`)
+    const stop = join(dir, 'STOP-test')
+    const ledger = fakeLedger()
+    ledger.kvSet('nav.first', '100000000000')
+    const args = brakeArgs({
+      ledger,
+      client: clientFor({ usdgBal: 600_000_000n }),
+      cfg: cfg({ execution: { killSwitchFile: stop } })
+    })
+    await drawdownBrake(args as never)
+    rmSync(stop, { force: true })
+    /* a doua rulare, tot sub linie: rotatiile raman oprite, dar fisierul nu se
+       rescrie peste decizia operatorului */
+    expect(await drawdownBrake(args as never)).not.toBeNull()
+    expect(existsSync(stop)).toBe(false)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('cand valoarea revine peste linie, frana se rearmeaza', async () => {
+    const ledger = fakeLedger()
+    ledger.kvSet('nav.first', '100000000000')
+    ledger.kvSet('brake.armed', '1')
+    const args = brakeArgs({ ledger, client: clientFor({ usdgBal: 900_000_000n }) })
+    expect(await drawdownBrake(args as never)).toBeNull()
+    expect(ledger.kvGet('brake.armed')).toBe('0')
+  })
+
+  it('fara prag, nu exista frana', async () => {
+    const ledger = fakeLedger()
+    ledger.kvSet('nav.first', '100000000000')
+    const args = brakeArgs({ ledger, job: jobCfg({ maxDrawdownBps: null }), client: clientFor({ usdgBal: 1n }) })
+    expect(await drawdownBrake(args as never)).toBeNull()
+  })
+
+  it('frana trasa opreste descoperirea, oricat de tare ar striga semnalul', async () => {
+    const dir = join(tmpdir(), `trader-brake3-${process.pid}`)
+    const ledger = fakeLedger()
+    ledger.kvSet('nav.first', '100000000000')
+    const items = await trader.discover(
+      discoverInput(clientFor({ usdgBal: 600_000_000n }), jobCfg(), {
+        ledger,
+        cfg: cfg({ execution: { killSwitchFile: join(dir, 'STOP-test') } })
+      })
+    )
+    expect(items).toHaveLength(0)
+    rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('trader: minimul strans din simulare', () => {
+  it('ridica minimul sub umplerea simulata, si scrie in registru si podeaua de oracol', async () => {
+    /* pool-ul da 5.1 NVDA, podeaua de oracol e 4.975: minimul urca la 5.1 - 50bps */
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, v4Out: 5_100_000_000_000_000_000n }), jobCfg()))
+    expect(items).toHaveLength(1)
+    const m = items[0]!.meta
+    expect(m.oracleFloor).toBe('4975000000000000000')
+    expect(m.minAmountOut).toBe('5074500000000000000')
+    expect(m.simulatedOut).toBe('5100000000000000000')
+    /* costul scade odata cu minimul strans: pierdem mai putin fata de oracol */
+    expect(BigInt(items[0]!.meta.maxLossUsd8)).toBeLessThan(500_000_000n)
+  })
+
+  it('cand pool-ul da fix cat podeaua, minimul ramane podeaua', async () => {
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, v4Out: 4_975_000_000_000_000_000n }), jobCfg()))
+    expect(items[0]!.meta.minAmountOut).toBe('4975000000000000000')
+  })
+
+  it('cu strangerea oprita, minimul e exact podeaua de oracol', async () => {
+    const items = await trader.discover(
+      discoverInput(clientFor({ usdgBal: 1_000_000_000n, v4Out: 6_000_000_000_000_000_000n }), jobCfg({ tightenBps: 0 }))
+    )
+    expect(items[0]!.meta.minAmountOut).toBe('4975000000000000000')
   })
 })

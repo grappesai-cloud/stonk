@@ -65,6 +65,17 @@ describe('serverul public', () => {
     expect((await post(8811, '/stop')).status).toBe(404)
     expect((await post(8811, '/go')).status).toBe(404)
   })
+
+  it('spune daca siguranta manuala e trasa, citind discul la fiecare cerere', async () => {
+    const read = async () => ((await (await get(8811, '/stats')).json()) as { stopped: boolean }).stopped
+    expect(await read()).toBe(false)
+    /* comutata din alta parte (consola, cli, mana omului pe server): pagina
+       trebuie sa vada starea de ACUM, nu pe cea de la pornire */
+    writeFileSync(STOP, 'stopped by hand\n')
+    expect(await read()).toBe(true)
+    rmSync(STOP, { force: true })
+    expect(await read()).toBe(false)
+  })
 })
 
 describe('consola', () => {

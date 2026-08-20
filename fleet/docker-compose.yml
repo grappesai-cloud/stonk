@@ -126,6 +126,11 @@ services:
       # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui
       - "10.0.0.1:8804:8804"
       - "127.0.0.1:8805:8805"
+      # Consola, tot pe punte: de aici o apeleaza pagina de comutator din
+      # nfa.grappes.dev (alt container, acelasi server). Ramane in afara
+      # internetului si cere jetonul; ce se poate face cu ea e pornit/oprit,
+      # nu miscat bani.
+      - "10.0.0.1:8805:8805"
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro
