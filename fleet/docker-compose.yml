@@ -113,6 +113,14 @@ services:
   # care sta in .gitignore. Fara creier, agentul sta si spune de ce.
   trader:
     <<: *agent
+    # Ora rezumatului zilnic (alerts.ntfy.digestHour) e ora OMULUI care il
+    # citeste, nu UTC. Cheia `environment` inlocuieste harta din ancora, nu se
+    # adauga la ea, deci se repeta tot ce era acolo.
+    environment:
+      LOG_FORMAT: json
+      API_HOST: 0.0.0.0
+      CONSOLE_HOST: 0.0.0.0
+      TZ: Europe/Bucharest
     ports:
       - "127.0.0.1:8804:8804"
       # si pe puntea docker, ca sa poata fi urmarit de Uptime Kuma din containerul lui

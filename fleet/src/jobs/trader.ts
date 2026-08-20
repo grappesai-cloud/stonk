@@ -946,7 +946,11 @@ export const trader: Job<TraderJob> = {
       }
     }
 
-    const day = new Date().toISOString().slice(0, 10)
+    /* ziua LOCALA, ca "azi" din raport sa fie aceeasi zi cu a omului care il
+       citeste dimineata; cheia rotatiei ramane pe UTC, acolo conteaza sa fie
+       stabila intre procese, nu sa semene cu ceasul de pe perete */
+    const n = new Date()
+    const day = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
     const { first, dayOpen } = navMarks(ledger, navUsd8, day)
     const sinceStart = movePct(first, navUsd8)
 
