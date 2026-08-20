@@ -1,0 +1,210 @@
+"""Haine peste tors. Cele cu clip=True sunt taiate pe silueta corpului,
+ca sa nu iasa din personaj. Pelerina se deseneaza in spate."""
+import numpy as np
+from .core import Layer, BODY_MASK, N
+
+CLOTHES = []
+
+
+def cloth(name, weight, clip=True, behind=False):
+    def deco(fn):
+        CLOTHES.append((name, weight, clip, behind, fn))
+        return fn
+    return deco
+
+
+def clip_to_body(L):
+    m = (L.px[:, :, 3] > 0) & ~BODY_MASK
+    L.px[m] = 0
+    return L
+
+
+@cloth('Lab Coat', 5)
+def _lab(L):
+    W, S, K = (242, 244, 246), (196, 200, 206), (44, 46, 52)
+    L.rect(11, 19, 38, 36, W)
+    for y in range(19, 36):
+        L.set(13, y, S); L.set(36, y, S)
+    for i in range(6):                      # revere in V
+        L.rect(21 - i, 19 + i, 22 - i, 19 + i, S)
+        L.rect(27 + i, 19 + i, 28 + i, 19 + i, S)
+    L.vline(24, 25, 36, S)
+    L.set(20, 29, K); L.set(29, 29, K)
+
+
+@cloth('Tuxedo', 3)
+def _tux(L):
+    K, S, W, R = (30, 30, 38), (58, 58, 68), (244, 244, 240), (188, 32, 52)
+    L.rect(11, 17, 38, 42, K)
+    for y in range(17, 30):
+        L.set(13, y, S); L.set(36, y, S)
+    for y in range(18, 28):
+        h = min(4, (y - 17))
+        L.rect(24 - h, y, 24 + h, y, W)
+    L.rect(22, 18, 26, 19, R)
+    L.set(24, 18, K)
+
+
+@cloth('Apron', 5)
+def _apr(L):
+    W, S, R = (240, 240, 236), (198, 198, 194), (198, 46, 62)
+    L.rect(19, 24, 30, 38, W)
+    L.hline(19, 30, 38, S)
+    L.rect(21, 19, 28, 23, W)               # pieptar
+    L.vline(20, 19, 23, S); L.vline(29, 19, 23, S)
+    L.hline(19, 30, 29, S)                  # snurul de la talie
+    L.rect(23, 33, 26, 35, R)
+
+
+@cloth('Hawaiian Shirt', 4)
+def _haw(L):
+    C, D, F, G = (34, 158, 152), (20, 110, 108), (240, 96, 118), (250, 214, 92)
+    L.rect(11, 17, 38, 30, C)
+    for y in range(17, 31):
+        L.set(13, y, D); L.set(36, y, D)
+    for (x, y) in ((17, 20), (28, 19), (21, 25), (32, 24), (15, 27), (25, 22), (34, 28)):
+        L.set(x, y, F); L.set(x + 1, y, F); L.set(x, y + 1, F)
+        L.set(x + 1, y + 1, G)
+
+
+@cloth('Medic Suit', 4)
+def _med(L):
+    W, S, R = (244, 246, 244), (200, 204, 202), (206, 38, 46)
+    L.rect(11, 17, 38, 42, W)
+    for y in range(17, 42):
+        L.set(13, y, S); L.set(36, y, S)
+    for cx, cy in ((21, 22), (32, 30)):
+        L.rect(cx - 1, cy, cx + 1, cy, R); L.vline(cx, cy - 1, cy + 1, R)
+
+
+@cloth('Hazard Vest', 5)
+def _vest(L):
+    O, D, S = (244, 132, 24), (188, 92, 8), (222, 232, 240)
+    L.rect(15, 18, 34, 32, O)
+    L.hline(15, 34, 32, D)
+    L.hline(15, 34, 23, S)
+    L.hline(15, 34, 27, S)
+    L.vline(24, 18, 32, D)
+
+
+@cloth('Armor', 3)
+def _arm(L):
+    G, D, H = (138, 146, 158), (92, 100, 112), (186, 194, 204)
+    L.rect(16, 17, 33, 32, G)
+    for y in (21, 26, 30):
+        L.hline(16, 33, y, D)
+    L.hline(16, 33, 17, H)
+    L.rect(13, 18, 17, 23, H); L.rect(32, 18, 36, 23, H)   # umerare
+    L.rect(22, 21, 27, 25, H)
+
+
+@cloth('Bandolier', 6)
+def _bnd(L):
+    B, D, G = (108, 70, 36), (72, 44, 18), (206, 176, 70)
+    for i in range(18):
+        x = 15 + i
+        y = 18 + i * 15 // 18
+        L.rect(x, y, x, y + 2, B)
+        L.set(x, y + 2, D)
+        if i % 4 == 1:
+            L.set(x, y + 1, G)
+
+
+@cloth('Scarf', 6)
+def _sca(L):
+    R, D = (196, 40, 56), (140, 20, 36)
+    L.rect(13, 17, 36, 19, R)
+    L.hline(13, 36, 19, D)
+    L.rect(30, 20, 32, 27, R)
+    L.vline(32, 20, 27, D)
+
+
+@cloth('Puffer Jacket', 4)
+def _puf(L):
+    C, D, H = (56, 92, 190), (34, 62, 140), (86, 128, 224)
+    L.rect(12, 17, 37, 30, C)
+    for y in range(18, 31, 3):
+        L.hline(12, 37, y, D)
+        L.hline(12, 37, y - 1, H)
+    L.vline(24, 17, 30, D)
+
+
+@cloth('Poncho', 4)
+def _pon(L):
+    A, B, C = (176, 92, 52), (128, 58, 34), (228, 196, 120)
+    L.rect(11, 18, 38, 34, A)
+    for y in (21, 27, 33):
+        L.hline(11, 38, y, C)
+        L.hline(11, 38, y + 1, B)
+    L.rect(21, 18, 27, 21, B)
+
+
+@cloth('Tool Belt', 6)
+def _tb(L):
+    B, D, S = (110, 74, 38), (72, 44, 18), (168, 176, 188)
+    L.rect(13, 29, 36, 32, B)
+    L.hline(13, 36, 32, D)
+    L.rect(22, 29, 26, 32, (206, 170, 62))
+    L.rect(16, 31, 18, 36, D); L.set(17, 33, S)
+    L.rect(31, 31, 33, 36, D); L.set(32, 33, S)
+
+
+@cloth('Gold Chains', 5)
+def _gc(L):
+    """Desenat la rezolutia fina: verigi rotunde cu gol intre ele. La grila de 50
+    iesea o dunga galbena continua, adica o pata."""
+    G, K, Hl = (248, 214, 86), (58, 42, 8), (255, 246, 190)
+    f = getattr(L, 'fine', None)
+    if f is None:
+        L.rect(16, 18, 34, 20, G)
+        return
+    for scale, y0, x0, x1 in ((1, 38, 32, 68), (1, 50, 38, 62)):
+        for i, x in enumerate(range(x0, x1, 4)):
+            y = y0 + abs(i - (x1 - x0) // 8) // 1
+            f(x, y, K); f(x + 3, y, K)
+            f(x + 1, y, G); f(x + 2, y, G)
+            f(x + 1, y - 1, Hl); f(x + 2, y + 1, K)
+    import math
+    cx, cy, r = 50, 60, 6                         # medalion, sub lantul de jos
+    for y in range(cy - r, cy + r + 1):
+        for x in range(cx - r, cx + r + 1):
+            d = math.hypot(x - cx, y - cy)
+            if d > r:
+                continue
+            if d > r - 1.4:
+                f(x, y, K)
+            elif d > r - 2.6:
+                f(x, y, G)
+            else:
+                f(x, y, Hl if (x - cx) + (y - cy) < -1 else G)
+
+
+@cloth('Backpack', 5, clip=False, behind=True)
+def _bp(L):
+    B, D, S = (74, 96, 66), (46, 62, 42), (168, 152, 96)
+    L.rect(7, 20, 14, 36, B)
+    L.hline(7, 14, 36, D)
+    L.hline(7, 14, 27, S)
+    L.rect(35, 20, 42, 36, B)
+    L.hline(35, 42, 36, D)
+    L.hline(35, 42, 27, S)
+
+
+@cloth('Cape', 3, clip=False, behind=True)
+def _cape(L):
+    C, D = (128, 26, 46), (86, 12, 28)
+    for y in range(18, 44):
+        w = (y - 18) // 6
+        L.rect(9 - w, y, 13, y, C)
+        L.rect(35, y, 39 + w, y, C)
+        L.set(9 - w, y, D); L.set(39 + w, y, D)
+    L.rect(14, 18, 34, 20, C)
+    L.hline(14, 34, 20, D)
+
+
+@cloth('Lab Coat', 0)
+def _dummy(L):
+    pass
+
+
+CLOTHES[:] = [c for c in CLOTHES if c[1] > 0]

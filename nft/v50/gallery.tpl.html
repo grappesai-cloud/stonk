@@ -1,0 +1,281 @@
+<title>Stonk Agents Field Manual</title>
+<style>
+:root{
+  --ink:#0B0B0D; --panel:#141418; --panel2:#1B1B21; --line:#26262C; --line2:#34343C;
+  --hi:#F9D602; --hi-dim:#7A6A08; --teal:#0F6886; --teal-lit:#3AA6C8;
+  --tx:#EAE8E2; --mut:#8C8A82; --faint:#5A594F;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--tx);font-family:var(--sans);
+     -webkit-font-smoothing:antialiased}
+img{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+.wrap{max-width:1320px;margin:0 auto;padding:0 22px}
+
+header{border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#101014,var(--ink))}
+.head{display:grid;grid-template-columns:auto 1fr;gap:30px;align-items:center;padding:34px 0 28px}
+.hero{width:124px;height:124px;border:1px solid var(--line2);background:var(--teal);flex:none}
+h1{margin:0 0 10px;font-size:clamp(28px,5vw,50px);font-weight:800;letter-spacing:-.035em;
+   line-height:.94;text-transform:uppercase;text-wrap:balance}
+h1 em{font-style:normal;color:var(--hi)}
+.sub{margin:0;max-width:64ch;color:var(--mut);font-size:14.5px;line-height:1.58}
+.sub b{color:var(--tx);font-weight:600}
+.stats{display:flex;flex-wrap:wrap;border-top:1px solid var(--line)}
+.stat{flex:1 1 130px;padding:15px 18px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat .v{font-family:var(--mono);font-size:22px;font-weight:600;
+         font-variant-numeric:tabular-nums;color:var(--hi)}
+.stat .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+         text-transform:uppercase;color:var(--faint);margin-top:5px}
+
+/* loturi */
+.lots{border-bottom:1px solid var(--line);padding:14px 0;overflow-x:auto}
+.lots-in{display:flex;gap:8px;min-width:max-content}
+button.lot{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  background:var(--panel);color:var(--mut);border:1px solid var(--line2);
+  padding:9px 13px;cursor:pointer;text-align:left;line-height:1.4}
+button.lot b{display:block;color:var(--tx);font-size:11px;letter-spacing:.06em}
+button.lot:hover{border-color:var(--faint)}
+button.lot[aria-pressed=true]{background:var(--hi);border-color:var(--hi);color:#4A3E02}
+button.lot[aria-pressed=true] b{color:#141005}
+button:focus-visible{outline:2px solid var(--teal-lit);outline-offset:2px}
+
+.bar{position:sticky;top:0;z-index:20;background:rgba(11,11,13,.95);
+     backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:11px 0}
+.bar-in{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button.t{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  background:transparent;color:var(--mut);border:1px solid var(--line2);padding:6px 10px;cursor:pointer}
+button.t:hover{color:var(--tx);border-color:var(--faint)}
+button.t[aria-pressed=true]{background:var(--hi);border-color:var(--hi);color:#141005;font-weight:600}
+select{font-family:var(--mono);font-size:10px;max-width:150px;background:var(--panel);color:var(--tx);
+  border:1px solid var(--line2);padding:6px 7px;cursor:pointer}
+select:focus-visible{outline:2px solid var(--teal-lit);outline-offset:1px}
+.count{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--faint);
+       letter-spacing:.09em;font-variant-numeric:tabular-nums}
+
+.lothead{padding:22px 0 4px}
+.lothead h2{margin:0;font-size:19px;letter-spacing:-.015em;text-transform:uppercase}
+.lothead p{margin:5px 0 0;color:var(--mut);font-size:13.5px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,200px);
+      gap:12px;padding:18px 0 20px;justify-content:center}
+.card{background:var(--panel);border:1px solid var(--line);cursor:pointer;padding:0;
+      text-align:left;color:inherit;font:inherit;display:block}
+.card:hover{border-color:var(--hi-dim)}
+.card .thumb{display:block}
+.meta{padding:7px 8px 9px;border-top:1px solid var(--line)}
+.id{font-family:var(--mono);font-size:10px;color:var(--hi);font-variant-numeric:tabular-nums}
+.nm{font-size:10.5px;color:var(--mut);margin-top:2px;line-height:1.3;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{display:inline-block;margin-top:6px;font-family:var(--mono);font-size:8.5px;
+     letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;border:1px solid}
+.more{display:block;margin:0 auto 56px;font-family:var(--mono);font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;background:var(--panel);color:var(--tx);
+  border:1px solid var(--line2);padding:11px 26px;cursor:pointer}
+.more:hover{border-color:var(--hi-dim)}
+
+.ov{position:fixed;inset:0;background:rgba(6,6,8,.9);display:none;align-items:center;
+    justify-content:center;padding:22px;z-index:50}
+.ov[open]{display:flex}
+.det{background:var(--panel);border:1px solid var(--line2);max-width:860px;width:100%;
+     max-height:92vh;overflow:auto;display:grid;grid-template-columns:400px 1fr}
+.det .thumb{background:#000}
+.det .side{padding:20px 22px}
+.det h2{margin:0;font-size:21px;letter-spacing:-.02em;text-transform:uppercase}
+.det .rk{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-top:6px;letter-spacing:.09em}
+.attrs{margin-top:16px;border-top:1px solid var(--line)}
+.at{display:flex;justify-content:space-between;gap:12px;padding:7px 0;
+    border-bottom:1px solid var(--line);font-size:12px}
+.at span:first-child{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;
+    text-transform:uppercase;color:var(--faint);padding-top:2px}
+.at span:last-child{text-align:right}
+.close{margin-top:16px;font-family:var(--mono);font-size:10px;letter-spacing:.11em;
+  text-transform:uppercase;background:transparent;border:1px solid var(--line2);
+  color:var(--mut);padding:7px 12px;cursor:pointer}
+.close:hover{color:var(--tx);border-color:var(--faint)}
+
+.notes{border-top:1px solid var(--line);padding:32px 0 60px}
+.notes h3{margin:0 0 14px;font-size:11.5px;font-family:var(--mono);letter-spacing:.16em;
+          text-transform:uppercase;color:var(--faint)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:24px}
+.cols p{margin:0 0 10px;font-size:13px;line-height:1.62;color:var(--mut)}
+.cols b{color:var(--tx);font-weight:600}
+@media(max-width:900px){ .det{grid-template-columns:1fr} .det img{width:100%} }
+@media(max-width:640px){ .head{grid-template-columns:1fr;gap:18px} }
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header>
+ <div class="wrap">
+  <div class="head">
+   <div class="hero" id="hero"></div>
+   <div>
+    <h1>Stonk Agents<br><em>Field Manual</em></h1>
+    <p class="sub">Doua mii de piese, in zece loturi. Toate sunt <b>acelasi personaj,
+    cel desenat de Vlad</b>, coborat 1:1 pe grila lui nativa de 50 pe 50 pixeli direct
+    din plansa lui, apoi randat pe o grila de 100, unde incap <b>umbra de forma,
+    reflexul din lentila si scene desenate cu plan indepartat si plan apropiat</b>.
+    Fiecare lot isi trage propriile costume, obiecte si scene; raritatea se calculeaza
+    insa pe toata colectia.</p>
+   </div>
+  </div>
+ </div>
+ <div class="wrap"><div class="stats" id="stats"></div></div>
+</header>
+
+<div class="wrap"><div class="lots"><div class="lots-in" id="lotbar"></div></div></div>
+<div class="bar"><div class="wrap bar-in" id="bar"></div></div>
+<div class="wrap">
+  <div class="lothead" id="lothead"></div>
+  <div class="grid" id="grid"></div>
+  <button class="more" id="more" hidden>mai multe</button>
+</div>
+
+<div class="wrap"><div class="notes">
+ <h3>Cum e facuta</h3>
+ <div class="cols">
+  <div>
+   <p><b>Baza nu e redesenata.</b> Randarea lui are un pas de grila de 20,45 pixeli,
+   deci sub ea sta un sprite de 50 pe 50. L-am masurat, am mediat fiecare celula si am
+   scos paleta reala. Ce vezi e sprite-ul lui, nu o imitatie.</p>
+   <p><b>Sloturile sunt semantice</b>, nu culori fixe: costum, umbra de costum, ochi,
+   metal, talpa, tub. De aceea recolorarea pastreaza umbrele lui.</p>
+  </div>
+  <div>
+   <p><b>Muchia neagra se genereaza singura</b> in jurul fiecarei piese desenate. Fara
+   ea accesoriile arata lipite peste personaj.</p>
+   <p><b>Obiectul se deseneaza in spatele corpului</b>, iar pumnul il acopera la mijloc.
+   De aceea partile care ies spre dreapta se muta la stanga: acolo intra sub trunchi.</p>
+  </div>
+  <div>
+   <p><b>Armele lungi se poarta pe spate, in diagonala</b>, ca la plansele lui: se vede
+   manerul peste umar si varful sub sold. Atarnate vertical in pumn ieseau pe marginea
+   placii si le acoperea bratul.</p>
+   <p><b>Hainele au anatomie</b>, nu sunt dreptunghiuri: guler in jurul gatului, revere
+   in V, culoarea costumului se vede pe mijloc, manseta sta separat pe brat. Umplut cu
+   o pata, personajul parea revopsit, nu imbracat.</p>
+  </div>
+  <div>
+   <p><b>Scenele nu sunt filtre, sunt obiecte desenate.</b> Stanci cu fata luminata,
+   bambus cu noduri, cladiri cu ferestre aprinse, apa cu unde. Granulatia si vinieta
+   adauga zgomot, nu detaliu; detaliul se deseneaza.</p>
+   <p><b>Palariile au calota rotunjita si piese laterale</b> - clapete de coif, curea de
+   sapca, bor care se lasa la capete. Deasupra capului sunt doisprezece randuri libere;
+   varianta veche folosea patru si ieseau benzi plate.</p>
+   <p><b>Loturile inclina greutatile, nu inventeaza trasaturi</b>, iar unicatele ies din
+   clasamentul pe benzi, ca sa nu manance treptele celorlalti.</p>
+  </div>
+ </div>
+</div></div>
+
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-label="Detaliu agent">
+ <div class="det" id="det"></div>
+</div>
+
+<script>
+const ROWS=__ROWS__, ATLAS=__ATLAS__, LOTS=__LOTS__, KEYS=__KEYS__, TIERS=__TIERS__;
+const TILE=200, SRC=100, COLS=10;
+const URL={}; for(const k in ATLAS) URL[k]='data:image/png;base64,'+ATLAS[k].d;
+function cell(r,size){
+  const s=size/SRC;
+  return `background-image:url(${URL[r.l]});background-size:${COLS*SRC*s}px auto;`+
+         `background-position:${-(r.i%COLS)*SRC*s}px ${-Math.floor(r.i/COLS)*SRC*s}px;`+
+         `width:${size}px;height:${size}px;image-rendering:pixelated`;
+}
+const TIER_COL={'1 of 1':['#F9D602','#141005'],'Mythic':['#E0518A','#1B0710'],
+ 'Legendary':['#C77CF5','#150920'],'Epic':['#3AA6C8','#04141B'],'Rare':['#63C98A','#04160B'],
+ 'Uncommon':['#8C8A82','#101010'],'Common':['#4A4A50','#0C0C0E']};
+const PAGE=200;
+const state={lot:LOTS[0].code, tier:'ALL', f:{}, shown:PAGE};
+
+{const h=ROWS.find(r=>r.t==='Patient Zero')||ROWS[0];
+ const el=document.getElementById('hero');
+ el.outerHTML='<div class="hero" id="hero" style="'+cell(h,124)+'"></div>';}
+
+const uniq=new Set(ROWS.map(r=>KEYS.map(k=>r.a[k]).join('|'))).size;
+document.getElementById('stats').innerHTML=[
+ [ROWS.length,'piese'],[LOTS.length,'loturi'],[uniq,'combinatii unice'],
+ [KEYS.length,'axe de trasaturi'],['50 \u2192 100','sprite \u2192 randare'],
+ [ROWS.filter(r=>r.tier==='1 of 1').length,'unicate']
+].map(([v,k])=>`<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+
+document.getElementById('lotbar').innerHTML =
+ `<button class="lot" data-lot="ALL"><b>Toate</b>${ROWS.length} piese</button>` +
+ LOTS.map(l=>`<button class="lot" data-lot="${l.code}"><b>${l.name}</b>${l.n} piese</button>`).join('');
+
+const bar=document.getElementById('bar');
+bar.innerHTML='<div style="display:flex;gap:4px;flex-wrap:wrap">'+
+ ['ALL'].concat(TIERS).map(t=>`<button class="t" data-tier="${t}" aria-pressed="${t==='ALL'}">${t}</button>`).join('')+
+ '</div>'+KEYS.map(k=>{
+   const v=[...new Set(ROWS.map(r=>r.a[k]))].sort();
+   return `<select data-key="${k}"><option value="">${k}: toate</option>`+
+     v.map(x=>`<option value="${x}">${x}</option>`).join('')+'</select>';
+ }).join('')+'<div class="count" id="count"></div>';
+
+function match(r){
+  if(state.lot!=='ALL' && r.l!==state.lot) return false;
+  if(state.tier!=='ALL' && r.tier!==state.tier) return false;
+  for(const k in state.f){ if(state.f[k] && r.a[k]!==state.f[k]) return false; }
+  return true;
+}
+
+function draw(){
+  const vis=ROWS.filter(match);
+  const page=vis.slice(0,state.shown);
+  document.getElementById('count').textContent=vis.length+' din '+ROWS.length;
+  const L=LOTS.find(l=>l.code===state.lot);
+  document.getElementById('lothead').innerHTML = L
+    ? `<h2>${L.name}</h2><p>${L.blurb}</p>`
+    : '<h2>Toate loturile</h2><p>Colectia intreaga, in ordinea emiterii.</p>';
+  document.getElementById('grid').innerHTML=page.map(r=>{
+    const c=TIER_COL[r.tier]||TIER_COL['Common'];
+    const label=r.t||(r.a['Headwear']!=='None'?r.a['Headwear']:r.a['Suit']);
+    return `<button class="card" data-n="${r.n}">
+      <div class="thumb" style="${cell(r,TILE)}" role="img" aria-label="Agent ${r.n}"></div>
+      <div class="meta"><div class="id">#${String(r.n).padStart(5,'0')}</div>
+      <div class="nm">${label}</div>
+      <div class="tag" style="color:${c[0]};border-color:${c[0]}44;background:${c[1]}">${r.tier}</div>
+      </div></button>`;}).join('');
+  const m=document.getElementById('more');
+  m.hidden = vis.length<=state.shown;
+  m.textContent = 'mai multe ('+(vis.length-state.shown)+' ramase)';
+}
+
+document.getElementById('lotbar').addEventListener('click',e=>{
+  const b=e.target.closest('button.lot'); if(!b) return;
+  state.lot=b.dataset.lot; state.shown=PAGE;
+  document.querySelectorAll('button.lot').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  draw(); window.scrollTo({top:0});
+});
+bar.addEventListener('click',e=>{
+  const b=e.target.closest('button.t'); if(!b) return;
+  state.tier=b.dataset.tier; state.shown=PAGE;
+  bar.querySelectorAll('button.t').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+  draw();
+});
+bar.addEventListener('change',e=>{
+  if(e.target.tagName!=='SELECT') return;
+  state.f[e.target.dataset.key]=e.target.value; state.shown=PAGE; draw();
+});
+document.getElementById('more').addEventListener('click',()=>{state.shown+=PAGE;draw();});
+
+const ov=document.getElementById('ov'), det=document.getElementById('det');
+document.getElementById('grid').addEventListener('click',e=>{
+  const c=e.target.closest('.card'); if(!c) return;
+  const r=ROWS.find(x=>x.n===+c.dataset.n);
+  det.innerHTML=`<div class="thumb" style="${cell(r,400)}" role="img" aria-label="Agent ${r.n}"></div>
+   <div class="side"><h2>${r.t||('Agent #'+String(r.n).padStart(5,'0'))}</h2>
+   <div class="rk">#${String(r.n).padStart(5,'0')} &middot; locul ${r.rank} din ${ROWS.length} &middot; ${r.tier}</div>
+   <div class="attrs">${['Lot'].concat(KEYS).map(k=>
+     `<div class="at"><span>${k}</span><span>${r.a[k]}</span></div>`).join('')}</div>
+   <button class="close" id="cl">inchide</button></div>`;
+  ov.setAttribute('open',''); document.getElementById('cl').focus();
+});
+ov.addEventListener('click',e=>{ if(e.target===ov||e.target.id==='cl') ov.removeAttribute('open'); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') ov.removeAttribute('open'); });
+
+document.querySelector('button.lot[data-lot="'+state.lot+'"]').setAttribute('aria-pressed','true');
+draw();
+</script>

@@ -1,0 +1,269 @@
+"""Obiecte in mana stanga. Tija urca prin pumn la x=10 si se deseneaza IN SPATELE
+corpului, ca pumnul sa o acopere la mijloc: asa se citeste prinderea.
+Obiectele mici stau langa brat, la x~6."""
+from .core import Layer
+
+GX = 10      # tija lunga, trece prin pumn
+SX = 6       # obiecte mici, langa brat
+ITEMS = []
+
+
+def item(name, weight):
+    def deco(fn):
+        ITEMS.append((name, weight, fn))
+        return fn
+    return deco
+
+
+@item('Katana', 3)
+def _kat(L):
+    B, E, H, G = (216, 224, 232), (150, 162, 176), (28, 26, 34), (198, 158, 44)
+    L.rect(GX, 11, GX + 1, 33, B)
+    L.vline(GX + 1, 11, 33, E)
+    L.rect(GX - 2, 34, GX + 3, 34, G)
+    L.rect(GX, 35, GX + 1, 44, H)
+
+
+@item('Trident', 2)
+def _tri(L):
+    S, D = (190, 198, 208), (124, 134, 148)
+    L.rect(GX, 19, GX + 1, 45, S)
+    L.vline(GX + 1, 19, 45, D)
+    L.rect(GX - 4, 17, GX + 5, 18, S)
+    for x in (GX - 4, GX, GX + 5):
+        L.rect(x, 12, x + 1, 17, S)
+
+
+@item('Battle Axe', 3)
+def _axe(L):
+    W, D, S, E = (146, 96, 44), (98, 60, 24), (208, 216, 226), (140, 150, 164)
+    L.rect(GX, 15, GX + 1, 45, W)
+    L.vline(GX + 1, 15, 45, D)
+    for y in range(15, 24):
+        k = 4 if 17 <= y <= 21 else 2
+        L.rect(GX - 1 - k, y, GX - 1, y, S)
+        L.rect(GX + 2, y, GX + 2 + k, y, S)
+    L.vline(GX - 5, 17, 21, E); L.vline(GX + 6, 17, 21, E)
+
+
+@item('Arcane Staff', 3)
+def _staff(L):
+    W, D, O, H = (120, 84, 44), (80, 52, 22), (112, 216, 234), (224, 250, 255)
+    L.rect(GX, 17, GX + 1, 45, W)
+    L.vline(GX + 1, 17, 45, D)
+    for y, half in ((12, 1), (13, 2), (14, 2), (15, 1)):
+        L.rect(GX - half, y, GX + 1 + half, y, O)
+    L.set(GX, 13, H)
+
+
+@item('Wrench', 4)
+def _wr(L):
+    S, D = (170, 180, 192), (112, 122, 136)
+    L.rect(GX, 23, GX + 1, 44, S)
+    L.vline(GX + 1, 23, 44, D)
+    L.rect(GX - 2, 20, GX + 3, 22, S)
+    L.rect(GX, 20, GX + 1, 21, (0, 0, 0))
+
+
+@item('Torch', 3)
+def _torch(L):
+    W, D, A, B, C = (118, 82, 42), (78, 50, 20), (250, 96, 22), (250, 178, 34), (252, 240, 160)
+    L.rect(GX, 24, GX + 1, 44, W)
+    L.vline(GX + 1, 24, 44, D)
+    L.rect(GX - 1, 20, GX + 2, 23, A)
+    L.rect(GX, 18, GX + 1, 22, B)
+    L.set(GX, 17, C)
+
+
+@item('Shovel', 4)
+def _sho(L):
+    W, D, S, E = (124, 88, 46), (84, 54, 22), (172, 182, 194), (116, 126, 140)
+    L.rect(GX, 20, GX + 1, 40, W)
+    L.vline(GX + 1, 20, 40, D)
+    L.rect(GX - 2, 41, GX + 3, 46, S)
+    L.hline(GX - 2, GX + 3, 46, E)
+    L.rect(GX - 1, 18, GX + 2, 19, W)
+
+
+@item('Cutlass', 3)
+def _cut(L):
+    B, E, G, K = (222, 228, 236), (156, 166, 180), (204, 170, 52), (36, 34, 40)
+    for i, y in enumerate(range(16, 34)):
+        off = max(0, (i - 9) // 3)
+        L.rect(GX - off, y, GX + 1 - off, y, B)
+        L.set(GX + 1 - off, y, E)
+    L.rect(GX - 2, 34, GX + 3, 35, G)
+    L.rect(GX, 36, GX + 1, 44, K)
+
+
+@item('Banner', 1)
+def _ban(L):
+    W, D, C, S = (120, 84, 44), (80, 52, 22), (176, 34, 58), (232, 196, 72)
+    L.rect(GX, 10, GX + 1, 45, W)
+    L.vline(GX + 1, 10, 45, D)
+    for j, y in enumerate(range(11, 23)):
+        w = 7 if y < 20 else 7 - (y - 19) * 2
+        L.rect(GX - w, y, GX - 1, y, C)
+        L.set(GX - w, y, D)
+    L.rect(GX - 6, 14, GX - 4, 16, S)
+    L.set(GX - 5, 13, S); L.set(GX - 5, 17, S)
+
+
+@item('Pistol', 4)
+def _gun(L):
+    K, S = (46, 46, 54), (110, 116, 126)
+    L.rect(SX - 3, 34, SX + 3, 36, K)
+    L.hline(SX - 3, SX + 3, 34, S)
+    L.rect(SX + 1, 37, SX + 3, 41, K)
+
+
+@item('Spray Can', 5)
+def _spray(L):
+    C, D, K, W = (232, 62, 128), (168, 28, 84), (40, 40, 46), (250, 250, 246)
+    L.rect(SX - 2, 33, SX + 1, 42, C)
+    L.vline(SX + 1, 33, 42, D)
+    L.rect(SX - 2, 36, SX + 1, 37, W)
+    L.rect(SX - 1, 31, SX, 32, K)
+    for i, y in enumerate((27, 28, 29)):
+        L.set(SX - 1 - i, y, W)
+
+
+@item('Frying Pan', 4)
+def _pan(L):
+    K, S = (38, 38, 44), (92, 96, 104)
+    L.rect(SX - 4, 30, SX + 2, 34, K)
+    L.hline(SX - 4, SX + 2, 30, S)
+    L.rect(SX + 2, 35, SX + 3, 41, K)
+
+
+@item('Flask', 5)
+def _flask(L):
+    G, L2, K = (110, 220, 140), (210, 250, 220), (200, 210, 214)
+    L.rect(SX - 3, 34, SX + 2, 40, G)
+    L.hline(SX - 3, SX + 2, 34, L2)
+    L.rect(SX - 1, 30, SX, 33, K)
+    L.rect(SX - 2, 29, SX + 1, 29, K)
+
+
+@item('Briefcase', 4)
+def _case(L):
+    B, D, G = (110, 74, 40), (74, 46, 22), (204, 168, 60)
+    L.rect(SX - 4, 39, SX + 4, 46, B)
+    L.hline(SX - 4, SX + 4, 42, D)
+    L.rect(SX - 1, 36, SX, 38, D)
+    L.set(SX - 1, 42, G); L.set(SX, 42, G)
+
+
+@item('Money Bag', 3)
+def _bag(L):
+    B, D, G = (192, 180, 152), (140, 128, 100), (206, 170, 62)
+    L.rect(SX - 4, 36, SX + 3, 44, B)
+    L.hline(SX - 4, SX + 3, 44, D)
+    L.rect(SX - 2, 34, SX + 1, 35, D)
+    L.set(SX, 39, G); L.set(SX, 40, G); L.set(SX - 1, 40, G); L.set(SX + 1, 41, G)
+
+
+@item('Joystick', 3)
+def _joy(L):
+    K, R, S = (40, 40, 48), (216, 40, 60), (150, 156, 166)
+    L.rect(SX - 3, 38, SX + 3, 42, K)
+    L.hline(SX - 3, SX + 3, 38, S)
+    L.rect(SX - 1, 33, SX, 37, S)
+    L.rect(SX - 2, 31, SX + 1, 32, R)
+
+
+@item('Diamond', 2)
+def _dia(L):
+    C, W = (110, 226, 240), (232, 252, 255)
+    for y, half in ((32, 0), (33, 1), (34, 2), (35, 2), (36, 1), (37, 0)):
+        L.rect(SX - half, y, SX + 1 + half, y, C)
+    L.set(SX, 33, W); L.set(SX, 34, W)
+
+
+@item('Guitar', 3)
+def _gui(L):
+    """Corpul sta la stanga bratului; ce trece peste x=9 dispare in spatele lui."""
+    W, D, S, K = (166, 92, 42), (110, 56, 22), (208, 214, 222), (40, 34, 26)
+    L.rect(1, 31, 8, 43, W)
+    L.rect(2, 30, 7, 30, W)
+    L.hline(1, 8, 43, D)
+    L.rect(3, 34, 6, 37, K)
+    L.rect(4, 20, 5, 30, W)
+    L.vline(5, 20, 30, D)
+    L.rect(3, 17, 6, 19, D)
+    for y in range(22, 30, 3):
+        L.hline(4, 5, y, S)
+
+
+@item('Umbrella', 4)
+def _umb(L):
+    """Umbrela sta pe langa corp, nu peste el: cupola la stanga, coada in jos."""
+    W, D, C, S = (108, 76, 40), (72, 46, 18), (48, 62, 156), (200, 214, 232)
+    L.rect(5, 25, 6, 45, W)
+    L.vline(6, 25, 45, D)
+    L.set(4, 45, W); L.set(3, 44, W)
+    for y, half in ((17, 1), (18, 3), (19, 4), (20, 5), (21, 6), (22, 6)):
+        L.rect(5 - half, y, 6 + half, y, C if (y // 2) % 2 else S)
+    L.rect(0, 23, 12, 23, C)
+    L.hline(0, 12, 24, D)
+    L.set(5, 16, D)
+    for x in (0, 3, 8, 12):
+        L.set(x, 25, D)
+
+
+@item('Lantern', 4)
+def _lan(L):
+    S, D, G = (146, 154, 166), (96, 104, 118), (250, 216, 120)
+    L.rect(GX, 22, GX + 1, 30, S)
+    L.rect(GX - 3, 31, GX + 4, 33, S)
+    L.rect(GX - 3, 34, GX + 4, 40, G)
+    L.vline(GX - 3, 34, 40, D); L.vline(GX + 4, 34, 40, D)
+    L.rect(GX - 3, 41, GX + 4, 43, S)
+    L.hline(GX - 3, GX + 4, 43, D)
+
+
+@item('Scythe', 2)
+def _scy(L):
+    """Lama merge spre stanga; spre dreapta ar intra sub corp."""
+    W, D, S, E = (98, 68, 34), (64, 42, 16), (216, 222, 232), (146, 156, 170)
+    L.rect(GX, 12, GX + 1, 45, W)
+    L.vline(GX + 1, 12, 45, D)
+    for i in range(10):
+        y = 12 + (i * i) // 10
+        L.rect(GX - 1 - i, y, GX - i, y + 1, S)
+        L.set(GX - 1 - i, y, E)
+    L.set(GX - 10, 22, E)
+
+
+@item('Baseball Bat', 4)
+def _bat(L):
+    W, D = (176, 130, 68), (124, 86, 36)
+    for i, y in enumerate(range(18, 45)):
+        w = 2 if y < 30 else (1 if y < 38 else 0)
+        L.rect(GX - w, y, GX + 1 + w, y, W)
+        L.set(GX + 1 + w, y, D)
+
+
+@item('Chain', 4)
+def _chn(L):
+    S, D = (162, 170, 182), (104, 112, 126)
+    for i, y in enumerate(range(18, 46, 3)):
+        x = GX - 1 if i % 2 else GX
+        L.rect(x, y, x + 2, y + 1, S)
+        L.hline(x, x + 2, y + 1, D)
+        L.set(x + 1, y + 2, D)
+
+
+@item('Pickaxe', 4)
+def _pick(L):
+    """Capul se curbeaza spre stanga; spre dreapta ar intra sub corp."""
+    W, D, S, E = (132, 92, 46), (88, 58, 22), (176, 186, 198), (116, 126, 140)
+    L.rect(GX, 16, GX + 1, 45, W)
+    L.vline(GX + 1, 16, 45, D)
+    for i in range(9):
+        y = 15 + (i * i) // 12
+        L.rect(GX - 1 - i, y, GX - i, y + 1, S)
+        L.set(GX - 1 - i, y, E)
+    L.rect(GX - 1, 14, GX + 2, 15, S)
+    L.rect(GX + 2, 15, GX + 4, 16, S)
+    L.set(GX + 4, 17, E)

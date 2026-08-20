@@ -1,0 +1,277 @@
+"""Palariile. Creastetul e la randul 9, centrul capului la x=25."""
+from .core import Layer
+
+HC, HB = 25, 9
+HATS = []
+
+
+def hat(name, weight, hide_tubes=False, dy=0):
+    """dy = cat coboara piesa. Cele care lasa tuburile la vedere stau mai jos,
+    fiindca acolo crestetul original e cu doua randuri sub cupola reconstruita."""
+    def deco(fn):
+        def wrapped(L):
+            tmp = type(L)()          # merge si pe grila de 50, si pe cea de 100
+            fn(tmp)
+            d = dy + (0 if hide_tubes else 2)
+            L.px[:] = tmp.shift(0, d).px if d else tmp.px
+        HATS.append((name, weight, hide_tubes, wrapped))
+        return fn
+    return deco
+
+
+def brim(L, half, y, c, d):
+    """Bor cu capetele lasate, ca sa nu arate a scandura."""
+    L.rect(HC - half, y, HC + half, y, c)
+    L.rect(HC - half + 2, y + 1, HC + half - 2, y + 1, d)
+    L.set(HC - half - 1, y + 1, c)
+    L.set(HC + half + 1, y + 1, c)
+
+
+@hat('Crown', 3, dy=1)
+def _crown(L):
+    G, D, J = (247, 197, 40), (168, 122, 10), (214, 40, 74)
+    for k in range(5):
+        x = HC - 8 + k * 4
+        L.vline(x, 3, 5, G)
+        L.set(x, 3, (255, 232, 150))
+    L.rect(HC - 8, 6, HC + 8, 8, G)
+    L.hline(HC - 8, HC + 8, 8, D)
+    for x in (HC - 5, HC, HC + 5):
+        L.set(x, 7, J)
+
+
+@hat('Top Hat', 4)
+def _top(L):
+    K, S, B = (30, 30, 38), (58, 58, 68), (196, 28, 60)
+    L.rect(HC - 6, 0, HC + 6, 6, K)
+    L.vline(HC - 6, 0, 6, S)
+    L.rect(HC - 6, 5, HC + 6, 6, B)
+    brim(L, 10, 7, K, S)
+
+
+@hat('Wizard Hat', 3, True)
+def _wiz(L):
+    P, D, S = (94, 58, 172), (56, 32, 108), (250, 224, 92)
+    for i, y in enumerate(range(0, 8)):
+        L.rect(HC - 2 - i, y, HC + 1 + i // 2, y, P)
+        L.set(HC + 1 + i // 2, y, D)
+    brim(L, 10, 8, P, D)
+    L.set(HC + 1, 3, S); L.set(HC - 4, 5, S); L.set(HC + 2, 6, S)
+
+
+@hat('Pirate Tricorn', 3, True)
+def _tri(L):
+    K, T, W = (30, 26, 44), (198, 160, 44), (238, 238, 234)
+    L.rect(HC - 6, 2, HC + 6, 7, K)
+    L.rect(HC - 10, 6, HC + 10, 8, K)
+    L.vline(HC - 10, 4, 6, K); L.vline(HC + 10, 4, 6, K)
+    L.set(HC - 9, 3, K); L.set(HC + 9, 3, K)
+    L.hline(HC - 10, HC + 10, 8, T)
+    L.set(HC - 2, 4, W); L.set(HC + 1, 4, W); L.rect(HC - 2, 5, HC + 1, 5, W)
+
+
+@hat('Bandana', 6, dy=1)
+def _band(L):
+    R, D = (198, 36, 52), (138, 20, 34)
+    L.rect(HC - 8, 7, HC + 8, 9, R)
+    L.hline(HC - 8, HC + 8, 9, D)
+    for i in range(-8, 9, 3):
+        L.set(HC + i, 8, D)
+    L.rect(HC + 9, 8, HC + 11, 9, R)
+    L.set(HC + 11, 10, D); L.set(HC + 10, 10, D)
+
+
+@hat('Chef Hat', 3, True, dy=1)
+def _chef(L):
+    W, S = (246, 246, 242), (206, 206, 202)
+    L.rect(HC - 5, 1, HC + 5, 4, W)
+    L.rect(HC - 7, 2, HC - 5, 4, W)
+    L.rect(HC + 5, 2, HC + 7, 4, W)
+    L.rect(HC - 5, 5, HC + 5, 8, W)
+    L.hline(HC - 5, HC + 5, 8, S)
+    L.hline(HC - 5, HC + 5, 6, S)
+
+
+@hat('Straw Hat', 5, True)
+def _straw(L):
+    S, D, B = (216, 180, 98), (160, 122, 48), (140, 92, 42)
+    L.rect(HC - 5, 3, HC + 5, 6, S)
+    L.hline(HC - 5, HC + 5, 6, B)
+    brim(L, 11, 7, S, D)
+
+
+@hat('Cowboy Hat', 4, True)
+def _cow(L):
+    B, D, L2 = (132, 84, 46), (86, 52, 26), (176, 124, 74)
+    L.rect(HC - 5, 3, HC + 5, 6, B)
+    L.vline(HC, 3, 4, D)
+    L.hline(HC - 5, HC + 5, 3, L2)
+    brim(L, 10, 7, B, D)
+
+
+@hat('Kabuto', 2, True)
+def _kab(L):
+    R, D, G = (168, 34, 40), (108, 18, 24), (240, 198, 62)
+    L.rect(HC - 7, 4, HC + 7, 8, R)
+    L.hline(HC - 7, HC + 7, 8, D)
+    L.hline(HC - 7, HC + 7, 4, (206, 66, 70))
+    for i in range(4):
+        L.set(HC - 5 - i, 3 - i, G); L.set(HC + 5 + i, 3 - i, G)
+    L.rect(HC - 2, 5, HC + 2, 6, G)
+    L.rect(HC - 9, 7, HC - 8, 10, D); L.rect(HC + 8, 7, HC + 9, 10, D)
+
+
+@hat('Pith Helmet', 4, True)
+def _pith(L):
+    K, D, S = (208, 192, 142), (152, 136, 92), (236, 226, 190)
+    L.rect(HC - 5, 3, HC + 5, 6, K)
+    L.hline(HC - 5, HC + 5, 3, S)
+    L.hline(HC - 5, HC + 5, 6, D)
+    brim(L, 9, 7, K, D)
+
+
+@hat('Cap', 6, dy=2)
+def _cap(L):
+    B, D = (38, 66, 156), (22, 40, 110)
+    L.rect(HC - 6, 4, HC + 6, 8, B)
+    L.hline(HC - 6, HC + 6, 4, (62, 96, 196))
+    L.hline(HC - 6, HC + 6, 8, D)
+    L.rect(HC - 12, 7, HC - 6, 8, B)
+    L.hline(HC - 12, HC - 6, 8, D)
+
+
+@hat('Beret', 4, dy=1)
+def _beret(L):
+    R, D = (190, 36, 60), (130, 18, 36)
+    L.rect(HC - 6, 5, HC + 6, 8, R)
+    L.hline(HC - 6, HC + 6, 8, D)
+    L.set(HC + 7, 6, R); L.set(HC + 7, 7, R)
+    L.set(HC - 1, 4, D); L.set(HC, 4, D)
+
+
+@hat('Space Dome', 2, True)
+def _dome(L):
+    """Bula de sticla in jurul capului: ochiul se vede prin ea."""
+    G, S, R = (168, 220, 240), (240, 252, 255), (176, 184, 194)
+    cx, cy, r = 24, 13, 10
+    for y in range(cy - r, cy + r + 1):
+        dy = y - cy
+        half = int((r * r - dy * dy) ** 0.5)
+        if half <= 0:
+            continue
+        L.rect(cx - half, y, cx + half, y, G, 62)
+        L.set(cx - half, y, R); L.set(cx + half, y, R)
+    L.rect(cx - 3, cy - r, cx + 3, cy - r, R)
+    L.rect(cx - 3, cy + r, cx + 3, cy + r, R)
+    for dx, dy in ((-6, -6), (-7, -5), (-7, -4), (-6, -3)):
+        L.set(cx + dx, cy + dy, S)
+    L.rect(cx - 7, cy + r - 1, cx + 7, cy + r + 1, R)   # gulerul
+
+@hat('Halo', 2, dy=3)
+def _halo(L):
+    G, W = (252, 220, 92), (255, 248, 200)
+    L.rect(HC - 6, 1, HC + 6, 1, G)
+    L.set(HC - 7, 0, G); L.set(HC + 7, 0, G)
+    L.hline(HC - 4, HC + 4, 0, W)
+
+
+@hat('Horns', 3, dy=1)
+def _horn(L):
+    R, D = (178, 34, 44), (114, 16, 26)
+    for i in range(4):
+        L.rect(HC - 8 - i, 7 - i * 2, HC - 7 - i, 8 - i * 2, R)
+        L.rect(HC + 7 + i, 7 - i * 2, HC + 8 + i, 8 - i * 2, R)
+    L.set(HC - 11, 0, D); L.set(HC + 11, 0, D)
+
+
+@hat('Flames', 2, True)
+def _fire(L):
+    A, B, C = (250, 92, 22), (250, 176, 34), (252, 238, 150)
+    L.rect(HC - 8, 6, HC + 8, 8, A)
+    for x, top in ((HC - 6, 3), (HC - 2, 0), (HC + 2, 2), (HC + 6, 4)):
+        L.rect(x, top, x + 1, 7, A)
+        L.rect(x, top + 2, x + 1, 6, B)
+        L.set(x, top, C)
+
+
+@hat('Hard Hat', 5, True)
+def _hard(L):
+    Y, D, S = (244, 190, 24), (186, 138, 8), (252, 226, 128)
+    L.rect(HC - 6, 3, HC + 6, 7, Y)
+    L.hline(HC - 6, HC + 6, 3, S)
+    L.vline(HC, 3, 6, S)
+    brim(L, 9, 8, Y, D)
+
+
+@hat('Headphones', 5)
+def _hp(L):
+    K, S, C = (40, 40, 48), (110, 116, 126), (86, 216, 232)
+    L.rect(HC - 10, 6, HC - 7, 12, K)
+    L.rect(HC + 7, 6, HC + 10, 12, K)
+    L.set(HC - 9, 8, C); L.set(HC + 9, 8, C)
+    for i, x in enumerate(range(HC - 9, HC + 10)):
+        y = 5 - min(2, min(x - (HC - 9), (HC + 9) - x))
+        L.set(x, y, S)
+
+
+@hat('Bucket Hat', 5, True)
+def _buck(L):
+    C, D = (74, 146, 118), (48, 104, 82)
+    L.rect(HC - 5, 3, HC + 5, 7, C)
+    L.hline(HC - 5, HC + 5, 6, D)
+    brim(L, 8, 8, C, D)
+
+
+@hat('Viking Helm', 2, True)
+def _vik(L):
+    S, D, H = (150, 158, 170), (98, 106, 120), (226, 214, 186)
+    L.rect(HC - 6, 3, HC + 6, 8, S)
+    L.hline(HC - 6, HC + 6, 3, (188, 196, 208))
+    L.hline(HC - 6, HC + 6, 8, D)
+    L.vline(HC, 3, 8, D)
+    for i in range(4):
+        L.rect(HC - 8 - i, 5 - i, HC - 7 - i, 6 - i, H)
+        L.rect(HC + 7 + i, 5 - i, HC + 8 + i, 6 - i, H)
+
+
+@hat('Party Hat', 4, True)
+def _party(L):
+    A, B, C = (238, 62, 116), (86, 216, 232), (250, 220, 92)
+    for i, y in enumerate(range(1, 9)):
+        w = i // 2
+        L.rect(HC - w, y, HC + w, y, A if (y // 2) % 2 else B)
+    L.set(HC, 0, C)
+    L.rect(HC - 4, 9, HC + 4, 9, C)
+
+
+@hat('Visor', 6)
+def _vis(L):
+    C, D, S = (52, 200, 214), (28, 138, 152), (206, 250, 254)
+    L.rect(HC - 9, 6, HC + 9, 8, C)
+    L.hline(HC - 9, HC + 9, 8, D)
+    L.hline(HC - 9, HC + 9, 6, S)
+    L.rect(HC + 9, 5, HC + 11, 8, D)
+
+
+@hat('Laurel', 3)
+def _lau(L):
+    G, D, H = (112, 184, 84), (62, 118, 48), (162, 218, 122)
+    for i in range(8):
+        y = 8 - i // 2
+        for side in (-1, 1):
+            x = HC + side * (10 - i)
+            L.rect(x, y - 1, x, y, G)
+            if i % 2 == 0:
+                L.set(x + side, y - 2, H); L.set(x, y - 2, D)
+    L.rect(HC - 2, 3, HC + 2, 4, (240, 206, 72))
+
+
+@hat('Beacon', 4)
+def _bea(L):
+    S, D, R, W = (140, 148, 160), (88, 96, 110), (244, 56, 66), (252, 216, 216)
+    L.rect(HC + 1, 3, HC + 2, 9, S)
+    L.vline(HC + 2, 3, 9, D)
+    L.rect(HC, 0, HC + 3, 3, R)
+    L.rect(HC, 0, HC + 1, 1, W)
+    L.rect(HC - 4, 8, HC + 6, 10, S)
+    L.hline(HC - 4, HC + 6, 10, D)

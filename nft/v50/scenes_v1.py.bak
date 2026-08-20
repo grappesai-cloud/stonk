@@ -1,0 +1,386 @@
+"""Scene desenate pe aceeasi grila de 50x50 ca personajul, cu linia solului la randul 44."""
+import math
+from .core import Layer, N, shade
+
+GROUND = 44
+SCENES = []
+
+
+def scene(name, weight):
+    def deco(fn):
+        SCENES.append((name, weight, fn))
+        return fn
+    return deco
+
+
+def _n(x, y, k=1.0):
+    return (math.sin(x * 12.9898 * k + y * 78.233) * 43758.5453) % 1.0
+
+
+def sky(L, top, bot, y0=0, y1=GROUND - 1):
+    for y in range(y0, y1 + 1):
+        t = (y - y0) / max(1, y1 - y0)
+        L.hline(0, N - 1, y, tuple(int(top[i] + (bot[i] - top[i]) * t) for i in range(3)))
+
+
+def floor(L, c, d, y=GROUND):
+    L.rect(0, y, N - 1, N - 1, c)
+    L.hline(0, N - 1, y, d)
+
+
+@scene('Neon Alley', 6)
+def _alley(L):
+    sky(L, (18, 12, 40), (40, 20, 62))
+    for i, (x, w, h, c) in enumerate([(0, 9, 30, (26, 18, 48)), (10, 7, 22, (34, 22, 58)),
+                                      (38, 12, 34, (24, 16, 44)), (32, 6, 18, (36, 24, 60))]):
+        L.rect(x, GROUND - h, x + w - 1, GROUND - 1, c)
+        for wy in range(GROUND - h + 2, GROUND - 2, 3):
+            for wx in range(x + 1, x + w - 1, 2):
+                if _n(wx, wy) > 0.45:
+                    L.set(wx, wy, (250, 220, 120) if _n(wx, wy) > 0.7 else (96, 214, 232))
+    for x, y, c in ((2, 16, (250, 62, 128)), (44, 22, (62, 224, 240)), (4, 28, (140, 96, 250))):
+        L.rect(x, y, x + 3, y + 5, c)
+        L.rect(x, y + 6, x + 3, y + 6, shade(c, 0.5))
+    floor(L, (28, 20, 44), (64, 44, 92))
+    for x in range(0, N, 4):
+        L.set(x, GROUND + 3, (56, 40, 78))
+
+
+@scene('Deep Sea', 5)
+def _sea(L):
+    sky(L, (8, 40, 84), (4, 18, 48))
+    for i in range(26):
+        x, y = int(_n(i, 1) * 49), int(_n(i, 2) * 42)
+        L.set(x, y, (120, 190, 226))
+    for bx in (5, 14, 36, 45):
+        for y in range(GROUND - 1, GROUND - 12, -1):
+            L.set(bx + int(math.sin(y * 0.6) * 1.6), y, (32, 128, 108))
+    L.rect(30, 20, 34, 25, (232, 96, 150))
+    L.rect(31, 26, 33, 28, (232, 96, 150))
+    floor(L, (28, 46, 70), (58, 86, 112))
+
+
+@scene('Lava Field', 4)
+def _lava(L):
+    sky(L, (44, 12, 16), (128, 40, 18))
+    for x in range(N):
+        h = 6 + int(4 * math.sin(x * 0.35))
+        L.rect(x, GROUND - h, x, GROUND - 1, (34, 20, 22))
+    for i in range(10):
+        x = int(_n(i, 5) * 46)
+        L.rect(x, GROUND - 2, x + 2, GROUND + 5, (250, 128, 24))
+        L.set(x + 1, GROUND - 4, (252, 216, 96))
+    floor(L, (44, 24, 22), (250, 106, 20))
+
+
+@scene('Orbital Deck', 5)
+def _orb(L):
+    L.rect(0, 0, N - 1, N - 1, (16, 18, 34))
+    L.rect(6, 4, 43, 34, (6, 6, 18))
+    for i in range(40):
+        L.set(int(_n(i, 7) * 36) + 7, int(_n(i, 8) * 29) + 5, (232, 238, 250))
+    L.rect(28, 10, 35, 17, (146, 106, 210))
+    L.rect(29, 9, 34, 9, (176, 140, 232))
+    for x in (5, 44):
+        L.rect(x, 3, x + 1, 35, (72, 82, 100))
+    L.hline(6, 43, 3, (72, 82, 100)); L.hline(6, 43, 35, (72, 82, 100))
+    L.rect(0, 36, N - 1, GROUND - 1, (40, 46, 62))
+    for x in range(2, 48, 6):
+        L.rect(x, 38, x + 2, 40, (86, 208, 232))
+    floor(L, (52, 58, 76), (92, 100, 122))
+
+
+@scene('Server Room', 5)
+def _srv(L):
+    L.rect(0, 0, N - 1, N - 1, (14, 20, 24))
+    for x in range(1, 48, 8):
+        L.rect(x, 6, x + 5, GROUND - 1, (26, 34, 40))
+        L.vline(x, 6, GROUND - 1, (44, 56, 64))
+        for y in range(8, GROUND - 2, 3):
+            c = (86, 250, 140) if _n(x, y) > 0.4 else (250, 96, 96)
+            L.set(x + 2, y, c); L.set(x + 4, y, shade(c, 0.5))
+    floor(L, (30, 38, 44), (58, 72, 82))
+
+
+@scene('Ice Cave', 4)
+def _ice(L):
+    sky(L, (150, 200, 232), (74, 132, 186))
+    for i in range(7):
+        x = i * 8 + 2
+        h = 10 + int(_n(i, 3) * 12)
+        for y in range(h):
+            w = max(0, 3 - y * 3 // h)
+            L.rect(x - w, y, x + w, y, (216, 240, 250) if y < h // 3 else (162, 206, 238))
+        L.vline(x - 1, 0, h - 2, (232, 246, 252))
+    for i in range(5):
+        x = 6 + i * 10
+        h = 8 + int(_n(i, 9) * 8)
+        for y in range(h):
+            w = max(0, 3 - y * 3 // h)
+            L.rect(x - w, GROUND - 1 - y, x + w, GROUND - 1 - y, (192, 226, 246))
+    floor(L, (206, 230, 246), (150, 190, 224))
+
+
+@scene('Wasteland', 5)
+def _waste(L):
+    sky(L, (196, 148, 92), (232, 190, 128))
+    for x, h, w in ((3, 14, 5), (12, 9, 4), (38, 17, 6), (46, 11, 3)):
+        L.rect(x, GROUND - h, x + w, GROUND - 1, (128, 96, 62))
+        L.hline(x, x + w, GROUND - h, (156, 122, 82))
+    for i in range(14):
+        x = int(_n(i, 11) * 48)
+        L.set(x, GROUND - 1, (110, 82, 52))
+    floor(L, (166, 128, 82), (128, 96, 60))
+    for x in range(1, 48, 5):
+        L.set(x, GROUND + 3, (140, 106, 68))
+
+
+@scene('Jungle Temple', 4)
+def _jun(L):
+    sky(L, (18, 52, 34), (26, 74, 44))
+    L.rect(8, 8, 41, GROUND - 1, (74, 82, 62))
+    for y in range(10, GROUND - 1, 5):
+        L.hline(8, 41, y, (54, 62, 46))
+    for x in range(9, 42, 7):
+        L.vline(x, 8, GROUND - 1, (54, 62, 46))
+    for i in range(22):
+        x, y = int(_n(i, 13) * 49), int(_n(i, 14) * 34)
+        L.set(x, y, (58, 156, 66)); L.set(x, y + 1, (40, 118, 50))
+    for x in range(0, N, 3):
+        L.vline(x, 0, 2 + int(_n(x, 2) * 5), (34, 100, 46))
+    floor(L, (52, 84, 48), (34, 62, 34))
+
+
+@scene('Cyber Grid', 4)
+def _grid(L):
+    sky(L, (26, 8, 48), (86, 18, 96))
+    L.rect(20, 24, 30, 30, (250, 128, 62))
+    for y in range(24, 31, 2):
+        L.hline(20, 30, y, (86, 18, 96))
+    L.rect(0, 32, N - 1, N - 1, (14, 6, 30))
+    for i, y in enumerate(range(33, N, 2)):
+        L.hline(0, N - 1, y, (198, 44, 176))
+    for x in range(-40, 90, 8):
+        for y in range(33, N):
+            px = 25 + (x - 25) * (y - 31) // 6
+            if 0 <= px < N:
+                L.set(px, y, (86, 236, 236))
+
+
+@scene('Toxic Lab', 4)
+def _lab(L):
+    L.rect(0, 0, N - 1, N - 1, (24, 40, 38))
+    for x in range(2, 48, 12):
+        L.rect(x, 8, x + 6, 22, (34, 58, 54))
+        L.rect(x + 1, 10, x + 5, 21, (72, 214, 132))
+        L.hline(x + 1, x + 5, 10 + int(_n(x, 1) * 6), (156, 250, 186))
+    L.hline(0, N - 1, 24, (44, 72, 66))
+    for x in range(0, N, 4):
+        L.set(x, 26, (86, 226, 148))
+    floor(L, (38, 60, 56), (66, 96, 90))
+
+
+@scene('Mine Shaft', 4)
+def _mine(L):
+    L.rect(0, 0, N - 1, N - 1, (34, 26, 20))
+    for i in range(30):
+        x, y = int(_n(i, 17) * 49), int(_n(i, 18) * 40)
+        L.set(x, y, (52, 40, 30))
+    for x in (6, 42):
+        L.rect(x, 4, x + 3, GROUND - 1, (96, 66, 36))
+        L.vline(x, 4, GROUND - 1, (128, 92, 52))
+    L.rect(6, 4, 45, 7, (96, 66, 36))
+    L.rect(23, 8, 26, 11, (250, 220, 120))
+    for i in range(6):
+        L.set(20 + i * 2, 13, (198, 156, 62))
+    for i in range(9):
+        L.set(12 + i * 3, GROUND - 1, (72, 56, 38))
+    L.rect(30, GROUND - 6, 38, GROUND - 1, (86, 62, 38))
+    L.rect(31, GROUND - 5, 37, GROUND - 3, (48, 34, 22))
+    L.set(32, GROUND - 4, (198, 156, 62)); L.set(35, GROUND - 4, (146, 196, 226))
+    floor(L, (58, 44, 30), (88, 68, 44))
+
+
+@scene('Zen Garden', 3)
+def _zen(L):
+    sky(L, (186, 212, 190), (146, 184, 156))
+    L.rect(30, 14, 45, 30, (98, 132, 108))
+    for x in range(2, 16, 4):
+        L.vline(x, 6, 30, (72, 132, 76))
+        L.rect(x - 1, 6, x + 1, 9, (96, 176, 96))
+    L.rect(34, 8, 41, 13, (140, 60, 56))
+    L.hline(33, 42, 13, (96, 40, 38))
+    floor(L, (168, 190, 168), (128, 154, 130))
+    for y in range(GROUND + 1, N, 2):
+        L.hline(0, N - 1, y, (146, 172, 150))
+
+
+@scene('Arcade', 4)
+def _arc(L):
+    L.rect(0, 0, N - 1, N - 1, (18, 14, 34))
+    for x in (1, 9, 34, 42):
+        L.rect(x, 12, x + 6, GROUND - 1, (44, 30, 70))
+        L.rect(x + 1, 14, x + 5, 21, (18, 44, 62))
+        for i in range(5):
+            L.set(x + 1 + int(_n(x, i) * 4), 15 + int(_n(i, x) * 6), (250, 220, 96))
+        L.rect(x + 1, 23, x + 2, 24, (232, 60, 92))
+        L.rect(x + 4, 23, x + 5, 24, (86, 216, 232))
+    for x in range(0, N, 6):
+        L.rect(x, 2, x + 2, 4, (250, 62, 128) if (x // 6) % 2 else (86, 216, 232))
+    floor(L, (34, 24, 56), (86, 56, 128))
+
+
+@scene('Desert Ruins', 3)
+def _des(L):
+    sky(L, (244, 196, 128), (250, 158, 96))
+    L.rect(38, 14, 44, 24, (250, 226, 150))
+    for x, h in ((2, 20), (9, 14), (40, 16)):
+        L.rect(x, GROUND - h, x + 4, GROUND - 1, (198, 168, 116))
+        L.hline(x, x + 4, GROUND - h, (222, 194, 142))
+        for y in range(GROUND - h + 3, GROUND - 1, 4):
+            L.hline(x, x + 4, y, (166, 138, 92))
+    floor(L, (222, 186, 128), (182, 148, 96))
+
+
+@scene('Matrix Rain', 3)
+def _rain(L):
+    L.rect(0, 0, N - 1, N - 1, (4, 12, 8))
+    for x in range(0, N, 2):
+        top = int(_n(x, 21) * 40)
+        for y in range(top, min(N, top + 14)):
+            v = (y - top) / 14.0
+            L.set(x, y, (int(40 + 180 * (1 - v)), int(140 + 110 * (1 - v)), int(60 + 60 * (1 - v))))
+        L.set(x, top, (220, 255, 230))
+
+
+@scene('Void', 4)
+def _void(L):
+    sky(L, (10, 10, 14), (26, 26, 34), 0, N - 1)
+    for i in range(18):
+        L.set(int(_n(i, 31) * 49), int(_n(i, 32) * 49), (70, 70, 84))
+
+
+@scene('Rooftop Night', 4)
+def _roof(L):
+    sky(L, (12, 16, 40), (52, 30, 74))
+    for i in range(28):
+        L.set(int(_n(i, 61) * 49), int(_n(i, 62) * 24), (222, 230, 250))
+    for x, h, w in ((0, 12, 7), (9, 18, 6), (17, 9, 5), (30, 16, 6), (39, 11, 8)):
+        L.rect(x, GROUND - 4 - h, x + w, GROUND - 5, (20, 22, 44))
+        for wy in range(GROUND - 3 - h, GROUND - 6, 3):
+            for wx in range(x + 1, x + w, 2):
+                if _n(wx, wy) > 0.5:
+                    L.set(wx, wy, (250, 224, 140))
+    L.rect(0, GROUND - 5, N - 1, GROUND - 1, (34, 34, 52))
+    L.hline(0, N - 1, GROUND - 5, (62, 62, 86))
+    floor(L, (44, 44, 62), (78, 78, 102))
+
+
+@scene('Casino Floor', 3)
+def _cas(L):
+    sky(L, (66, 12, 26), (108, 20, 40))
+    for x in range(2, 46, 11):
+        L.rect(x, 12, x + 8, 24, (24, 60, 34))
+        L.hline(x, x + 8, 12, (206, 172, 62))
+        for i in range(3):
+            L.rect(x + 1 + i * 3, 15, x + 2 + i * 3, 17, (238, 238, 232))
+    for i in range(16):
+        L.set(int(_n(i, 71) * 49), int(_n(i, 72) * 10), (250, 220, 96))
+    floor(L, (92, 16, 34), (206, 172, 62))
+
+
+@scene('Subway', 4)
+def _sub(L):
+    L.rect(0, 0, N - 1, N - 1, (26, 30, 36))
+    L.rect(0, 6, N - 1, 10, (44, 50, 58))
+    for x in range(2, 48, 9):
+        L.rect(x, 7, x + 5, 9, (206, 210, 214))
+    for x in (4, 45):
+        L.rect(x, 11, x + 2, GROUND - 1, (56, 62, 70))
+    L.rect(12, 14, 37, 30, (36, 42, 50))
+    for x in range(13, 37, 4):
+        L.rect(x, 16, x + 2, 26, (86, 132, 176))
+    floor(L, (48, 52, 58), (82, 88, 96))
+    for x in range(0, N, 2):
+        L.set(x, GROUND + 3, (66, 70, 78))
+
+
+@scene('Greenhouse', 4)
+def _gh(L):
+    sky(L, (206, 232, 224), (170, 206, 196))
+    for x in range(0, N, 8):
+        L.vline(x, 0, GROUND - 1, (140, 172, 164))
+    for y in range(0, GROUND, 9):
+        L.hline(0, N - 1, y, (140, 172, 164))
+    for x in (2, 12, 34, 44):
+        L.rect(x, GROUND - 12, x + 5, GROUND - 8, (140, 88, 52))
+        for i in range(5):
+            L.vline(x + i, GROUND - 18 - int(_n(x, i) * 4), GROUND - 13, (62, 148, 66))
+    floor(L, (168, 186, 172), (124, 146, 128))
+
+
+@scene('Sky Islands', 3)
+def _sky(L):
+    sky(L, (250, 196, 208), (168, 200, 246))
+    for i in range(5):
+        x = int(_n(i, 81) * 36) + 2
+        y = int(_n(i, 82) * 24) + 4
+        w = 5 + int(_n(i, 83) * 6)
+        L.rect(x, y, x + w, y + 2, (108, 178, 92))
+        L.rect(x + 1, y + 3, x + w - 1, y + 5, (146, 116, 78))
+        L.rect(x + 2, y + 6, x + w - 3, y + 7, (110, 84, 54))
+    L.rect(14, GROUND - 3, 36, GROUND - 1, (108, 178, 92))
+    floor(L, (146, 116, 78), (108, 84, 54))
+
+
+@scene('Bank Vault', 3)
+def _vault(L):
+    L.rect(0, 0, N - 1, N - 1, (46, 48, 56))
+    for x in range(1, 48, 6):
+        for y in range(3, GROUND - 2, 5):
+            L.rect(x, y, x + 4, y + 3, (206, 172, 62))
+            L.hline(x, x + 4, y, (240, 214, 120))
+            L.hline(x, x + 4, y + 3, (156, 122, 30))
+    L.rect(18, 10, 32, 26, (78, 82, 92))
+    L.rect(22, 16, 28, 20, (128, 134, 146))
+    floor(L, (62, 64, 74), (100, 104, 116))
+
+
+@scene('Swamp', 4)
+def _swp(L):
+    sky(L, (46, 62, 44), (72, 88, 58))
+    for x in (3, 14, 33, 44):
+        L.rect(x, 4, x + 2, GROUND - 3, (62, 50, 34))
+        for i in range(4):
+            L.rect(x - 3 + i, 6 + i * 3, x + 5 - i, 7 + i * 3, (54, 96, 48))
+    for i in range(18):
+        L.set(int(_n(i, 91) * 49), 20 + int(_n(i, 92) * 20), (146, 190, 96))
+    L.rect(0, GROUND - 3, N - 1, N - 1, (48, 66, 48))
+    L.hline(0, N - 1, GROUND - 3, (86, 116, 72))
+    for x in range(1, 48, 7):
+        L.rect(x, GROUND + 1, x + 3, GROUND + 1, (100, 132, 84))
+
+
+# fundalurile plate din plansele lui: culoare intinsa, fara decor
+_FLATS = [
+    ('Studio Teal', 7, (15, 104, 134)),
+    ('Studio Magenta', 3, (166, 34, 88)),
+    ('Studio Olive', 3, (74, 116, 52)),
+    ('Studio Slate', 3, (78, 84, 96)),
+    ('Studio Amber', 3, (206, 128, 34)),
+    ('Studio Plum', 3, (96, 56, 152)),
+    ('Studio Sand', 3, (188, 160, 112)),
+    ('Studio Navy', 3, (34, 52, 128)),
+    ('Studio Cream', 2, (226, 216, 186)),
+]
+
+
+def _flat(c):
+    def fn(L):
+        L.rect(0, 0, N - 1, N - 1, c)
+        L.rect(0, GROUND + 2, N - 1, N - 1, shade(c, 0.86))
+    return fn
+
+
+for _n_, _w_, _c_ in _FLATS:
+    SCENES.append((_n_, _w_, _flat(_c_)))
