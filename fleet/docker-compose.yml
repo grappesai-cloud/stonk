@@ -143,6 +143,39 @@ services:
       start_period: 20s
       retries: 3
 
+  # HARVESTER: the fleet's market-making desk on Financial NFA. Vaults on the
+  # v3 account implementation sit as concentrated liquidity in the approved v4
+  # pools and collect the pool fee from everyone else's flow. Same brain-mount
+  # rule as the trader (financial-nfa BUILT, dist/, mounted read-only).
+  # Behind a profile on purpose: it starts only with
+  #   docker compose --profile harvester up -d harvester
+  # so a plain `up -d` on the server cannot launch it before its config and
+  # collection exist.
+  harvester:
+    <<: *agent
+    profiles: ["harvester"]
+    environment:
+      LOG_FORMAT: json
+      API_HOST: 0.0.0.0
+      CONSOLE_HOST: 0.0.0.0
+      TZ: Europe/Bucharest
+    ports:
+      - "127.0.0.1:8810:8810"
+      - "10.0.0.1:8810:8810"
+      - "127.0.0.1:8811:8811"
+      - "10.0.0.1:8811:8811"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+      - ./brain:/app/brain:ro
+    command: ["start", "-c", "./config/harvester.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8810/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # PAYMASTER: the fleet's hands on the fee pipeline. Flushes the Treasury
   # (coin fees, ETH -> USDG -> RewardDistributor) and claims every agent's
   # share into its own vault. Its key can only pick flush timing and the price

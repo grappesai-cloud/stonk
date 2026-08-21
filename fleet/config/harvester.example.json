@@ -1,0 +1,185 @@
+{
+  "_": "HARVESTER, the fleet's market-making desk on Financial NFA: the vault of each configured NFT sits as concentrated liquidity in the approved v4 pools and COLLECTS the pool fee from everyone else's flow. Brother of the trader; the hard brake lives in AgentAccountV3 on chain (canonical route, band width, oracle centering, freshness, USD caps, cooldown, and an exit that can never be blocked). What the fleet adds is what the contract cannot know: feed velocity (the storm brake), the collect cadence, the NAV drawdown fuse and the ledger.",
+  "_measured": "Parameters below come from the on-chain measurement of 21 Aug 2026 (52 days of history, financial-nfa memory note): NVDA 0.3% pool ~1.2-4.8%/wk at +-1% band; PLTR 1% ~3.5%/wk at +-3%; MSTR 3% ~4.8%/wk at +-5%. AMD measured NEGATIVE in a down week and is deliberately absent. Fee-harvesting is fair-weather income: the brakes are not optional.",
+  "_brain": "The planner/math/state readers are PRIVATE brain, mounted from financial-nfa (built dist/) into ./brain, gitignored, same as the trader's signals.",
+  "watchtower": false,
+  "agent": {
+    "kind": "harvester",
+    "id": 1,
+    "name": "HARVESTER #0001",
+    "collection": null,
+    "wallet": null,
+    "owner": null
+  },
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": ["https://rpc.mainnet.chain.robinhood.com"],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 2000
+  },
+  "target": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "_": "AgentNFTv3 (LP-capable collection) on 4663 -- fill in after DeployLp.s.sol is broadcast. The v2 collection's vaults are on the v2 implementation and have NO liquidity entrypoints; harvester agents must be minted on the v3 collection.",
+    "errorSignatures": [
+      "error NotOwner()",
+      "error NotAgent()",
+      "error IsPaused()",
+      "error NotAllowedAsset(address token)",
+      "error NoPolicy()",
+      "error TradeTooBig()",
+      "error DailyCapExceeded()",
+      "error Cooldown()",
+      "error StaleOracle(address feed)",
+      "error BadOraclePrice(address feed)",
+      "error SlippageTooHigh()",
+      "error PoolMismatch()",
+      "error NoRoute()",
+      "error GloballyPaused()",
+      "error ZeroNotional()",
+      "error SequencerDown()",
+      "error LpDisabled()",
+      "error BadRange()",
+      "error PoolNotInitialized()",
+      "error OutOfRange()",
+      "error CenterTooFar()",
+      "error TooManyPositions()",
+      "error NotPoolManager()",
+      "error UnexpectedCallback()",
+      "error UnknownPosition()",
+      "error WithdrawWouldPay()",
+      "error NativeNotSupported()"
+    ],
+    "deployBlock": 0
+  },
+  "job": {
+    "_tokenIds": "Explicit list, not 'all': harvesting is a distinct strategy family and each vault is sized against pool capacity; onboarding a vault is a decision, not a scan.",
+    "tokenIds": [1],
+    "registry": "0x2f974396e1ddf941cF9ad866fA267bdf1df557de",
+    "poolManager": "0x8366a39CC670B4001A1121B8F6A443A643e40951",
+    "brain": { "dir": "./brain" },
+    "cashSymbol": "USDG",
+    "tokens": {
+      "USDG": {
+        "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "decimals": 6,
+        "_feed": "StableFeed (constant $1) -- fill in the deployed address; the on-chain guard reads it from StrategyRegistry either way.",
+        "feed": null
+      },
+      "NVDA": {
+        "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        "decimals": 18,
+        "feed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15"
+      },
+      "PLTR": {
+        "address": "0x894E1EC2D74FFE5AEF8Dc8A9e84686acCB964F2A",
+        "decimals": 18,
+        "feed": "0x820ABedFF239034956B7A9d2F0a331f9F075eB4c"
+      },
+      "MSTR": {
+        "address": "0xec262a75e413fAfD0dF80480274532C79D42da09",
+        "decimals": 18,
+        "feed": "0x2521a77F42098357e83bDea7fBb2A38745bf9280"
+      }
+    },
+    "_pools": "The measured basket. widthTicks is the TOTAL band (1 tick = 1bp): NVDA 200 = +-1%, PLTR 600 = +-3%, MSTR 1000 = +-5%. maxShareOfActiveLBps is the dilution cap that keeps returns at the measured level; the pools are small and the strategy does not scale past it.",
+    "pools": [
+      {
+        "symbol": "NVDA",
+        "fee": 3000,
+        "tickSpacing": 60,
+        "widthTicks": 200,
+        "weight": 0.4,
+        "maxShareOfActiveLBps": 2000,
+        "recenterEdgeQuarters": 1,
+        "maxPoolDevBps": 100
+      },
+      {
+        "symbol": "PLTR",
+        "fee": 10000,
+        "tickSpacing": 200,
+        "widthTicks": 600,
+        "weight": 0.3,
+        "maxShareOfActiveLBps": 2500,
+        "recenterEdgeQuarters": 1,
+        "maxPoolDevBps": 150
+      },
+      {
+        "symbol": "MSTR",
+        "fee": 30000,
+        "tickSpacing": 600,
+        "widthTicks": 1200,
+        "weight": 0.3,
+        "maxShareOfActiveLBps": 2500,
+        "recenterEdgeQuarters": 1,
+        "maxPoolDevBps": 300
+      }
+    ],
+    "_brakes": "staleSec: no oracle, no quoting (weekends are blind, not cheap). feedJumpBps over the window is the storm brake: pull EVERYTHING, sit out brakeCooldownSec. The gap-day lesson: nothing sees a gap coming, so the only defense is being diversified, centered, and quick to leave.",
+    "brakes": {
+      "staleSec": 3600,
+      "feedJumpBps": 150,
+      "feedJumpWindowSec": 900,
+      "brakeCooldownSec": 21600,
+      "minNotionalUsd8": "1000000000"
+    },
+    "collectIntervalSec": 21600,
+    "_maxDrawdownBps": "NAV fuse: 20% below the first value seen empties every pool and stops adds until an operator clears harvester.fuse.<id> from kv. Delete harvester.nav.first.<id> on ANY manual funding, or the deposit reads as profit.",
+    "maxDrawdownBps": 2000,
+    "eth": { "feed": null, "usd8": "227500000000" }
+  },
+  "policy": {
+    "_": "Campaign mode like the trader: the reward is the fee stream, not a measurable per-call payout. The hard fleet brakes are the per-call and daily gas budgets; the capital brakes are on chain.",
+    "mode": "campaign",
+    "profitMultiple": 1.5,
+    "minRewardWei": "0",
+    "minStakeWei": "0",
+    "requireMeasuredReward": false,
+    "requireMeasuredCost": true,
+    "maxCostPerJobWei": "50000000000000000",
+    "dailySpendBudgetWei": "150000000000000000",
+    "cooldownSec": 0,
+    "maxJobsPerRun": 12,
+    "batchSize": 1,
+    "gasCapPerCall": "2500000",
+    "maxGasPriceWei": null,
+    "dailyGasBudgetWei": "20000000000000000",
+    "denyKeys": []
+  },
+  "execution": {
+    "dryRun": true,
+    "privateKey": "env:HARVESTER_KEY",
+    "beneficiary": null,
+    "confirmations": 1,
+    "killSwitchFile": "./data/STOP-harvester",
+    "maxConsecutiveFailures": 5
+  },
+  "runner": {
+    "_": "Minutes, not seconds: the band is +-1% and wider, the recenter check does not need sub-minute cadence, and every run reads a dozen contracts. 300s keeps the storm brake responsive (two samples inside the 900s jump window).",
+    "mode": "interval",
+    "intervalSec": 300,
+    "jitterSec": 20,
+    "pollMs": 2000,
+    "staleAfterSec": 900,
+    "watchdogSec": 1800
+  },
+  "alerts": {
+    "telegram": { "enabled": false, "token": "env:TELEGRAM_TOKEN", "channel": null, "digestHour": 9, "gasLowWei": "2000000000000000" },
+    "heartbeat": { "url": "env:HEARTBEAT_URL", "failUrl": null, "timeoutMs": 5000 },
+    "ntfy": { "enabled": true, "url": "env:NTFY_URL", "digestHour": 9, "timeoutMs": 8000 }
+  },
+  "api": { "enabled": true, "host": "127.0.0.1", "port": 8810, "cors": ["*"], "rateLimitPerMinute": 120 },
+  "console": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8811,
+    "token": "env:CONSOLE_TOKEN",
+    "_": "Loopback only; reach it through an SSH tunnel like the trader's."
+  },
+  "storage": {
+    "file": "./data/harvester.db",
+    "backup": { "enabled": true, "dir": "./data/backups", "everyHours": 6, "keep": 28 }
+  }
+}

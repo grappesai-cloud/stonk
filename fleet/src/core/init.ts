@@ -92,6 +92,12 @@ const WORDS: Record<AgentKind, { action: RegExp; value: RegExp; discovery: RegEx
     value: /balance|nav|value|equity/i,
     discovery: /nextId|accountOf|strategyOf|paused|policy|route/i,
     event: /trade|swap|rotated|executed/i
+  },
+  harvester: {
+    action: /lpProvide|lpWithdraw|modifyLiquidity|provide|withdraw|collect/i,
+    value: /balance|nav|value|equity|liquidity|fees/i,
+    discovery: /accountOf|lpPositions|lpLiquidityOf|routeOf|policyOf|paused/i,
+    event: /LiquidityProvided|LiquidityWithdrawn|ModifyLiquidity/i
   }
 }
 
