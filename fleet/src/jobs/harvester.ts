@@ -545,6 +545,13 @@ export const harvester: Job<HarvesterJob> = {
             : ({ kind: 'hold', symbol: p.symbol, reason: 'drawdown fuse' } as LpActionB)
           : brain.planPool(obs, job.brakes, navUsd8)
 
+        /* jurnalul dry-run-ului: si un hold isi spune MOTIVUL, altfel "run complete,
+           0 candidates" arata la fel cand frana lucreaza si cand ceva e stricat */
+        log.info(
+          { tokenId: String(id), symbol: p.symbol, decision: action.kind, navUsd: Number(navUsd8) / 1e8 },
+          `plan: ${action.reason}`
+        )
+
         if (action.kind === 'withdraw') {
           if (action.reason.includes('storm')) {
             ledger.kvSet(`harvester.brake.${id}.${p.symbol}`, String(nowSec))
