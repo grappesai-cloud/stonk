@@ -9,7 +9,7 @@
      7. Hero
      8. Banda
      9. Cifre
-    10. Flota (sina orizontala)
+    10. Flota (grila)
     11. Pasii
     12. Mint si formular
     13. Subsol
@@ -49,6 +49,8 @@
   --pad:clamp(20px,4vw,40px);
   --nav-h:68px;
   --ease:cubic-bezier(.22,1,.36,1);
+  /* coltul retezat: o muchie, sus-dreapta, aceeasi peste tot */
+  --notch:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,0 100%);
 }
 
 /* ---------- 3. Baza ---------- */
@@ -145,6 +147,10 @@ main{position:relative;z-index:1}
 .chip span{color:var(--dim)}
 
 .tag{padding:3px 8px;border:1px solid var(--line);border-radius:6px;color:var(--faint)}
+/* fluxul masurat, nu simulat: verde cu punct viu */
+.tag.live{display:inline-flex;align-items:center;gap:6px;color:var(--green);border-color:rgba(0,200,5,.4)}
+.tag.live::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);animation:pulse 2.4s ease-in-out infinite}
 
 /* ---------- 6. Bara de sus ---------- */
 .nav{
@@ -181,15 +187,21 @@ main{position:relative;z-index:1}
 .hero-inner{position:relative;z-index:1;display:grid;gap:26px;justify-items:start}
 .hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
 
+/* Panoul cu colt taiat e geometria semnatura a paginii: fara raze, o singura
+   muchie retezata sus-dreapta. Se repeta la feed, carduri si formular, si de
+   aia sta intr-o variabila - se schimba dintr-un loc. */
 .quote{
-  margin-top:26px;width:min(420px,100%);padding:16px 18px;border:1px solid var(--line);border-radius:16px;
-  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
-  backdrop-filter:blur(8px);transition:transform .3s var(--ease);will-change:transform;
+  margin-top:26px;width:min(440px,100%);
+  background:var(--panel);border:1px solid var(--line);clip-path:var(--notch);
+  transition:transform .3s var(--ease);will-change:transform;
 }
-.quote-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.quote-feed{display:grid;gap:9px;min-height:76px}
+.quote-top{display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;border-bottom:1px solid var(--line)}
+.quote-feed{display:grid;min-height:76px}
 .quote-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:baseline;
+  padding:11px 16px;border-bottom:1px solid var(--line-2);
   font-size:11.5px;letter-spacing:.04em;animation:rowIn .5s var(--ease) both}
+.quote-row:last-child{border-bottom:0}
 .quote-row b{color:var(--dim);font-weight:500}
 .quote-row u{text-decoration:none;color:var(--faint);margin-left:8px}
 .quote-row em{font-style:normal;color:var(--green);font-weight:600}
@@ -213,51 +225,54 @@ main{position:relative;z-index:1}
 /* ---------- 9. Cifre ---------- */
 .stats{padding:88px 0 20px}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;
-  background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden}
-.stat{background:var(--panel);padding:30px 26px}
+  background:var(--line);border:1px solid var(--line)}
+.stat{background:var(--bg);padding:30px 26px}
 .stat b{display:block;font-family:var(--mono);font-size:clamp(30px,3.4vw,42px);font-weight:700;letter-spacing:-.03em}
 .stat span{display:block;margin-top:10px;color:var(--faint);font-size:13px}
 
-/* ---------- 10. Flota ---------- */
-.rail{position:relative}
-.rail-stick{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;
-  gap:44px;overflow:hidden;padding-top:var(--nav-h)}
-.rail-head{max-width:56ch}
-.rail-track{display:flex;gap:22px;padding-inline:var(--pad);will-change:transform}
+/* ---------- 10. Flota (grila) ---------- */
+.fleet{padding:clamp(70px,10vw,120px) 0 10px}
+.fleet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
 .card{
-  flex:0 0 clamp(280px,32vw,400px);min-height:clamp(300px,42vh,380px);
-  display:flex;flex-direction:column;gap:14px;padding:28px;
-  border:1px solid var(--line);border-radius:20px;position:relative;overflow:hidden;
-  background:linear-gradient(180deg,var(--panel-2),var(--panel));
-  transition:border-color .3s,transform .3s var(--ease);
+  position:relative;display:flex;flex-direction:column;padding:24px;
+  background:var(--panel);border:1px solid var(--line);clip-path:var(--notch);
+  transition:border-color .25s,transform .25s var(--ease);
 }
-.card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;
+.card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;pointer-events:none;
   background:radial-gradient(300px circle at var(--cx,50%) var(--cy,50%),var(--green-soft),transparent 70%)}
-.card:hover{border-color:rgba(0,200,5,.4)}
+.card:hover{border-color:rgba(0,200,5,.5);transform:translateY(-3px)}
 .card:hover::before{opacity:1}
-.card-top{display:flex;justify-content:space-between;align-items:flex-start}
-.card-code{font-family:var(--mono);font-size:44px;font-weight:700;letter-spacing:-.04em;color:rgba(255,255,255,.14)}
-.card-glyph{width:38px;height:38px;stroke:var(--green);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.card h3{font-size:26px;letter-spacing:-.025em}
-.card-role{color:var(--green);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
-.card p{margin:0;color:var(--dim);font-size:15px}
-.card-earns{margin-top:auto;padding-top:16px;border-top:1px solid var(--line-2);
-  display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:10.5px;
-  letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
-.card-earns b{color:var(--text);font-weight:600}
-
-.rail-bar{height:2px;background:var(--line);margin-inline:var(--pad);border-radius:2px;overflow:hidden}
-.rail-bar i{display:block;height:100%;width:22%;background:var(--green);border-radius:2px;transform-origin:left}
+.card>*{position:relative}
+.card-top{display:flex;align-items:center;gap:12px}
+.card-code{font-family:var(--mono);font-size:40px;font-weight:700;letter-spacing:-.04em;
+  color:rgba(255,255,255,.12);line-height:1}
+.card-glyph{width:24px;height:24px;stroke:var(--green);fill:none;stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+.card-role{color:var(--green);font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;margin:20px 0 6px}
+.card h3{font-size:22px;letter-spacing:-.025em}
+.card-job{margin:10px 0 0;color:var(--dim);font-size:14.5px;line-height:1.5;flex:1}
+.card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:18px}
+.card-tags span{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--faint);
+  border:1px solid var(--line);border-radius:5px;padding:3px 7px}
+.card-earns{margin:16px 0 18px;padding-top:14px;border-top:1px solid var(--line-2);
+  display:flex;justify-content:space-between;gap:14px;align-items:baseline;font-family:var(--mono);
+  font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.card-earns b{color:var(--text);font-weight:600;text-align:right}
+/* butonul unei clase care inca nu lucreaza: prezent, dar stins si fara drum */
+.card-cta-off{color:var(--faint);cursor:default}
+.card-cta-off::after{display:none}
+.card-cta-off:hover{border-color:var(--line);background:transparent}
 
 /* ---------- 11. Pasii ---------- */
-.loop{padding:120px 0}
+.loop{padding:110px 0}
 .steps{list-style:none;margin:0;padding:0;display:grid;gap:1px;
-  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-  background:var(--line);border:1px solid var(--line);border-radius:18px;overflow:hidden}
-.step{background:var(--panel);padding:30px 26px;display:grid;gap:10px;position:relative}
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  background:var(--line);border:1px solid var(--line)}
+.step{background:var(--bg);padding:28px 24px;display:grid;gap:0;position:relative}
 .step-n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;color:var(--green)}
-.step h3{font-size:21px}
-.step p{margin:0;color:var(--dim);font-size:15px}
+.step h3{font-size:19px;margin:14px 0 8px}
+.step p{margin:0;color:var(--dim);font-size:14.5px;line-height:1.5}
 .step::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:0;background:var(--green);
   transition:width .8s var(--ease)}
 .step.in::after{width:100%}
@@ -268,7 +283,7 @@ main{position:relative;z-index:1}
 .mint-left{display:grid;gap:22px;justify-items:start}
 .count{margin-top:6px;display:grid;gap:12px}
 .count-row{display:flex;gap:10px}
-.count-cell{min-width:74px;padding:14px 10px;border:1px solid var(--line);border-radius:14px;
+.count-cell{min-width:74px;padding:14px 10px;border:1px solid var(--line);
   background:var(--panel);text-align:center}
 .count-cell b{display:block;font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:-.02em}
 .count-cell span{display:block;margin-top:6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;color:var(--faint)}
@@ -278,15 +293,15 @@ main{position:relative;z-index:1}
   background:none;cursor:pointer;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint)}
 .contract button:hover{color:var(--green);border-color:var(--green)}
 
-.form{display:grid;gap:16px;padding:30px;border:1px solid var(--line);border-radius:20px;
-  background:linear-gradient(180deg,var(--panel-2),var(--panel))}
+.form{display:grid;gap:16px;padding:30px;border:1px solid var(--line);
+  background:var(--panel);clip-path:var(--notch)}
 .form-head{display:grid;gap:6px;margin-bottom:4px}
 .form-head h3{font-family:var(--mono);font-size:12px;letter-spacing:.16em}
 .form-head p{margin:0;font-size:14px}
 .field{display:grid;gap:8px}
 .field span{color:var(--faint);font-family:var(--mono);font-size:10px;letter-spacing:.14em}
 .field input,.field select{
-  height:46px;padding:0 14px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.5);
+  height:46px;padding:0 14px;border:1px solid var(--line);border-radius:0;background:var(--panel-2);
   outline:none;transition:border-color .2s,background .2s;
   -webkit-appearance:none;appearance:none;
 }
@@ -315,12 +330,7 @@ main{position:relative;z-index:1}
   .mint-inner{grid-template-columns:1fr}
   .nav-links{display:none}
   .burger{display:grid}
-  .rail-stick{height:auto;position:static;padding:100px 0 60px}
-  .rail-track{overflow-x:auto;scroll-snap-type:x mandatory;transform:none !important;
-    padding-bottom:16px;-webkit-overflow-scrolling:touch}
-  .rail-track::-webkit-scrollbar{display:none}
-  .card{scroll-snap-align:center;flex-basis:min(78vw,340px)}
-  .rail-bar{display:none}
+  .fleet{padding-top:80px}
   .hero{min-height:auto;padding-top:calc(var(--nav-h) + 56px)}
   .hero-chart,.hero-fade{height:48%}
   .scroll-hint{display:none}
@@ -346,9 +356,7 @@ main{position:relative;z-index:1}
    Verde plin = agentul lucreaza pe lant. Contur stins = meseria nu exista
    inca acolo. Diferenta se vede dintr-o privire, fara sa citesti nimic. */
 .card-state{
-  margin-left:auto;font:600 10px/1 var(--mono);letter-spacing:.14em;
-  padding:5px 8px;border-radius:999px;align-self:flex-start;
+  margin-left:auto;font:500 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  padding:5px 8px;border-radius:5px;border:1px solid var(--line);color:var(--faint);
 }
-.card-state-live{background:var(--green);color:#000}
-.card-state-soon{border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.45)}
-.card-top{align-items:flex-start}
+.card-state-live{color:var(--green);border-color:rgba(0,200,5,.4)}

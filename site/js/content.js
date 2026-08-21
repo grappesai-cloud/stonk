@@ -115,18 +115,30 @@ window.SITE = {
   classes: {
     eyebrow: 'FIVE CLASSES',
     title: 'One agent, one job, one paycheck.',
+    body: 'Every class is a different job on the same chain. Two of them already work; the other three wait for their contracts to ship, and the card says so instead of pretending.',
     hint: 'SCROLL',
+    /* Butonul cardului. Doar clasele LIVE duc la formular: o clasa a carei
+       meserie nu exista pe lant nu are ce sa promita. */
+    ctaLive: 'Hire {{name}}',
+    ctaSoon: 'Not hiring yet',
+    earnsLabel: 'EARNS',
+    /* `tags` = ce atinge agentul pe lant, nu cifre. Etichete, nu telemetrie. */
     items: [
       { code: '01', glyph: 'bell',  name: 'The Ringer', status: 'LIVE',   role: 'CLOCK IN EXECUTOR',
-        job: 'Fires Clock In the second the pot fills.', earns: 'Coverage, proven per round' },
+        job: 'Fires Clock In the second the pot fills.', earns: 'Coverage, proven per round',
+        tags: ['CLOCK IN', 'THE POT'] },
       { code: '02', glyph: 'pick',  name: 'The Miner', status: 'SOON',    role: 'VRNG FULFILLER',
-        job: 'Settles Broker Box rounds waiting on randomness.', earns: 'Fulfill bounty' },
+        job: 'Settles Broker Box rounds waiting on randomness.', earns: 'Fulfill bounty',
+        tags: ['VRNG', 'BROKER BOX'] },
       { code: '03', glyph: 'box',   name: 'The Stocker', status: 'SOON',  role: 'INVENTORY RESTOCKER',
-        job: 'Refills machines before they run dry.', earns: 'Restock commission' },
+        job: 'Refills machines before they run dry.', earns: 'Restock commission',
+        tags: ['MACHINES', 'INVENTORY'] },
       { code: '04', glyph: 'vote',  name: 'The Lobbyist', status: 'SOON', role: 'VEUP VOTE OPTIMIZER',
-        job: 'Votes your gauges before the epoch closes.', earns: 'Voter fees' },
+        job: 'Votes your gauges before the epoch closes.', earns: 'Voter fees',
+        tags: ['VEUP', 'GAUGES'] },
       { code: '05', glyph: 'truck', name: 'The Courier', status: 'LIVE',  role: 'DELIVERY AND SWEEP',
-        job: 'Pushes unclaimed drops into broker wallets.', earns: 'Coverage, proven per broker' }
+        job: 'Pushes unclaimed drops into broker wallets.', earns: 'Coverage, proven per broker',
+        tags: ['DROPS', 'BROKER WALLETS'] }
     ]
   },
 

@@ -369,60 +369,70 @@
     vote: '<path d="M4 20h16"/><path d="M6 16V9l6-5 6 5v7"/><path d="M9 16v-4h6v4"/>',
     truck: '<path d="M2 7h11v9H2z"/><path d="M13 10h4l4 3v3h-8"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>'
   }
+  /* Clasele stau intr-o GRILA, nu pe o sina orizontala. Sina fura scrollul
+     vertical ca sa se miste lateral, deci pe drumul in jos pagina pare
+     blocata si nu se vede niciodata toata flota deodata. Grila arata cele
+     cinci meserii dintr-o privire si nu are nevoie de scroll furat. */
   const track = $('[data-track]')
-  ;(S.classes.items || []).forEach((c) => {
+  const CL = S.classes || {}
+  ;(CL.items || []).forEach((c, i) => {
+    const live = String(c.status || '').toUpperCase() === 'LIVE'
     const card = el('article', 'card')
+    card.setAttribute('data-reveal', '')
+    /* intrarea pe randuri, nu toate cardurile odata */
+    card.style.transitionDelay = `${(i % 3) * 70}ms`
+
     const top = el('div', 'card-top')
     top.appendChild(el('span', 'card-code', c.code))
-    /* Starea reala a fiecarei clase. Trei dintre meserii nu exista inca pe
-       lant, iar o pagina care le arata pe toate la fel promite ceva ce nu
-       poate livra. Un badge onest arata mai bine decat o promisiune. */
-    if (c.status) {
-      const st = el('span', 'card-state card-state-' + c.status.toLowerCase(), c.status)
-      top.appendChild(st)
-    }
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('viewBox', '0 0 24 24')
     svg.setAttribute('class', 'card-glyph')
     svg.innerHTML = GLYPHS[c.glyph] || GLYPHS.box
     top.appendChild(svg)
+    /* Starea reala a fiecarei clase. Trei dintre meserii nu exista inca pe
+       lant, iar o pagina care le arata pe toate la fel promite ceva ce nu
+       poate livra. Un badge onest arata mai bine decat o promisiune. */
+    if (c.status) top.appendChild(el('span', 'card-state card-state-' + (live ? 'live' : 'soon'), c.status))
     card.appendChild(top)
-    card.appendChild(el('h3', null, c.name))
+
     card.appendChild(el('p', 'card-role', c.role))
-    card.appendChild(el('p', null, c.job))
+    card.appendChild(el('h3', null, c.name))
+    card.appendChild(el('p', 'card-job', c.job))
+
+    if (c.tags && c.tags.length) {
+      const tags = el('div', 'card-tags')
+      c.tags.forEach((t) => tags.appendChild(el('span', null, t)))
+      card.appendChild(tags)
+    }
+
     const earns = el('div', 'card-earns')
-    earns.appendChild(el('span', null, 'EARNS'))
+    earns.appendChild(el('span', null, CL.earnsLabel || 'EARNS'))
     earns.appendChild(el('b', null, c.earns))
     card.appendChild(earns)
+
+    /* Butonul duce la formular DOAR pentru clasele care lucreaza deja. La
+       celelalte ramane stins si spune de ce, in loc sa deschida un formular
+       pentru o meserie care nu exista. */
+    const cta = el('a', `btn btn-sm btn-block ${live ? 'btn-solid' : 'btn-ghost card-cta-off'}`)
+    cta.textContent = live
+      ? fill(CL.ctaLive || '').replace(/\{\{name\}\}/g, c.name)
+      : fill(CL.ctaSoon || '')
+    if (live) {
+      cta.href = '#mint'
+      cta.dataset.magnet = ''
+    } else {
+      cta.setAttribute('aria-disabled', 'true')
+    }
+    card.appendChild(cta)
+
     card.addEventListener('pointermove', (e) => {
       const r = card.getBoundingClientRect()
       card.style.setProperty('--cx', `${e.clientX - r.left}px`)
       card.style.setProperty('--cy', `${e.clientY - r.top}px`)
     })
     track.appendChild(card)
+    watch(card)
   })
-
-  /* sina: sectiunea creste cat trackul, iar scrollul vertical il trage lateral */
-  const rail = $('[data-rail]')
-  const railBar = $('[data-rail-bar]')
-  const layoutRail = () => {
-    if (!rail || !track) return
-    if (innerWidth <= 900) {
-      rail.style.height = ''
-      track.style.transform = ''
-      return
-    }
-    const dist = Math.max(0, track.scrollWidth - innerWidth + 40)
-    rail.style.height = `${innerHeight + dist}px`
-  }
-  const moveRail = () => {
-    if (!rail || !track || innerWidth <= 900) return
-    const r = rail.getBoundingClientRect()
-    const dist = Math.max(0, track.scrollWidth - innerWidth + 40)
-    const p = clamp(-r.top / (rail.offsetHeight - innerHeight || 1), 0, 1)
-    track.style.transform = `translate3d(${-p * dist}px,0,0)`
-    if (railBar) railBar.style.transform = `scaleX(${0.22 + p * 0.78})`
-  }
 
   /* pasii */
   const steps = $('[data-steps]')
@@ -626,7 +636,12 @@
         }
       }
       const tag = $('[data-t="hero.feedTag"]')
-      if (tag && j.feed?.length) tag.textContent = 'LIVE'
+      if (tag && j.feed?.length) {
+        tag.textContent = 'LIVE'
+        /* eticheta trece si vizual, nu doar ca text: verde cu punct care
+           pulseaza, ca sa se vada dintr-o privire ca randurile sunt masurate */
+        tag.classList.add('live')
+      }
     } catch {
       /* ramanem pe cifrele din content.js */
     }
@@ -666,7 +681,6 @@
       const max = document.documentElement.scrollHeight - innerHeight
       progress.style.width = `${max > 0 ? (y / max) * 100 : 0}%`
     }
-    moveRail()
     let active = -1
     sections.forEach((s, i) => {
       if (s.getBoundingClientRect().top < innerHeight * 0.4) active = i
@@ -676,34 +690,23 @@
 
   $$('[data-reveal]').forEach(watch)
   $$('.scramble').forEach((n) => scramble(n))
-  layoutRail()
   onScroll()
   sweep()
 
   addEventListener('scroll', onScroll, { passive: true })
-  addEventListener('resize', () => {
-    layoutRail()
-    moveRail()
-  })
+  addEventListener('resize', sweep)
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) sweep()
   })
-  /* daca fonturile intra tarziu, latimea trackului se schimba */
-  document.fonts?.ready.then(() => {
-    layoutRail()
-    moveRail()
-  })
 
-  /* Ancora din adresa se rezolva ABIA dupa ce sina isi ia inaltimea. Altfel
-     browserul sare la o pozitie calculata inainte ca sectiunea flotei sa
-     creasca, si aterizezi in alta parte a paginii. */
+  /* Ancora din adresa se re-aplica dupa ce fonturile intra: pana atunci
+     inaltimile sectiunilor se mai schimba si aterizezi langa tinta. */
   if (location.hash) {
     const goToHash = () => {
       const t = document.querySelector(location.hash)
       if (t) t.scrollIntoView({ behavior: 'instant', block: 'start' })
     }
     requestAnimationFrame(goToHash)
-    setTimeout(goToHash, 260)
     document.fonts?.ready.then(() => setTimeout(goToHash, 60))
   }
 })()
