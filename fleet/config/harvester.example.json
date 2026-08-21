@@ -114,7 +114,9 @@
         "weight": 0.3,
         "maxShareOfActiveLBps": 2500,
         "recenterEdgeQuarters": 1,
-        "maxPoolDevBps": 300
+        "maxPoolDevBps": 300,
+        "_bootstrapSlippageBps": "the 3% pool fee alone eats the global floor; NOTE: the on-chain strategy-9 policy must allow it too (maxSlippageBps >= this)",
+        "bootstrapSlippageBps": 450
       }
     ],
     "_brakes": "staleSec: no oracle, no quoting (weekends are blind, not cheap). feedJumpBps over the window is the storm brake: pull EVERYTHING, sit out brakeCooldownSec. The gap-day lesson: nothing sees a gap coming, so the only defense is being diversified, centered, and quick to leave.",
@@ -123,7 +125,8 @@
       "feedJumpBps": 150,
       "feedJumpWindowSec": 900,
       "brakeCooldownSec": 21600,
-      "minNotionalUsd8": "1000000000"
+      "minNotionalUsd8": "1000000000",
+      "rebalanceSlippageBps": 250
     },
     "collectIntervalSec": 21600,
     "_maxDrawdownBps": "NAV fuse: 20% below the first value seen empties every pool and stops adds until an operator clears harvester.fuse.<id> from kv. Delete harvester.nav.first.<id> on ANY manual funding, or the deposit reads as profit.",
