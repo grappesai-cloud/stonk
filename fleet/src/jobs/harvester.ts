@@ -150,6 +150,9 @@ const PoolCfg = z.object({
 export const HarvesterSchema = z.object({
   /** NFT-urile operate: seiful fiecaruia devine o casa de schimb */
   tokenIds: z.array(zBig).min(1),
+  /** strategia pe care o serveste meseria asta; un holder care comuta pe alta (pin manual)
+      isi scoate singur seiful de sub harvester, si aia e un drept, nu o eroare */
+  strategyId: z.number().int().default(9),
   registry: zAddress,
   poolManager: zAddress,
   brain: z.object({ dir: z.string().default('./brain') }).default({}),
@@ -408,12 +411,29 @@ export const harvester: Job<HarvesterJob> = {
     })) as boolean
 
     for (const id of job.tokenIds) {
-      const account = (await client.readContract({
-        address: cfg.target.address,
-        abi: nftAbi,
-        functionName: 'accountOf',
-        args: [id]
-      })) as Address
+      const [account, strategyOf] = await Promise.all([
+        client.readContract({
+          address: cfg.target.address,
+          abi: nftAbi,
+          functionName: 'accountOf',
+          args: [id]
+        }) as Promise<Address>,
+        client.readContract({
+          address: cfg.target.address,
+          abi: nftAbi,
+          functionName: 'strategyOf',
+          args: [id]
+        }) as Promise<number | bigint>
+      ])
+      /* holderul a comutat strategia (pin manual sau altceva): harvesterul se da la o
+         parte IMEDIAT si spune de ce. Vault-ul e al lui, nu al meseriei. */
+      if (Number(strategyOf) !== job.strategyId) {
+        log.info(
+          { tokenId: String(id), strategyOf: Number(strategyOf) },
+          `plan: standing down - holder switched to strategy ${Number(strategyOf)}`
+        )
+        continue
+      }
       const positions = (await client.readContract({
         address: account,
         abi: accountAbi,
