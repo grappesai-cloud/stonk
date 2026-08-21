@@ -49,7 +49,7 @@
     },
     "maxSlippageBps": 150,
     "minFlushWei": "200000000000000",
-    "windowsPerDay": 1,
+    "windowsPerDay": 4,
     "claimBatch": 25,
     "minClaimTotal": "10000",
     "maxTokens": 2000

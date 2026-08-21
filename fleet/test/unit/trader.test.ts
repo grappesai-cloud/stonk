@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { decodeAbiParameters } from 'viem'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ConfigSchema } from '../../src/core/config.js'
-import { drawdownBrake, loadBrain, movePct, navMarks, resolveTokenIds, signed, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
+import { drawdownBrake, loadBrain, movePct, navMarks, resolveTokenIds, signed, tradableTargets, trader, tradesLeft, usd } from '../../src/jobs/trader.js'
 
 const BRAIN_DIR = fileURLToPath(new URL('./fixtures/brain', import.meta.url))
 const CACHE = join(tmpdir(), `trader-test-${process.pid}`)
@@ -575,6 +575,79 @@ describe('trader: minimul strans din simulare', () => {
       discoverInput(clientFor({ usdgBal: 1_000_000_000n, v4Out: 6_000_000_000_000_000_000n }), jobCfg({ tightenBps: 0 }))
     )
     expect(items[0]!.meta.minAmountOut).toBe('4975000000000000000')
+  })
+})
+
+/* ------------------------------------------------------------------ manual mode (pinned strategies) */
+
+const TSLA_TOKEN = '0x0000000000000000000000000000000000000112'
+const TSLA_FEED = '0x0000000000000000000000000000000000000334'
+
+describe('trader: manual mode (pinned strategies)', () => {
+  it('a pinned vault converts incoming cash into the chosen asset', async () => {
+    const items = await trader.discover(discoverInput(clientFor({ strategyId: 101, usdgBal: 1_000_000_000n }), jobCfg()))
+    expect(items).toHaveLength(1)
+    expect(items[0]!.key).toBe(`rotate:1:${DAY}:USDG->NVDA`)
+    expect(items[0]!.meta.strategy).toBe('Hold NVDA')
+  })
+
+  it('a pinned vault already holding its asset sits still', async () => {
+    const items = await trader.discover(
+      discoverInput(clientFor({ strategyId: 101, nvdaBal: 10_000_000_000_000_000_000n }), jobCfg())
+    )
+    expect(items).toHaveLength(0)
+  })
+
+  it('Cash Park sells the stock into cash and then has nothing left to do', async () => {
+    const items = await trader.discover(
+      discoverInput(clientFor({ strategyId: 100, nvdaBal: 10_000_000_000_000_000_000n }), jobCfg())
+    )
+    expect(items).toHaveLength(1)
+    expect(items[0]!.key).toBe(`rotate:1:${DAY}:NVDA->USDG`)
+    expect(items[0]!.meta.to).toBe('USDG')
+  })
+
+  it('a stock-to-stock pin with no direct pool sells into cash first (leg 1 of 2)', async () => {
+    const base = clientFor({ strategyId: 102, nvdaBal: 10_000_000_000_000_000_000n }) as unknown as {
+      readContract: (req: never) => Promise<unknown>
+    }
+    const client = {
+      ...base,
+      async readContract(req: { address: string; functionName: string; args?: unknown[] }) {
+        if (req.functionName === 'routeOf') {
+          const pair = new Set((req.args as [string, string]).map((x) => x.toLowerCase()))
+          if (pair.has(NVDA_TOKEN) && pair.has(TSLA_TOKEN)) return { fee: 0, tickSpacing: 0, hooks: ZERO, exists: false }
+          return { fee: 3000, tickSpacing: 60, hooks: ZERO, exists: true }
+        }
+        const a = req.address.toLowerCase()
+        if (a === TSLA_FEED) {
+          if (req.functionName === 'latestRoundData') return [1n, 30_000_000_000n, 0n, NOW, 1n]
+          if (req.functionName === 'decimals') return 8
+        }
+        if (a === TSLA_TOKEN && req.functionName === 'balanceOf') return 0n
+        return base.readContract(req as never)
+      }
+    }
+    const job = jobCfg({
+      tokens: {
+        USDG: { address: USDG_TOKEN, decimals: 6, feed: null },
+        NVDA: { address: NVDA_TOKEN, decimals: 18, feed: NVDA_FEED },
+        TSLA: { address: TSLA_TOKEN, decimals: 18, feed: TSLA_FEED }
+      }
+    })
+    const items = await trader.discover(discoverInput(client, job))
+    expect(items).toHaveLength(1)
+    expect(items[0]!.key).toBe(`rotate:1:${DAY}:NVDA->USDG`)
+    expect(items[0]!.meta.to).toBe('USDG')
+    /* leg 2 happens on the next run, once the vault holds cash and the
+       ordinary cash-to-target path takes over */
+  })
+
+  it('tradableTargets reads the pin from the brain, and a cash pin trades toward nothing', async () => {
+    const brain = await loadBrain(BRAIN_DIR)
+    expect(tradableTargets(101, brain)).toEqual(['NVDA'])
+    expect(tradableTargets(100, brain)).toEqual([])
+    expect(tradableTargets(6, brain)).toEqual(['NVDA'])
   })
 })
 

@@ -85,6 +85,11 @@ export interface Brain {
   ALL_SYMBOLS: string[]
   ROTOR_UNI: string[]
   OCTANE: string[]
+  /**
+   * manual mode: strategyId -> the one symbol the holder pinned. OPTIONAL, an
+   * older brain without it simply has no pinned strategies on offer.
+   */
+  PINNED?: Record<number, string>
   loadSeries(symbols: string[], range: string, cacheDir: string): Promise<Series>
   encodeTrade(t: TradeIntent): Hex
   poolKey(a: Address, b: Address, fee: number, tickSpacing: number, hooks: Address): PoolKey
@@ -141,6 +146,7 @@ export async function loadBrain(dir: string): Promise<Brain> {
       loadSeries: dat.loadSeries,
       encodeTrade: trd.encodeTrade,
       poolKey: trd.poolKey,
+      ...(sig.PINNED ? { PINNED: sig.PINNED } : {}),
       ...(agg ? { encodeAggregatorTrade: agg.encodeAggregatorTrade, fetchAggregatorSwap: agg.fetch1inchSwap } : {})
     }
     const missing = (Object.keys(brain) as Array<keyof Brain>).filter((k) => brain[k] === undefined)
@@ -691,6 +697,8 @@ function ago(sec: number): string {
 
 /** in ce simboluri poate ateriza strategia; portile (SPY/QQQ pe post de regim) nu apar aici */
 export function tradableTargets(strategyId: number, brain: Brain): string[] {
+  const pin = brain.PINNED?.[strategyId]
+  if (pin !== undefined) return pin === brain.CASH ? [] : [pin]
   switch (strategyId) {
     case 1:
       return ['NVDA', 'TSLA']
@@ -925,15 +933,33 @@ export const trader: Job<TraderJob> = {
         continue
       }
       const tin = job.tokens[current]
-      const tout = job.tokens[target]
+      let tout = job.tokens[target]
       if (!tin || !tout || (!hasFeed(tout) && target !== cash)) {
         log.warn(`${tag} [${sig.name}] no token or feed configured for ${current} -> ${target}, holding`)
         continue
       }
-      const pout = await getPrice(target, policy.maxStaleSec)
+      /* Canonical pool routes are registered as CASH pairs only, so a
+         stock-to-stock rotation travels through cash in two runs: this one
+         sells into cash, the next one buys the target. Each leg gets its own
+         oracle floor - the same split the on-chain guard would demand. */
+      let effTarget = target
+      if (current !== cash && target !== cash) {
+        const direct = await client.readContract({
+          address: job.registry,
+          abi: registryAbi,
+          functionName: 'routeOf',
+          args: [tin.address, tout.address]
+        })
+        if (!direct.exists) {
+          effTarget = cash
+          tout = job.tokens[cash]!
+          log.info(`${tag} [${sig.name}] no direct pool ${current}/${target}, selling into ${cash} first (leg 1 of 2)`)
+        }
+      }
+      const pout = await getPrice(effTarget, policy.maxStaleSec)
       if (pin.stale || pout.stale) {
         /* the weekend window: the oracle sleeps, the bot stands. The guard would refuse anyway. */
-        log.warn(`${tag} [${sig.name}] oracle is stale for ${pin.stale ? current : target}, market is closed`)
+        log.warn(`${tag} [${sig.name}] oracle is stale for ${pin.stale ? current : effTarget}, market is closed`)
         continue
       }
 
@@ -976,7 +1002,7 @@ export const trader: Job<TraderJob> = {
             } satisfies TradeIntent)
           candidates.push({ via: 'v4', fn: 'executeTrade', data: build(minOut), build })
         } else {
-          log.warn(`${tag} [${sig.name}] no pool route for ${current}/${target}`)
+          log.warn(`${tag} [${sig.name}] no pool route for ${current}/${effTarget}`)
         }
       }
 
@@ -1019,7 +1045,7 @@ export const trader: Job<TraderJob> = {
       }
 
       if (candidates.length === 0) {
-        log.warn(`${tag} [${sig.name}] no execution path for ${current} -> ${target}, holding`)
+        log.warn(`${tag} [${sig.name}] no execution path for ${current} -> ${effTarget}, holding`)
         continue
       }
 
@@ -1086,8 +1112,8 @@ export const trader: Job<TraderJob> = {
       const day = new Date().toISOString().slice(0, 10)
 
       items.push({
-        key: `rotate:${v.id}:${day}:${current}->${target}`,
-        label: `ROTATE ${tag} ${current} -> ${target}`,
+        key: `rotate:${v.id}:${day}:${current}->${effTarget}`,
+        label: `ROTATE ${tag} ${current} -> ${effTarget}`,
         args: [chosen.data],
         /* a rotation's reward is the strategy's alpha; it cannot be read up front */
         rewardWei: 0n,
@@ -1104,7 +1130,7 @@ export const trader: Job<TraderJob> = {
           account: v.account,
           strategy: sig.name,
           from: current,
-          to: target,
+          to: effTarget,
           fn: chosen.fn,
           via: chosen.via,
           amountIn: balance.toString(),

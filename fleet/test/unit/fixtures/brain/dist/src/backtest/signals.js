@@ -8,6 +8,17 @@ export const ROTOR_UNI = ['NVDA']
 export const OCTANE = ['NVDA']
 export const ALL_SYMBOLS = ['NVDA']
 
+/* manual mode, same shape as the real brain: the holder pins one symbol and
+   the signal never reads the tape */
+const pinned = (id, sym) => ({
+  id,
+  name: sym === CASH ? 'Cash Park' : `Hold ${sym}`,
+  warmup: 0,
+  target: () => sym
+})
+
+export const PINNED = { 100: 'USDG', 101: 'NVDA', 102: 'TSLA' }
+
 export const SIGNALS = {
   6: {
     id: 6,
@@ -17,5 +28,8 @@ export const SIGNALS = {
       const b = s.NVDA
       return b[i].c / b[i - 2].c - 1 > 0 ? 'NVDA' : CASH
     }
-  }
+  },
+  100: pinned(100, 'USDG'),
+  101: pinned(101, 'NVDA'),
+  102: pinned(102, 'TSLA')
 }
