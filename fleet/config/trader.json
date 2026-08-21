@@ -52,6 +52,10 @@
     "_tokenIds": "ONE process for the WHOLE collection: 'all' follows nextId, so a freshly minted agent is picked up on the next run with zero operator work (the mint installs the bot key on chain). Per-vault state is read in batched multicalls; brain, price series, oracle prices and policies are shared per run. Empty vaults (most, until rewards flow) are skipped below minVaultUsd8.",
     "tokenIds": "all",
     "maxTokens": 1000,
+    "_excludeTokenIds": "Frozen out of trading (rewards still flow): #3 is the OpenSea sale-and-transfer test token; its vault must hold still while ownership moves.",
+    "excludeTokenIds": [
+      3
+    ],
     "minVaultUsd8": "10000000",
     "registry": "0x2f974396e1ddf941cF9ad866fA267bdf1df557de",
     "brain": {

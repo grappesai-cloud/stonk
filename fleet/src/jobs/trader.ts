@@ -178,6 +178,14 @@ export const TraderSchema = z.object({
   /** runaway backstop for 'all': never scan more tokens than this */
   maxTokens: z.number().int().min(1).max(5000).default(1000),
   /**
+   * Tokens the fleet must never trade even when tokenIds covers them: test
+   * mints, souvenirs, anything frozen for a manual check. Trader-only —
+   * rewards still accrue to these vaults and the paymaster still pays their
+   * claims; remove the id from this list and the bot picks the vault back up
+   * on the next run.
+   */
+  excludeTokenIds: z.array(zBig).default([]),
+  /**
    * Vaults worth less than this (USD, 8 decimals) are treated as empty. Most
    * minted vaults hold nothing until rewards flow; scanning is cheap but
    * signing dust rotations is not, and the on-chain guard would refuse a
@@ -319,15 +327,17 @@ async function nftState(client: PublicClient, cfg: Config, job: TraderJob, token
  * anyone touching a config file.
  */
 export async function resolveTokenIds(client: PublicClient, cfg: Config, job: TraderJob): Promise<bigint[]> {
-  if (job.tokenId !== undefined) return [job.tokenId]
+  const excluded = new Set(job.excludeTokenIds)
+  const keep = (ids: bigint[]) => ids.filter((i) => !excluded.has(i))
+  if (job.tokenId !== undefined) return keep([job.tokenId])
   if (job.tokenIds && job.tokenIds !== 'all') {
     const out: bigint[] = []
     for (let i = job.tokenIds.from; i <= job.tokenIds.to && out.length < job.maxTokens; i++) out.push(i)
-    return out
+    return keep(out)
   }
   const nextId = await client.readContract({ address: cfg.target.address, abi: nftAbi, functionName: 'nextId' })
   const count = Math.min(Number(nextId) - 1, job.maxTokens)
-  return Array.from({ length: Math.max(count, 0) }, (_, i) => BigInt(i + 1))
+  return keep(Array.from({ length: Math.max(count, 0) }, (_, i) => BigInt(i + 1)))
 }
 
 /** one vault's prefetched state: identity, keys, and every balance in one place */
@@ -1433,7 +1443,8 @@ export const trader: Job<TraderJob> = {
           value:
             `${ours.length} managed of ${scans.length} minted, ${funded} funded` +
             (foreign > 0 ? `, ${foreign} foreign-key` : '') +
-            (paused > 0 ? `, ${paused} paused` : ''),
+            (paused > 0 ? `, ${paused} paused` : '') +
+            (job.excludeTokenIds.length > 0 ? `, ${job.excludeTokenIds.length} excluded by config` : ''),
           level: paused > 0 ? 'warn' : undefined
         },
         {

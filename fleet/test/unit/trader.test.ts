@@ -663,6 +663,28 @@ describe('trader: fleet mode (many NFTs, one process)', () => {
     expect(ids).toEqual([1n, 2n])
   })
 
+  it('excludeTokenIds freezes a token out of every resolution path', async () => {
+    const all = await resolveTokenIds(fleetClient(), cfg(), jobCfg({ tokenId: undefined, tokenIds: 'all', excludeTokenIds: [3] }))
+    expect(all).toEqual([1n, 2n])
+    const range = await resolveTokenIds(
+      fleetClient(),
+      cfg(),
+      jobCfg({ tokenId: undefined, tokenIds: { from: 1, to: 3 }, excludeTokenIds: ['3'] })
+    )
+    expect(range).toEqual([1n, 2n])
+    /* even an explicit single token: an exclusion outranks a stale tokenId line */
+    const single = await resolveTokenIds(fleetClient(), cfg(), jobCfg({ tokenId: 3, excludeTokenIds: [3] }))
+    expect(single).toEqual([])
+  })
+
+  it('an excluded token is not scanned, not rotated, and the report says why the fleet is smaller', async () => {
+    const job = jobCfg({ tokenId: undefined, tokenIds: 'all', excludeTokenIds: [1] })
+    const items = await trader.discover(discoverInput(fleetClient(), job))
+    expect(items).toHaveLength(0) // #1 was the only fundable rotation
+    const lines = await trader.report!(discoverInput(fleetClient(), job, { ledger: fakeLedger() }))
+    expect(lines.find((l) => l.name === 'fleet')!.value).toContain('1 excluded by config')
+  })
+
   it('a vault below the dust floor is treated as empty instead of signing a dust rotation', async () => {
     const job = jobCfg({ tokenId: undefined, tokenIds: { from: 1, to: 1 }, minVaultUsd8: '2000000000000' }) // $20,000 floor
     const items = await trader.discover(discoverInput(fleetClient(), job))
