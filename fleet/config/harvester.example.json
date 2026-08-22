@@ -84,7 +84,7 @@
         "feed": "0x2521a77F42098357e83bDea7fBb2A38745bf9280"
       }
     },
-    "_pools": "The measured basket. widthTicks is the TOTAL band (1 tick = 1bp): NVDA 200 = +-1%, PLTR 600 = +-3%, MSTR 1000 = +-5%. maxShareOfActiveLBps is the dilution cap that keeps returns at the measured level; the pools are small and the strategy does not scale past it.",
+    "_pools": "The measured basket. widthTicks is the TOTAL band (1 tick = 1bp): NVDA 200 = +-1%, PLTR 600 = +-3%, MSTR 1200 = +-6%. maxShareOfActiveLBps is the dilution cap that keeps returns at the measured level; the pools are small and the strategy does not scale past it.",
     "pools": [
       {
         "symbol": "NVDA",
