@@ -226,6 +226,28 @@ describe('trader: descoperirea', () => {
     expect(items).toHaveLength(0)
   })
 
+  it('pe o colectie IMPARTITA, seiful altui birou se sare: cheia e a noastra, strategia nu', async () => {
+    /* exact cazul v3: harvesterul tine strategia 9, iar seifurile poarta cheia
+       LUI, fiindca un seif are un singur agentSigner. Fara lista, procesul asta
+       ar incerca sa administreze si ce nu e al lui. */
+    const job = jobCfg({ strategyIds: [100, 101, 106] })
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, strategyId: 9 }), job))
+    expect(items).toHaveLength(0)
+  })
+
+  it('un seif FIXAT pe lista lui isi primeste rotatia catre activul fixat', async () => {
+    const job = jobCfg({ strategyIds: [100, 101] })
+    // 101 = Hold NVDA: seiful e tot cash, deci trebuie sa cumpere NVDA
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n, strategyId: 101 }), job))
+    expect(items).toHaveLength(1)
+    expect(items[0]!.meta.to).toBe('NVDA')
+  })
+
+  it('lista goala pastreaza purtarea veche: orice strategie cu semnal e a noastra', async () => {
+    const items = await trader.discover(discoverInput(clientFor({ usdgBal: 1_000_000_000n }), jobCfg()))
+    expect(items).toHaveLength(1)
+  })
+
   it('cheia care nu e agentSigner nu propune nimic', async () => {
     const items = await trader.discover(
       discoverInput(clientFor({ usdgBal: 1_000_000_000n, agentSigner: '0x000000000000000000000000000000000000beef' }), jobCfg())
@@ -342,6 +364,23 @@ describe('trader: diagnosticul', () => {
   it('fara curs ETH, doctor pica inainte sa se piarda o luna in jurnal', async () => {
     const checks = await trader.checks!(discoverInput(clientFor({}), jobCfg({ eth: { usd8: '0' } })))
     const c = checks.find((x) => x.name === 'ETH is priced')
+    expect(c!.ok).toBe(false)
+    expect(c!.fatal).toBe(true)
+  })
+
+  it('seiful altui birou NU e o configurare gresita: doctorul il numeste, nu il pica', async () => {
+    const job = jobCfg({ strategyIds: [100, 101] })
+    const checks = await trader.checks!(discoverInput(clientFor({ strategyId: 9 }), job))
+    const c = checks.find((x) => x.name === 'strategy')
+    expect(c!.ok).toBe(true)
+    expect(c!.fatal).toBeFalsy()
+    expect(c!.detail).toContain('another desk')
+  })
+
+  it('dar o strategie fara semnal, pe care CHIAR trebuia sa o serveasca, ramane fatala', async () => {
+    const job = jobCfg({ strategyIds: [9] })
+    const checks = await trader.checks!(discoverInput(clientFor({ strategyId: 9 }), job))
+    const c = checks.find((x) => x.name === 'strategy')
     expect(c!.ok).toBe(false)
     expect(c!.fatal).toBe(true)
   })

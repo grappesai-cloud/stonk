@@ -1,0 +1,217 @@
+{
+  "_": "TRADER-V3: acelasi cod ca trader-ul, alta colectie. Pe v3 seifurile se nasc cu agentSigner = cheia HARVESTERULUI, si un seif are UN SINGUR semnatar, deci procesul asta semneaza cu ACEEASI cheie ca harvesterul. De aia executorul are lacatul pe semnatar (src/core/signerLock.ts): cele doua containere nu-si mai calca nonce-ul. Impartirea muncii se face singura, fara nicio conventie: harvesterul se retrage de pe orice seif care nu e pe strategia 9, iar trader-ul n-are semnal pentru 9, deci il sare. Ce ramane pentru el sunt seifurile FIXATE manual (100..107).",
+  "_brain": "Creierul (strategiile) NU sta in repo-ul asta public: se monteaza din financial-nfa (build-uit) in ./brain, care e in .gitignore. Fara creier agentul sta si spune de ce.",
+  "watchtower": false,
+  "agent": {
+    "kind": "trader",
+    "id": 3,
+    "name": "TRADER #0003 (v3)",
+    "collection": null,
+    "wallet": null,
+    "owner": null
+  },
+  "network": {
+    "name": "robinhood",
+    "chainId": 4663,
+    "rpc": [
+      "https://rpc.mainnet.chain.robinhood.com"
+    ],
+    "explorer": "https://robinhoodchain.blockscout.com",
+    "nativeSymbol": "ETH",
+    "multicall3": "0xcA11bde05977b3631167028862bE2a173976CA11",
+    "blockTimeMs": 2000
+  },
+  "target": {
+    "address": "0x8EB6F9234542609Cf65694dB954e1eF396e05d07",
+    "_": "AgentNFTv3, colectia harvesterului. Trader-ul o serveste DOAR pentru modul manual; vezi nota de sus.",
+    "errorSignatures": [
+      "error NotOwner()",
+      "error NotAgent()",
+      "error IsPaused()",
+      "error NotAllowedAsset(address token)",
+      "error NoPolicy()",
+      "error TradeTooBig()",
+      "error DailyCapExceeded()",
+      "error Cooldown()",
+      "error StaleOracle(address feed)",
+      "error BadOraclePrice(address feed)",
+      "error SlippageTooHigh()",
+      "error BadOperation()",
+      "error CallFailed()",
+      "error SameToken()",
+      "error PoolMismatch()",
+      "error NoRoute()",
+      "error GloballyPaused()",
+      "error ZeroNotional()",
+      "error SequencerDown()",
+      "error ApproveBlocked()"
+    ],
+    "deployBlock": 0
+  },
+  "job": {
+    "_tokenIds": "ONE process for the WHOLE collection: 'all' follows nextId, so a freshly minted agent is picked up on the next run with zero operator work (the mint installs the bot key on chain). Per-vault state is read in batched multicalls; brain, price series, oracle prices and policies are shared per run. Empty vaults (most, until rewards flow) are skipped below minVaultUsd8.",
+    "tokenIds": "all",
+    "maxTokens": 1000,
+    "_excludeTokenIds": "Frozen out of trading (rewards still flow): #3 is the OpenSea sale-and-transfer test token; its vault must hold still while ownership moves.",
+    "excludeTokenIds": [
+      3
+    ],
+    "minVaultUsd8": "10000000",
+    "registry": "0x2f974396e1ddf941cF9ad866fA267bdf1df557de",
+    "brain": {
+      "dir": "./brain"
+    },
+    "_tokens": "actiunile tokenizate REALE de pe 4663, cu feed-urile Chainlink verificate on-chain (20 aug). USDG e cash-ul: fara feed, valoreaza $1.",
+    "tokens": {
+      "USDG": {
+        "address": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+        "decimals": 6,
+        "feed": null
+      },
+      "NVDA": {
+        "address": "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        "decimals": 18,
+        "feed": "0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15"
+      },
+      "TSLA": {
+        "address": "0x322F0929c4625eD5bAd873c95208D54E1c003b2d",
+        "decimals": 18,
+        "feed": "0x4A1166a659A55625345e9515b32adECea5547C38"
+      },
+      "SPY": {
+        "address": "0x117cc2133c37B721F49dE2A7a74833232B3B4C0C",
+        "decimals": 18,
+        "feed": "0x319724394D3A0e3669269846abE664Cd621f9f6A"
+      },
+      "COIN": {
+        "address": "0x6330D8C3178a418788dF01a47479c0ce7CCF450b",
+        "decimals": 18,
+        "feed": "0xA3a468A452940B7D6b69991207B508c609a98Ef2"
+      },
+      "MSTR": {
+        "address": "0xec262a75e413fAfD0dF80480274532C79D42da09",
+        "decimals": 18,
+        "feed": "0x2521a77F42098357e83bDea7fBb2A38745bf9280"
+      },
+      "PLTR": {
+        "address": "0x894E1EC2D74FFE5AEF8Dc8A9e84686acCB964F2A",
+        "decimals": 18,
+        "feed": "0x820ABedFF239034956B7A9d2F0a331f9F075eB4c"
+      },
+      "AMD": {
+        "address": "0x86923f96303D656E4aa86D9d42D1e57ad2023fdC",
+        "decimals": 18,
+        "feed": "0x943A29E7ae51A4798823ca9eEd2ed533B2A22C72"
+      }
+    },
+    "_maxDrawdownBps": "Frana de pierdere (M-2 din audit): sub 30% fata de valoarea de referinta (nav.first din registru) agentul nu mai roteste si trage siguranta o data. Plafonul zilnic margine\u0219te notionalul pe zi, nu sangerarea cumulata pe saptamani. LA ORICE ALIMENTARE a seifului se sterge nav.first, altfel depunerea apare ca profit si linia se muta singura.",
+    "maxDrawdownBps": 3000,
+    "_tightenBps": "Cat sub umplerea SIMULATA acceptam sa iasa tranzactia (M-3): podeaua de oracol e o podea, nu o tinta, si un pool care ar da mai mult are voie sa umple fix la podea. Simulam, aflam cat da de fapt, ridicam minimul. Prea strans = revert la miscari de pret intre simulare si minerit.",
+    "tightenBps": 50,
+    "_eth": "cursul ETH/USD pentru contabilitate in wei (plafoanele pe alunecare). Static, pus la go-live (20 aug: ~$2275); e o rigla de buget, nu de executie \u2014 executia se masoara contra oracolelor de stock. De improspatat cand ETH se misca mult, sau inlocuit cu feed daca apare unul pe 4663.",
+    "eth": {
+      "feed": null,
+      "usd8": "227500000000"
+    },
+    "history": {
+      "range": "1y",
+      "cacheDir": "./data/prices-live"
+    },
+    "_strategyIds": "Colectia e IMPARTITA cu harvesterul. Procesul asta e biroul modului MANUAL: doar strategiile fixate 100..107. Seifurile pe 9 sunt ale harvesterului si se sar cu motiv logat, nu ca eroare.",
+    "strategyIds": [
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107
+    ]
+  },
+  "policy": {
+    "_": "Rotatia nu se plateste singura pe loc (castigul e alpha-ul strategiei), deci mod campanie. Franele care raman tari: plafonul pe bucata si bugetul zilnic, amandoua pe ALUNECARE (cat avem voie sa pierdem fata de oracol), nu pe marfa.",
+    "mode": "campaign",
+    "profitMultiple": 1.5,
+    "minRewardWei": "0",
+    "minStakeWei": "0",
+    "requireMeasuredReward": false,
+    "requireMeasuredCost": true,
+    "maxCostPerJobWei": "50000000000000000",
+    "dailySpendBudgetWei": "150000000000000000",
+    "cooldownSec": 3600,
+    "maxJobsPerRun": 10,
+    "batchSize": 1,
+    "gasCapPerCall": "2500000",
+    "maxGasPriceWei": null,
+    "dailyGasBudgetWei": "20000000000000000",
+    "denyKeys": []
+  },
+  "execution": {
+    "dryRun": true,
+    "privateKey": "env:HARVESTER_KEY",
+    "beneficiary": null,
+    "confirmations": 1,
+    "maxFeePerGasWei": null,
+    "maxPriorityFeePerGasWei": null,
+    "killSwitchFile": "./data/STOP-trader-v3",
+    "maxConsecutiveFailures": 5,
+    "_privateKey": "Cheia harvesterului, nu TRADER_KEY: pe v3 ea e agentSigner-ul seifurilor. Cu TRADER_KEY fiecare apel ar cadea cu NotAgent().",
+    "_dryRun": "Uscat pana citim zile de jurnal, exact ca harvesterul."
+  },
+  "runner": {
+    "_": "Modul manual n-are semnal de prins la deschidere: singura munca e sa converteasca ce intra in seif catre activul fixat. O trecere la 10 minute e deja generoasa.",
+    "mode": "interval",
+    "intervalSec": 600,
+    "jitterSec": 30,
+    "pollMs": 2000,
+    "staleAfterSec": 1800,
+    "watchdogSec": 3600
+  },
+  "alerts": {
+    "telegram": {
+      "enabled": false,
+      "token": "env:TELEGRAM_TOKEN",
+      "channel": null,
+      "digestHour": 9,
+      "gasLowWei": "2000000000000000"
+    },
+    "heartbeat": {
+      "url": "env:HEARTBEAT_URL",
+      "failUrl": null,
+      "timeoutMs": 5000
+    },
+    "_ntfy": "Soneria operatorului, acelasi topic pe care tipa si Uptime Kuma. Rezumatul zilnic spune ce tine seiful si cat valoreaza; alarmele (gaz pe terminate, vault pauzat, oracol vechi in cursul saptamanii) pleaca pe loc. Un bot cu bani in mana care tace arata la fel si cand merge, si cand e blocat.",
+    "ntfy": {
+      "enabled": true,
+      "url": "env:NTFY_URL",
+      "digestHour": 9,
+      "timeoutMs": 8000
+    }
+  },
+  "api": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8812,
+    "cors": [
+      "*"
+    ],
+    "rateLimitPerMinute": 120
+  },
+  "console": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8813,
+    "token": "env:CONSOLE_TOKEN",
+    "_": "Pe loopback. Se ajunge prin tunel SSH: ssh -L 8805:127.0.0.1:8805 root@<server>, apoi http://127.0.0.1:8805/?token=<CONSOLE_TOKEN>"
+  },
+  "storage": {
+    "file": "./data/trader-v3.db",
+    "backup": {
+      "enabled": true,
+      "dir": "./data/backups",
+      "everyHours": 6,
+      "keep": 28
+    }
+  }
+}

@@ -13,12 +13,14 @@
  * trimisa, un grup intreg trecut in registru ca facut.
  */
 import { existsSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { type Account, type Address, type Hex, type PublicClient, type WalletClient } from 'viem'
 import type { Config } from './config.js'
 import type { Ledger } from './ledger/db.js'
 import type { Target, WorkItem } from './work.js'
 import { calldataFor, quote, type SingleSim } from './simulate.js'
 import { decideProfit, gasPriceAcceptable, withinDailyBudget, withinSpendBudget, type Skipped } from './policy/rules.js'
+import { withSignerLock } from './signerLock.js'
 import { log } from './log.js'
 
 export interface DoneItem {
@@ -189,18 +191,23 @@ export async function execute(input: ExecuteInput): Promise<ExecuteResult> {
     // 7. trimitere
     try {
       const t0 = Date.now()
-      const nonce = await client.getTransactionCount({ address: account.address, blockTag: 'pending' })
-      const fees = await feesOf(client, cfg, input.fees)
-
-      const hash = await wallet.sendTransaction({
-        account,
-        chain: wallet.chain,
-        to: itemTarget.address,
-        data: calldataFor(itemTarget, item),
-        value: item.valueWei,
-        nonce,
-        gas: sim.gas > 0n ? (sim.gas * 12n) / 10n : cfg.policy.gasCapPerCall,
-        ...fees
+      /* Citirea nonce-ului si trimiterea sunt UNA SINGURA fata de alte procese
+         care semneaza cu aceeasi cheie: pe colectia v3 un seif are un singur
+         `agentSigner`, deci harvesterul si trader-ul impart cheia. Lacatul NU
+         acopera si asteptarea chitantei, care n-are de ce sa blocheze pe nimeni. */
+      const hash = await withSignerLock(dirname(cfg.storage.file), account.address, async () => {
+        const nonce = await client.getTransactionCount({ address: account.address, blockTag: 'pending' })
+        const fees = await feesOf(client, cfg, input.fees)
+        return await wallet.sendTransaction({
+          account,
+          chain: wallet.chain,
+          to: itemTarget.address,
+          data: calldataFor(itemTarget, item),
+          value: item.valueWei,
+          nonce,
+          gas: sim.gas > 0n ? (sim.gas * 12n) / 10n : cfg.policy.gasCapPerCall,
+          ...fees
+        })
       })
       const signedAtMs = Date.now()
       out.txHashes.push(hash)

@@ -176,6 +176,35 @@ services:
       start_period: 20s
       retries: 3
 
+  # TRADER-V3: acelasi cod ca trader-ul, pe colectia harvesterului. Serveste
+  # seifurile FIXATE manual (strategiile 100..107), pe care harvesterul le lasa
+  # in pace. Semneaza cu HARVESTER_KEY, fiindca pe v3 ea e agentSigner-ul
+  # seifurilor si un seif are un singur semnatar; ciocnirea de nonce cu
+  # harvesterul e tinuta de lacatul pe semnatar din executor.
+  trader-v3:
+    <<: *agent
+    profiles: ["harvester"]
+    environment:
+      LOG_FORMAT: json
+      API_HOST: 0.0.0.0
+      CONSOLE_HOST: 0.0.0.0
+      TZ: Europe/Bucharest
+    ports:
+      - "127.0.0.1:8812:8812"
+      - "10.0.0.1:8812:8812"
+      - "127.0.0.1:8813:8813"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+      - ./brain:/app/brain:ro
+    command: ["start", "-c", "./config/trader-v3.json"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8812/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
   # PAYMASTER: the fleet's hands on the fee pipeline. Flushes the Treasury
   # (coin fees, ETH -> USDG -> RewardDistributor) and claims every agent's
   # share into its own vault. Its key can only pick flush timing and the price

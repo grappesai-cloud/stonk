@@ -192,6 +192,20 @@ export const TraderSchema = z.object({
    */
   excludeTokenIds: z.array(zBig).default([]),
   /**
+   * Which strategies THIS process is the desk for. Empty means "every strategy
+   * the brain has a signal for", which is the original behaviour and stays the
+   * default.
+   *
+   * It exists because a collection can be shared. On v3 the harvester runs the
+   * strategy it was built for and this process serves the manually pinned
+   * vaults beside it, on the same collection and with the same key, since a
+   * vault has exactly one agentSigner. Without this list the doctor would call
+   * a harvester vault a fatal misconfiguration - it has no signal here - when
+   * in truth it is simply not ours. Naming the split makes the runtime skip
+   * say why, and lets the doctor agree with the runtime instead of alarming.
+   */
+  strategyIds: z.array(z.number().int().min(1).max(65535)).default([]),
+  /**
    * Vaults worth less than this (USD, 8 decimals) are treated as empty. Most
    * minted vaults hold nothing until rewards flow; scanning is cheap but
    * signing dust rotations is not, and the on-chain guard would refuse a
@@ -869,7 +883,9 @@ export const trader: Job<TraderJob> = {
     }
 
     const items: WorkItem[] = []
-    const skipped = { foreign: 0, paused: 0, noSignal: 0, empty: 0, hold: 0 }
+    const skipped = { foreign: 0, paused: 0, noSignal: 0, empty: 0, hold: 0, otherDesk: 0 }
+    /* `strategyIds` empty = serve everything the brain knows; see the schema. */
+    const isOurs = (sid: number) => job.strategyIds.length === 0 || job.strategyIds.includes(sid)
 
     for (const v of scans) {
       const tag = `#${v.id}`
@@ -880,6 +896,12 @@ export const trader: Job<TraderJob> = {
       }
       if (v.paused) {
         skipped.paused++
+        continue
+      }
+      if (!isOurs(v.strategyId)) {
+        /* another desk's vault on a shared collection: not a fault, not ours */
+        skipped.otherDesk++
+        log.info({ tokenId: v.id.toString(), strategyId: v.strategyId }, `${tag} standing down - another desk serves strategy ${v.strategyId}`)
         continue
       }
       const sig = brain.SIGNALS[v.strategyId]
@@ -1149,7 +1171,7 @@ export const trader: Job<TraderJob> = {
       log.info(
         `fleet of ${scans.length}: nothing to rotate ` +
           `(${skipped.hold} holding, ${skipped.empty} empty, ${skipped.foreign} foreign key, ` +
-          `${skipped.paused} paused, ${skipped.noSignal} no strategy)`
+          `${skipped.paused} paused, ${skipped.noSignal} no strategy, ${skipped.otherDesk} another desk)`
       )
     }
     return items
@@ -1213,16 +1235,20 @@ export const trader: Job<TraderJob> = {
         fatal: ours.length === 0 && !isStranger
       })
 
-      const strategies = [...new Set(ours.map((v) => v.strategyId))]
+      /* on a shared collection, vaults belonging to another desk are not a fault */
+      const mine = ours.filter((v) => job.strategyIds.length === 0 || job.strategyIds.includes(v.strategyId))
+      const ceded = ours.length - mine.length
+      const strategies = [...new Set(mine.map((v) => v.strategyId))]
       const tradable = strategies.filter((sid) => !!brain!.SIGNALS[sid])
+      const cededNote = ceded > 0 ? `; ${ceded} vault(s) left to another desk` : ''
       checks.push({
         name: 'strategies',
         ok: strategies.length === 0 || tradable.length > 0,
         detail:
           strategies.length === 0
-            ? 'no managed vaults yet'
+            ? `no managed vaults yet${cededNote}`
             : `managed vaults run strategy ${strategies.join(', ')}; ` +
-              `${tradable.length} of ${strategies.length} have a signal implementation`,
+              `${tradable.length} of ${strategies.length} have a signal implementation${cededNote}`,
         fatal: strategies.length > 0 && tradable.length === 0
       })
 
@@ -1302,14 +1328,20 @@ export const trader: Job<TraderJob> = {
       detail: st.globallyPaused ? 'the registry is globally paused, no vault can trade' : 'off'
     })
 
-    const sig = brain.SIGNALS[st.strategyId]
+    /* A vault outside this desk's remit is not a misconfiguration: on a shared
+       collection it belongs to the process that runs its strategy. Only call it
+       fatal when this process was supposed to serve it and cannot. */
+    const cededHere = job.strategyIds.length > 0 && !job.strategyIds.includes(st.strategyId)
+    const sig = cededHere ? undefined : brain.SIGNALS[st.strategyId]
     checks.push({
       name: 'strategy',
-      ok: !!sig,
-      detail: sig
-        ? `#${st.strategyId} ${sig.name}, warmup ${sig.warmup} bars`
-        : `strategy ${st.strategyId} has no signal implementation: this vault cannot be traded by the bot`,
-      fatal: !sig
+      ok: cededHere || !!sig,
+      detail: cededHere
+        ? `NFT #${tokenId} runs strategy ${st.strategyId}, which another desk serves; this process stands down on it`
+        : sig
+          ? `#${st.strategyId} ${sig.name}, warmup ${sig.warmup} bars`
+          : `strategy ${st.strategyId} has no signal implementation: this vault cannot be traded by the bot`,
+      fatal: !cededHere && !sig
     })
     if (sig) {
       try {
